@@ -1,0 +1,66 @@
+spring:
+  application:
+    name: district-data-dashboard
+  datasource:
+    embedded-database-connection: none
+    hikari:
+      maximum-pool-size: ${DISTRICT_DB_POOL_SIZE:8}
+      minimum-idle: ${DISTRICT_DB_MIN_IDLE:2}
+      connection-timeout: ${DISTRICT_DB_CONNECTION_TIMEOUT_MS:2000}
+  jdbc:
+    template:
+      query-timeout: ${DISTRICT_DB_QUERY_TIMEOUT:5s}
+  sql:
+    init:
+      mode: never
+  flyway:
+    clean-disabled: true
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+      resolve-lazily: true
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: true
+
+server:
+  address: 127.0.0.1
+  port: ${DISTRICT_API_PORT:8080}
+  tomcat:
+    max-connections: 128
+    accept-count: 32
+    max-part-count: 4
+    threads:
+      min-spare: 4
+      max: 32
+      max-queue-capacity: 64
+  servlet:
+    session:
+      timeout: 30m
+      tracking-modes: cookie
+      cookie:
+        name: DISTRICT_SESSION
+        http-only: true
+        same-site: strict
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  server:
+    address: 127.0.0.1
+    port: ${DISTRICT_MANAGEMENT_PORT:8081}
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+mybatis-plus:
+  configuration:
+    default-statement-timeout: ${DISTRICT_MAPPER_TIMEOUT_SECONDS:5}
+  global-config:
+    banner: false
