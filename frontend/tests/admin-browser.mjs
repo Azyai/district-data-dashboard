@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { pageLayout } from './layout-check.mjs'
 
 const baseUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
 const output = process.env.E2E_ARTIFACTS
@@ -97,6 +98,17 @@ try {
   await connectAndRun(page)
   await page.getByRole('region', { name: '标准化样本预览' }).getByText('73', { exact: true }).waitFor()
   await capture(page, 'admin-source-sync.png')
+  const sourceDetail = page.getByRole('dialog', { name: '来源详情', exact: true })
+  await sourceDetail.getByRole('button', { name: '关闭', exact: true }).click()
+  await sourceDetail.waitFor({ state: 'hidden' })
+  const listAnchors = ['.admin-list', '.admin-content']
+  const sourcesLayout = await pageLayout(page, listAnchors)
+  await page.getByRole('button', { name: '查看来源 ' + sourceName, exact: true }).click()
+  await sourceDetail.getByRole('heading', { name: sourceName, exact: true }).waitFor()
+  assert.deepEqual(await pageLayout(page, listAnchors), sourcesLayout, 'Source detail should overlay the list')
+  await sourceDetail.getByRole('button', { name: '关闭', exact: true }).click()
+  await sourceDetail.waitFor({ state: 'hidden' })
+  assert.deepEqual(await pageLayout(page, listAnchors), sourcesLayout)
   console.log('PASS CSV upload, config revision, preview, sync history and dataset')
 
   await page.getByRole('link', { name: '指标目录', exact: true }).click()
@@ -118,14 +130,32 @@ try {
   await metricEditor.getByRole('button', { name: '保存草稿' }).click()
   await metricEditor.waitFor({ state: 'hidden' })
   await publish(page, metricName, 2)
+  const metricsLayout = await pageLayout(page, listAnchors)
+  await page.getByRole('button', { name: '查看口径 ' + metricName, exact: true }).click()
+  const metricDetail = page.getByRole('dialog', { name: '指标口径', exact: true })
+  await metricDetail.getByRole('link', { name: '到驾驶舱核对' }).waitFor()
+  assert.deepEqual(await pageLayout(page, listAnchors), metricsLayout, 'Metric detail should overlay the list')
   await capture(page, 'admin-metric-published.png')
 
-  await page.getByRole('link', { name: '到驾驶舱核对' }).click()
+  await metricDetail.getByRole('link', { name: '到驾驶舱核对' }).click()
   const tile = page.locator('.cockpit-metric').filter({ hasText: metricName })
   await tile.waitFor()
   await tile.getByText('73', { exact: true }).waitFor()
   await capture(page, 'admin-cockpit-verification.png')
-  console.log('PASS metric create, update, two publishes and visible cockpit value 73')
+  assert.equal(await page.locator('main .cockpit-sources').count(), 0)
+  const issueTrigger = page.getByRole('button', { name: '查看问题', exact: true })
+  const cockpitAnchors = ['.map-panel', '.cockpit-brief', '.cockpit-deck']
+  await issueTrigger.scrollIntoViewIfNeeded()
+  const cockpitLayout = await pageLayout(page, cockpitAnchors)
+  await issueTrigger.click()
+  const issues = page.getByRole('dialog', { name: '门头沟区问题诊断' })
+  const evidence = issues.getByRole('region', { name: '指标与依据' })
+  await evidence.getByText(sourceName, { exact: false }).waitFor()
+  assert.deepEqual(await pageLayout(page, cockpitAnchors), cockpitLayout, 'Evidence should overlay the cockpit')
+  await issues.getByRole('button', { name: '关闭', exact: true }).last().click()
+  await issues.waitFor({ state: 'hidden' })
+  assert.deepEqual(await pageLayout(page, cockpitAnchors), cockpitLayout)
+  console.log('PASS metric publication, visible cockpit value and evidence without page shifts')
 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(new URL('/admin/sources', baseUrl).toString())
@@ -135,6 +165,13 @@ try {
   const actionBox = await sourceAction.boundingBox()
   assert(actionBox && actionBox.x >= 0 && actionBox.x + actionBox.width <= 390, 'The source action should be reachable without horizontal scrolling')
   await capture(page, 'admin-mobile.png')
+  const mobileLayout = await pageLayout(page, listAnchors)
+  await sourceAction.click()
+  await sourceDetail.getByRole('heading', { name: sourceName, exact: true }).waitFor()
+  assert.deepEqual(await pageLayout(page, listAnchors), mobileLayout)
+  await sourceDetail.getByRole('button', { name: '关闭', exact: true }).click()
+  await sourceDetail.waitFor({ state: 'hidden' })
+  assert.deepEqual(await pageLayout(page, listAnchors), mobileLayout)
   await page.getByRole('button', { name: '退出管理' }).click()
   await page.getByRole('heading', { name: '数据管理员核验' }).waitFor()
   assert.deepEqual(errors, [])

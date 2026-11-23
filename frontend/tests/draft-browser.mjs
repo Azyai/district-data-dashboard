@@ -2,11 +2,13 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { pageLayout } from './layout-check.mjs'
 
 const baseUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
 const output = process.env.E2E_ARTIFACTS
 const route = new URL('/admin/dashboards', baseUrl).toString()
 const draftPath = '/api/v1/admin/dashboards/city-operations/draft'
+const editorAnchors = ['.designer-command', '.designer-stage', '.designer-materials', '.designer-inspector']
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE })
 
 async function capture(page, name, fullPage = false) {
@@ -77,14 +79,20 @@ try {
   await page.getByLabel('绑定指标').selectOption('active-alerts')
   await stage.getByLabel('画布缩放').selectOption('fit')
   await capture(page, 'draft-editor-desktop.png')
-  await page.getByRole('button', { name: '预览草稿', exact: true }).click()
+  const previewButton = page.getByRole('button', { name: '预览草稿', exact: true })
+  await previewButton.scrollIntoViewIfNeeded()
+  const editorLayout = await pageLayout(page, editorAnchors)
+  await previewButton.click()
   const preview = page.getByRole('region', { name: '草稿预览', exact: true })
   const card = preview.locator('.screen-component').filter({ has: page.getByRole('heading', { name: title, exact: true }) })
   await card.waitFor()
   assert.match(await card.locator('.screen-metric strong').innerText(), /\d/)
   await preview.locator('.data-chart canvas').first().waitFor()
+  assert.deepEqual(await pageLayout(page, editorAnchors), editorLayout, 'Preview should overlay the editor')
   await capture(page, 'draft-preview-desktop.png')
   await page.getByRole('button', { name: '返回编辑', exact: true }).click()
+  await preview.waitFor({ state: 'hidden' })
+  assert.deepEqual(await pageLayout(page, editorAnchors), editorLayout)
 
   const persisted = page.waitForResponse(reply => reply.request().method() === 'PUT' && reply.url().endsWith(draftPath))
   await page.getByRole('button', { name: '保存草稿', exact: true }).click()
@@ -112,10 +120,19 @@ try {
   const localTitle = title + ' 本地'
   await page.getByLabel('组件标题').fill(localTitle)
   await page.getByLabel('组件标题').press('Enter')
-  await page.getByRole('button', { name: '保存草稿', exact: true }).click()
+  const saveButton = page.getByRole('button', { name: '保存草稿', exact: true })
+  await saveButton.scrollIntoViewIfNeeded()
+  const beforeConflict = await pageLayout(page, editorAnchors)
+  await saveButton.click()
   await page.getByRole('alert').filter({ hasText: '草稿版本有更新' }).waitFor()
+  assert.deepEqual(await pageLayout(page, editorAnchors), beforeConflict, 'Conflict feedback should overlay the editor')
+  const failure = page.getByRole('dialog', { name: '保存草稿失败' })
+  await failure.getByRole('button', { name: '继续编辑', exact: true }).click()
+  await failure.waitFor({ state: 'hidden' })
+  assert.deepEqual(await pageLayout(page, editorAnchors), beforeConflict)
   await page.getByRole('button', { name: '组件 ' + localTitle, exact: true }).waitFor()
-  await page.getByRole('button', { name: '加载服务器草稿', exact: true }).click()
+  await saveButton.click()
+  await failure.getByRole('button', { name: '加载服务器草稿', exact: true }).click()
   await page.getByRole('dialog', { name: '加载服务器草稿' })
     .getByRole('button', { name: '放弃更改并加载', exact: true }).click()
   await page.getByRole('button', { name: '组件 ' + serverTitle, exact: true }).waitFor()
@@ -129,6 +146,16 @@ try {
   await phone.getByRole('region', { name: '画布', exact: true }).waitFor()
   assert.ok(await phone.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1))
   await capture(phone, 'draft-editor-mobile.png', true)
+  const mobilePreviewButton = phone.getByRole('button', { name: '预览草稿', exact: true })
+  await mobilePreviewButton.scrollIntoViewIfNeeded()
+  const mobileLayout = await pageLayout(phone, editorAnchors)
+  await mobilePreviewButton.tap()
+  const mobilePreview = phone.getByRole('region', { name: '草稿预览', exact: true })
+  await mobilePreview.waitFor()
+  assert.deepEqual(await pageLayout(phone, editorAnchors), mobileLayout)
+  await phone.getByRole('button', { name: '返回编辑', exact: true }).tap()
+  await mobilePreview.waitFor({ state: 'hidden' })
+  assert.deepEqual(await pageLayout(phone, editorAnchors), mobileLayout)
   assert.deepEqual(errors, [])
   console.log('PASS P3 draft auth, zoom/drag, resize, keyboard, undo/redo, preview, save/reload, conflict recovery and mobile layout')
 } finally {
