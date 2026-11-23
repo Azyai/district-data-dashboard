@@ -9,7 +9,7 @@ import type { AssistantReply } from '../assistant/VoiceAssistant'
 import './cockpit.css'
 
 const AreaIssuesDialog = lazy(() => import('./AreaIssuesDialog'))
-const DistrictMap = lazy(() => import('./DistrictMap'))
+const NavigationMap = lazy(() => import('./NavigationMap'))
 const TerrainView = lazy(() => import('./TerrainView'))
 const DataChart = lazy(() => import('../playback/DataChart'))
 const VoiceAssistant = lazy(() => import('../assistant/VoiceAssistant').then(module => ({ default: module.VoiceAssistant })))
@@ -250,7 +250,7 @@ function RegionMap({ area, onSelectArea }: { area: CockpitArea; onSelectArea: (a
         <div className="district-map-extent">
           <Suspense fallback={<div className="map-wait" role="status">正在加载地图</div>}>
             {showsDistrict ? (
-              <DistrictMap areas={area.children} onSelectArea={onSelectArea} fallback={terrain} />
+              <NavigationMap areas={area.children} onSelectArea={onSelectArea} fallback={terrain} />
             ) : terrain}
           </Suspense>
         </div>

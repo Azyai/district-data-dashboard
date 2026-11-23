@@ -8,12 +8,13 @@
   --amber: #ffcf91;
   --local-gutter: clamp(1rem, 2.2vw, 4.5rem);
   --panel-gap: clamp(.8rem, 1.25vw, 2rem);
+  --cockpit-font-size: 15px;
   min-height: 100svh;
   color: var(--text-main);
   background:
     radial-gradient(ellipse at 49% -17%, #203a79 0%, #14284d 31%, transparent 64%),
     var(--page-ground);
-  font-size: 15px;
+  font-size: var(--cockpit-font-size);
 }
 
 .cockpit-icon { width: 1.15em; height: 1.15em; flex: 0 0 auto; }
@@ -175,8 +176,8 @@
 .update-label { margin-left: .24em; }
 
 .cockpit-main {
-  --rail-left: clamp(11.5rem, 19%, 18em);
-  --rail-right: clamp(14rem, 24%, 20em);
+  --rail-left: clamp(11.5rem, 19%, calc(18 * var(--cockpit-font-size)));
+  --rail-right: clamp(14rem, 24%, calc(20 * var(--cockpit-font-size)));
   position: relative;
   isolation: isolate;
   display: grid;
@@ -362,6 +363,13 @@
   min-width: 0;
   min-height: 0;
 }
+
+.map-panel[data-district="true"] .district-map-extent {
+  grid-column: 1 / -1;
+  --district-map-inset-left: var(--rail-left);
+  --district-map-inset-right: var(--rail-right);
+}
+
 .map-wait { min-height: 280px; display: grid; place-items: center; color: var(--text-secondary); }
 .region-picker { position: relative; z-index: 7; }
 .region-picker > summary { list-style: none; gap: .48em; }
@@ -502,7 +510,7 @@
 .cockpit-state p { color: var(--text-secondary); }
 
 @media (min-width: 100rem) {
-  .cockpit { font-size: clamp(16px, .86vw, 31px); }
+  .cockpit { --cockpit-font-size: clamp(16px, .86vw, 31px); }
 }
 
 @media (max-width: 57rem) {
@@ -510,12 +518,16 @@
   .map-panel { grid-row: auto; grid-template-rows: auto minmax(0, 1fr); min-height: clamp(23.5rem, 54svh, 38rem); }
   .map-plot { grid-template-columns: minmax(0, 1fr); }
   .district-map-extent { grid-column: 1; }
+  .map-panel[data-district="true"] .district-map-extent {
+    --district-map-inset-left: 0px;
+    --district-map-inset-right: 0px;
+  }
   .cockpit-rail { grid-row: auto; margin: 0; }
   .cockpit-brief { grid-column: 2; }
 }
 
 @media (max-width: 56rem) {
-  .cockpit { font-size: 14px; }
+  .cockpit { --cockpit-font-size: 14px; }
   .masthead-name h1 { font-size: 1.78em; }
   .map-count { display: none; }
 }
