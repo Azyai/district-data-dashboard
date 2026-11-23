@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
+import { pageLayout } from './layout-check.mjs'
 
 const baseUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
 const browserPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
@@ -28,6 +29,20 @@ async function waitForArea(page, name) {
   await page.locator('.district-terrain .terrain-surface canvas').waitFor()
 }
 
+async function verifyRegionMenuLayout(page) {
+  const trigger = page.locator('.region-picker > summary')
+  const menu = page.getByRole('navigation', { name: '下辖区域' })
+  const anchors = ['.map-panel', '.cockpit-brief', '.cockpit-deck']
+  await trigger.scrollIntoViewIfNeeded()
+  const original = await pageLayout(page, anchors)
+  await trigger.click()
+  await menu.waitFor()
+  assert.deepEqual(await pageLayout(page, anchors), original, 'The area menu should overlay the map')
+  await trigger.press('Escape')
+  await menu.waitFor({ state: 'hidden' })
+  assert.deepEqual(await pageLayout(page, anchors), original)
+}
+
 async function verifyAs(page, name) {
   const request = page.waitForResponse(response => response.url().endsWith('/api/v1/auth/demo-session'))
   const dialog = page.getByRole('dialog', { name: '身份核验' })
@@ -47,6 +62,9 @@ try {
   await waitForArea(page, '门头沟区')
   await page.getByRole('button', { name: '身份核验' }).waitFor()
   await assertNoHorizontalOverflow(page)
+  await page.setViewportSize({ width: 1072, height: 893 })
+  await verifyRegionMenuLayout(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, 'cockpit-1440.png')
 
   if (evidence) {
@@ -121,6 +139,8 @@ try {
   await page.getByRole('link', { name: '返回门头沟区全域' }).click()
   await waitForArea(page, '门头沟区')
   await assertNoHorizontalOverflow(page)
+  await verifyRegionMenuLayout(page)
+  console.log('PASS area selector preserves the cockpit layout at 1072px and 390px')
   await capture(page, 'cockpit-mobile.png')
   await verifyAs(page, /政务服务专项/)
   await page.waitForURL('**/play/public-services')
