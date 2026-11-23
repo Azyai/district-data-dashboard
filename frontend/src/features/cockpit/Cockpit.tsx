@@ -9,6 +9,7 @@ import type { AssistantReply } from '../assistant/VoiceAssistant'
 import './cockpit.css'
 
 const AreaIssuesDialog = lazy(() => import('./AreaIssuesDialog'))
+const DistrictMap = lazy(() => import('./DistrictMap'))
 const TerrainView = lazy(() => import('./TerrainView'))
 const DataChart = lazy(() => import('../playback/DataChart'))
 const VoiceAssistant = lazy(() => import('../assistant/VoiceAssistant').then(module => ({ default: module.VoiceAssistant })))
@@ -216,8 +217,11 @@ function SignalPanel({ area, onInspect }: { area: CockpitArea; onInspect: (signa
 
 function RegionMap({ area, onSelectArea }: { area: CockpitArea; onSelectArea: (areaId: string) => void }) {
   const parent = area.breadcrumbs.at(-2)
+  const showsDistrict = area.id === district
+  const terrain = <TerrainView areaId={area.id} areaName={area.name} level={area.level}
+    areas={area.children} onSelectArea={onSelectArea} />
   return (
-    <section className="map-panel" aria-labelledby="area-map">
+    <section className="map-panel" aria-labelledby="area-map" data-district={showsDistrict}>
       <div className="map-toolbar">
         <div className="map-heading">
           <h2 id="area-map"><CockpitIcon name="layers" />空间态势</h2>
@@ -243,9 +247,13 @@ function RegionMap({ area, onSelectArea }: { area: CockpitArea; onSelectArea: (a
         </div>
       </div>
       <div className="map-plot">
-        <Suspense fallback={<div className="map-wait" role="status">正在加载地形</div>}>
-          <TerrainView areaId={area.id} areaName={area.name} level={area.level} areas={area.children} onSelectArea={onSelectArea} />
-        </Suspense>
+        <div className="district-map-extent">
+          <Suspense fallback={<div className="map-wait" role="status">正在加载地图</div>}>
+            {showsDistrict ? (
+              <DistrictMap areas={area.children} onSelectArea={onSelectArea} fallback={terrain} />
+            ) : terrain}
+          </Suspense>
+        </div>
       </div>
     </section>
   )
@@ -378,16 +386,16 @@ export default function Cockpit({ identityControl }: { identityControl: ReactNod
             <div ref={heading} className="area-focus" tabIndex={-1} aria-label={area.name}><AreaBar area={area} /></div>
 
             <div className="cockpit-main">
-              <MetricPanel metrics={metricGroups.headline} headline />
               <RegionMap area={area} onSelectArea={areaId => navigate(areaPath(areaId))} />
-              <aside className="cockpit-brief" aria-label="区域运行信息">
+              <aside className="cockpit-rail cockpit-primary" aria-label="区域指标与分布">
+                <MetricPanel metrics={metricGroups.headline} headline />
+                {area.distribution.length > 0 && <Distribution area={area} />}
+              </aside>
+              <aside className="cockpit-rail cockpit-brief" aria-label="区域运行信息">
                 <SignalPanel area={area} onInspect={openIssues} />
                 <MetricPanel metrics={metricGroups.supporting} />
+                <TrendPanel area={area} />
               </aside>
-            </div>
-            <div className="cockpit-deck" data-paired={area.distribution.length > 0}>
-              <TrendPanel area={area} />
-              {area.distribution.length > 0 && <Distribution area={area} />}
             </div>
           </>
         ) : (

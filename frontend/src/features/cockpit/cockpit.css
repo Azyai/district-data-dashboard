@@ -175,12 +175,16 @@
 .update-label { margin-left: .24em; }
 
 .cockpit-main {
+  --rail-left: clamp(11.5rem, 19%, 18em);
+  --rail-right: clamp(14rem, 24%, 20em);
+  position: relative;
+  isolation: isolate;
   display: grid;
-  grid-template-columns: minmax(13rem, .84fr) minmax(0, 2.8fr) minmax(15.8rem, 1fr);
-  gap: var(--panel-gap);
+  grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
-.key-metrics, .map-panel, .cockpit-brief, .cockpit-trend, .distribution-panel {
+.key-metrics, .map-panel, .signals-panel, .supporting-metrics, .cockpit-trend, .distribution-panel {
   min-width: 0;
   border: 1px solid var(--panel-line);
   border-radius: 12px;
@@ -188,11 +192,28 @@
   box-shadow: 0 9px 27px #03071330;
 }
 
+.cockpit-rail {
+  z-index: 2;
+  grid-row: 2;
+  align-self: start;
+  display: grid;
+  gap: var(--panel-gap);
+  min-width: 0;
+  margin: .9em .65em;
+}
+.cockpit-primary { grid-column: 1; margin-inline-start: .9em; }
+.cockpit-brief { grid-column: 3; margin-inline-end: .9em; }
+.cockpit-rail > section {
+  border-color: #355478;
+  background: linear-gradient(155deg, #182b47ed, #0c192dee 73%);
+  box-shadow: 0 .65em 1.6em #030b19a1, inset 0 1px #acdcff1b;
+  backdrop-filter: blur(9px);
+}
+
 .key-metrics {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(165deg, #142443, #0c182b 58%);
 }
 
 .metrics-heading {
@@ -221,8 +242,9 @@
 .cockpit-metric[data-metric="air-quality-rate"] { --metric-tone: #8fefdc; --metric-wash: #8fefdc12; }
 .cockpit-metric[data-metric="active-alerts"] { --metric-tone: var(--amber); --metric-wash: #ffcf9114; }
 .key-metrics .cockpit-metric {
-  min-height: 5.76em;
-  padding: .68em 1.02em .74em;
+  min-height: 5.3em;
+  gap: .25em;
+  padding: .58em 1.02em .57em;
   background: radial-gradient(ellipse at -14% 50%, var(--metric-wash), transparent 87%);
 }
 
@@ -264,6 +286,7 @@
 }
 
 .metric-reading span { color: var(--text-secondary); font-size: .8em; }
+.key-metrics .metric-reading strong { font-size: 2.58em; }
 .key-metrics .cockpit-metric[data-metric="active-alerts"] .metric-reading strong { color: var(--amber); }
 .metric-delta { color: var(--metric-tone); font-variant-numeric: tabular-nums; font-size: .76em; line-height: 1.23; }
 .metric-delta[data-flat="true"] { color: var(--text-secondary); }
@@ -272,10 +295,12 @@
 .map-panel {
   position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  min-height: clamp(26.5rem, 51svh, 70rem);
+  grid-column: 1 / -1;
+  grid-row: 1 / 3;
+  grid-template-rows: subgrid;
+  min-height: max(39em, calc(100svh - 9.65em));
   border-color: #395b8a;
-  background: linear-gradient(142deg, #152a4b, #101d32 65%);
+  background: #0a1728;
   box-shadow: 0 12px 30px #03071152;
 }
 
@@ -292,6 +317,8 @@
 }
 
 .map-toolbar {
+  position: relative;
+  z-index: 4;
   display: flex;
   min-height: 3.75em;
   align-items: center;
@@ -300,7 +327,7 @@
   padding: .56em 1em;
   border-bottom: 1px solid #324c70;
   border-radius: 11px 11px 0 0;
-  background: linear-gradient(100deg, #1732528c, #111e3400 70%);
+  background: linear-gradient(100deg, #192f4a, #101c30 75%);
 }
 
 .map-heading { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .72em; min-width: 0; }
@@ -319,13 +346,22 @@
 .map-actions .cockpit-icon { color: #a3e5fb; }
 .map-plot {
   display: grid;
-  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  grid-template: minmax(0, 1fr) / var(--rail-left) minmax(0, 1fr) var(--rail-right);
   min-height: 0;
   overflow: hidden;
   border-radius: 0 0 11px 11px;
+  background:
+    radial-gradient(ellipse at 50% 44%, #162f4b, #0b182c 64%, #081423),
+    #0b182c;
 }
 
-.map-plot > * { min-width: 0; }
+.district-map-extent {
+  grid-column: 2;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
 .map-wait { min-height: 280px; display: grid; place-items: center; color: var(--text-secondary); }
 .region-picker { position: relative; z-index: 7; }
 .region-picker > summary { list-style: none; gap: .48em; }
@@ -374,14 +410,6 @@
 .map-directory a:hover, .map-directory a:focus-visible { color: #e7f9ff; background: #234269; }
 .map-directory a:focus-visible { outline-offset: -2px; }
 
-.cockpit-brief {
-  display: flex;
-  flex-direction: column;
-  gap: .92em;
-  padding: 1.02em 1em;
-  background: linear-gradient(148deg, #142642, #0d192d 62%);
-}
-
 .brief-bar, .trend-heading { display: flex; align-items: center; justify-content: space-between; gap: .55em; }
 .attention-count {
   color: var(--amber);
@@ -394,7 +422,8 @@
   white-space: nowrap;
 }
 
-.signals { list-style: none; padding: 0; margin: .65em 0 .4em; }
+.signals-panel { padding: .85em .92em; }
+.signals { list-style: none; padding: 0; margin: .65em 0 .4em; max-height: 10em; overflow-y: auto; }
 .signals li + li { margin-top: .4em; }
 .signal-title {
   display: grid;
@@ -421,7 +450,7 @@
 .issue-link { color: var(--panel-accent); font-size: .81em; min-height: 2.6em; }
 .issue-link .cockpit-icon { width: 1.05em; height: 1.05em; }
 
-.supporting-metrics { padding-top: .92em; border-top: 1px solid var(--panel-line); }
+.supporting-metrics { padding: .82em .92em .45em; }
 .supporting-metrics .brief-heading { font-size: .96em; }
 .supporting-metrics .cockpit-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -439,16 +468,14 @@
 .supporting-metrics .metric-delta { font-size: .72em; }
 .supporting-metrics dt { font-size: .79em; }
 
-.cockpit-deck { display: grid; gap: var(--panel-gap); margin-top: var(--panel-gap); }
-.cockpit-deck[data-paired="true"] { grid-template-columns: minmax(0, 2.8fr) minmax(15.8rem, 1fr); }
 .cockpit-trend {
   display: flex;
   flex-direction: column;
-  min-height: clamp(11rem, 21svh, 32rem);
-  background: radial-gradient(ellipse at 75% 110%, #21366080, transparent 67%), #0e1b31;
+  block-size: 12.4em;
 }
 
-.trend-heading { padding: .76em 1.04em .26em; }
+.trend-heading { flex-wrap: wrap; padding: .76em .92em .35em; }
+.trend-heading h2 { font-size: .96em; }
 .trend-heading span {
   color: var(--text-secondary);
   font-size: .78em;
@@ -460,11 +487,11 @@
   white-space: nowrap;
 }
 
-.cockpit-trend[data-empty="true"] { min-height: 0; }
+.cockpit-trend[data-empty="true"] { block-size: auto; }
 .trend-empty { padding: .5em 1.05em .9em; color: var(--text-secondary); font-size: .84em; }
-.cockpit-trend .data-chart { flex: 1; min-height: 8.7em; }
+.cockpit-trend .data-chart { flex: 1; min-height: 0; }
 .distribution-panel { padding: .8em .95em; }
-.distribution-list { list-style: none; display: grid; align-content: start; gap: .54em; padding: 0; margin: .7em 0 0; }
+.distribution-list { list-style: none; display: grid; align-content: start; gap: .54em; padding: 0; margin: .7em 0 0; max-height: 14em; overflow-y: auto; }
 .distribution-list li { display: grid; grid-template-columns: minmax(4em, auto) 1fr 3.2em; gap: .6em; align-items: center; font-size: .81em; }
 .distribution-list strong { text-align: right; font-variant-numeric: tabular-nums; font-size: .96em; }
 .distribution-track { height: .4em; background: #283e5d; border-radius: 3px; overflow: hidden; }
@@ -475,20 +502,16 @@
 .cockpit-state p { color: var(--text-secondary); }
 
 @media (min-width: 100rem) {
-  .cockpit { font-size: clamp(16px, 1vw, 31px); }
-  .cockpit-main { grid-template-columns: minmax(13.8em, .84fr) minmax(0, 2.8fr) minmax(16.6em, 1fr); }
+  .cockpit { font-size: clamp(16px, .86vw, 31px); }
 }
 
-@media (max-width: 72rem) {
-  .cockpit-main, .cockpit-deck[data-paired="true"] { grid-template-columns: minmax(0, 2.35fr) minmax(14.6rem, 1fr); }
-  .key-metrics { grid-column: 1 / -1; }
-  .key-metrics .cockpit-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .metrics-heading { padding: .7em .93em 0; }
-  .key-metrics .cockpit-metric { padding: .48em .88em .68em; min-height: 5em; }
-  .key-metrics .cockpit-metric + .cockpit-metric { border-left: 1px solid var(--panel-line); border-top: 0; }
-  .key-metrics .metric-reading strong { font-size: 2.26em; }
-  .map-panel { min-height: clamp(23.3rem, 42svh, 36rem); }
-  .cockpit-trend { min-height: clamp(10.3rem, 20svh, 29rem); }
+@media (max-width: 57rem) {
+  .cockpit-main { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; gap: var(--panel-gap); }
+  .map-panel { grid-row: auto; grid-template-rows: auto minmax(0, 1fr); min-height: clamp(23.5rem, 54svh, 38rem); }
+  .map-plot { grid-template-columns: minmax(0, 1fr); }
+  .district-map-extent { grid-column: 1; }
+  .cockpit-rail { grid-row: auto; margin: 0; }
+  .cockpit-brief { grid-column: 2; }
 }
 
 @media (max-width: 56rem) {
@@ -504,18 +527,18 @@
   .cockpit-actions { justify-content: flex-start; }
   .area-bar { min-height: 3.25em; gap: .45em; }
   .area-meta { gap: .46em; }
-  .cockpit-main, .cockpit-deck[data-paired="true"] { grid-template-columns: minmax(0, 1fr); }
+  .cockpit-main { grid-template-columns: minmax(0, 1fr); }
+  .cockpit-rail { grid-column: 1; }
   .key-metrics .cockpit-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .key-metrics .cockpit-metric { min-height: 5.35em; }
+  .key-metrics .cockpit-metric:nth-child(-n+2) { border-top: 0; }
   .key-metrics .cockpit-metric:nth-child(odd) { border-left: 0; }
   .key-metrics .cockpit-metric:nth-child(n+3) { border-top: 1px solid var(--panel-line); }
   .map-panel { min-height: 24rem; }
   .map-toolbar { padding-inline: .8em; }
   .map-plot { min-height: 18rem; }
-  .cockpit-brief { padding-inline: .9em; }
   .supporting-metrics .cockpit-metrics { max-height: none; }
   .supporting-metrics .cockpit-metric { padding-block: .55em; }
-  .cockpit-trend { min-height: 11.2rem; }
 }
 
 @media (pointer: coarse) {
