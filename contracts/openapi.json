@@ -1,0 +1,2990 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "区政府数字大屏演示 API",
+    "version": "0.1.0",
+    "description": "P1 平台底座演示契约，使用合成身份和合成业务数据。"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "security": [
+    {
+      "sessionCookie": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "identity",
+      "description": "演示会话及身份"
+    },
+    {
+      "name": "projects",
+      "description": "授权内项目推荐"
+    },
+    {
+      "name": "playback",
+      "description": "播放清单与快照查询"
+    },
+    {
+      "name": "cockpit",
+      "description": "门头沟区、镇街、村社三级演示总览"
+    },
+    {
+      "name": "sources",
+      "description": "数据来源、连接、同步与数据集"
+    },
+    {
+      "name": "metrics",
+      "description": "指标版本和发布"
+    }
+  ],
+  "paths": {
+    "/api/v1/auth/csrf": {
+      "get": {
+        "operationId": "getCsrfToken",
+        "summary": "领取当前会话的 CSRF 令牌",
+        "tags": [
+          "identity"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CsrfToken"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/demo-session": {
+      "post": {
+        "operationId": "createDemoSession",
+        "summary": "建立或切换演示身份",
+        "tags": [
+          "identity"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemoSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CurrentIdentity"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "summary": "结束演示会话",
+        "tags": [
+          "identity"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "operationId": "getCurrentIdentity",
+        "summary": "查询当前身份",
+        "tags": [
+          "identity"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CurrentIdentity"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/recommendations": {
+      "get": {
+        "operationId": "getRecommendations",
+        "summary": "返回授权范围内的推荐项目",
+        "tags": [
+          "projects"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProjectSummary"
+                      },
+                      "maxItems": 50,
+                      "minItems": 0
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/playback/{projectId}/manifest": {
+      "get": {
+        "operationId": "getManifest",
+        "summary": "读取项目生效播放清单",
+        "tags": [
+          "playback"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Manifest"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/playback/{projectId}/component-queries": {
+      "post": {
+        "operationId": "queryComponents",
+        "summary": "批量读取绑定组件的模拟快照",
+        "tags": [
+          "playback"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchQueryRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BatchQueryResult"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/cockpit/areas/{areaId}": {
+      "get": {
+        "operationId": "getCockpitArea",
+        "summary": "读取当前行政层级的合成驾驶舱快照",
+        "description": "仅演示模式开放，所有业务数值和地形节点坐标均为合成，不包含内部数据。",
+        "tags": [
+          "cockpit"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "areaId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "返回当前区域与下级导航",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CockpitArea"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources": {
+      "get": {
+        "operationId": "listSources",
+        "summary": "列出数据来源",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SourceRecord"
+                      }
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createSource",
+        "summary": "新建来源配置",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SourceRecord"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources/{id}": {
+      "put": {
+        "operationId": "updateSource",
+        "summary": "按版本更新来源",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SourceRecord"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AdminId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SourceInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/sources/{id}/connection-tests": {
+      "post": {
+        "operationId": "testSource",
+        "summary": "测试连接并预览标准化字段",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/ConnectionTest"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AdminId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/sources/{id}/sync-runs": {
+      "get": {
+        "operationId": "listSyncRuns",
+        "summary": "查询来源的同步批次",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/SyncRun"
+                      }
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AdminId"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "syncSource",
+        "summary": "拉取并校验数据批次",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SyncRun"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AdminId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncRunInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/source-assets": {
+      "post": {
+        "operationId": "uploadSourceAsset",
+        "summary": "上传 CSV 演示文件",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SourceAsset"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/source-options": {
+      "get": {
+        "operationId": "getSourceOptions",
+        "summary": "读取已登记的地址和连接引用",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/SourceOptions"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metrics": {
+      "get": {
+        "operationId": "listMetrics",
+        "summary": "查询指标草稿和生效版",
+        "tags": [
+          "metrics"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/MetricRecord"
+                      }
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createMetric",
+        "summary": "建立指标草稿",
+        "tags": [
+          "metrics"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MetricRecord"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metrics/{id}": {
+      "put": {
+        "operationId": "updateMetric",
+        "summary": "按版本更新指标草稿",
+        "tags": [
+          "metrics"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MetricRecord"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AdminId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MetricInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/metrics/{id}/publish": {
+      "post": {
+        "operationId": "publishMetric",
+        "summary": "从成功数据集验证并发布指标",
+        "tags": [
+          "metrics"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/MetricRecord"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AdminId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/sources/{id}/dataset": {
+      "get": {
+        "operationId": "getSourceDataset",
+        "summary": "返回来源最新成功的数据集摘要",
+        "tags": [
+          "sources"
+        ],
+        "description": "仅有数据管理权限的演示会话可操作。",
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DatasetSummary"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          },
+          "422": {
+            "$ref": "#/components/responses/Http422"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AdminId"
+          }
+        ]
+      }
+    },
+    "/api/v1/cockpit/locations": {
+      "get": {
+        "operationId": "getCockpitLocations",
+        "summary": "读取驾驶舱可下钻区域目录",
+        "description": "用于站内导航与区域咨询的演示区划目录。",
+        "tags": [
+          "cockpit"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "按先父后子返回区域和父级关系",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CockpitDirectoryEntry"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "ProjectId": {
+        "name": "projectId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        }
+      },
+      "CsrfHeader": {
+        "name": "X-CSRF-TOKEN",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "从当前会话的 CSRF 接口取得"
+      },
+      "AdminId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "当前配置的版本号"
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "description": "安全重试的操作标识"
+      }
+    },
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "DISTRICT_SESSION"
+      }
+    },
+    "schemas": {
+      "Persona": {
+        "type": "string",
+        "enum": [
+          "district",
+          "service",
+          "data-admin"
+        ]
+      },
+      "Theme": {
+        "type": "string",
+        "enum": [
+          "city",
+          "services"
+        ]
+      },
+      "CsrfToken": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "headerName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "headerName"
+        ],
+        "additionalProperties": false
+      },
+      "DemoSessionRequest": {
+        "type": "object",
+        "properties": {
+          "persona": {
+            "$ref": "#/components/schemas/Persona"
+          }
+        },
+        "required": [
+          "persona"
+        ],
+        "additionalProperties": false
+      },
+      "CurrentIdentity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "department": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "demo"
+            ]
+          },
+          "defaultProjectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "landingPath": {
+            "type": "string",
+            "pattern": "^/(admin|play/[a-z][a-z0-9-]{0,63})?$",
+            "description": "常规身份保持驾驶舱，专项路由为服务端授权的站内播放入口。"
+          }
+        },
+        "required": [
+          "id",
+          "displayName",
+          "department",
+          "roles",
+          "permissions",
+          "mode",
+          "defaultProjectId",
+          "landingPath"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "theme": {
+            "$ref": "#/components/schemas/Theme"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "PERSONAL_DEFAULT",
+              "AUTHORIZED_PROJECT"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "theme",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "Manifest": {
+        "$ref": "./schemas/dashboard-manifest.schema.json"
+      },
+      "BatchQueryRequest": {
+        "type": "object",
+        "properties": {
+          "releaseId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "componentIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "releaseId",
+          "componentIds"
+        ],
+        "additionalProperties": false
+      },
+      "DataPoint": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "ComponentResult": {
+        "type": "object",
+        "properties": {
+          "componentId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "metricId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "points": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DataPoint"
+            },
+            "maxItems": 100,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "componentId",
+          "metricId",
+          "unit"
+        ],
+        "additionalProperties": false
+      },
+      "BatchQueryResult": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "releaseId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "snapshotId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "SIMULATED"
+            ]
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ComponentResult"
+            },
+            "maxItems": 20,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "projectId",
+          "releaseId",
+          "snapshotId",
+          "updatedAt",
+          "quality",
+          "results"
+        ],
+        "additionalProperties": false
+      },
+      "ErrorBody": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "AUTH_REQUIRED",
+              "ACCESS_DENIED",
+              "CSRF_INVALID",
+              "INVALID_REQUEST",
+              "PROJECT_NOT_FOUND",
+              "RELEASE_CONFLICT",
+              "NOT_FOUND",
+              "INTERNAL_ERROR",
+              "VERSION_CONFLICT",
+              "ALREADY_EXISTS",
+              "DATASET_REQUIRED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "data"
+        ],
+        "additionalProperties": false
+      },
+      "CockpitLevel": {
+        "type": "string",
+        "enum": [
+          "district",
+          "town",
+          "village"
+        ]
+      },
+      "CockpitLocation": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "level"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "$ref": "#/components/schemas/CockpitLevel"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CockpitChild": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "level",
+          "x",
+          "z"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "$ref": "#/components/schemas/CockpitLevel"
+          },
+          "x": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "z": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "CockpitMetric": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "value",
+          "unit",
+          "delta",
+          "series"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unit": {
+            "type": "string"
+          },
+          "delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "maxItems": 31
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "READY",
+              "NO_DATA"
+            ]
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/MetricEvidence"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CockpitPoint": {
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "properties": {
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CockpitSignal": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "detail",
+          "status",
+          "time"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "detail": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "attention",
+              "normal"
+            ]
+          },
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CockpitArea": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "level",
+          "breadcrumbs",
+          "children",
+          "updatedAt",
+          "quality",
+          "metrics",
+          "trend",
+          "distribution",
+          "signals"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "$ref": "#/components/schemas/CockpitLevel"
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CockpitLocation"
+            },
+            "maxItems": 3
+          },
+          "children": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CockpitChild"
+            },
+            "maxItems": 500
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "SIMULATED"
+            ]
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CockpitMetric"
+            },
+            "maxItems": 24
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CockpitPoint"
+            },
+            "maxItems": 31
+          },
+          "distribution": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CockpitPoint"
+            },
+            "maxItems": 24
+          },
+          "signals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CockpitSignal"
+            },
+            "maxItems": 30
+          }
+        },
+        "additionalProperties": false
+      },
+      "MetricEvidence": {
+        "type": "object",
+        "properties": {
+          "sourceId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "sourceName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "measure": {
+            "type": "string"
+          },
+          "batchId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "observedOn": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sourceId",
+          "sourceName",
+          "measure",
+          "batchId",
+          "version",
+          "updatedAt",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "SourceType": {
+        "type": "string",
+        "enum": [
+          "HTTPS_JSON",
+          "MYSQL_VIEW",
+          "CSV"
+        ]
+      },
+      "SourceConfig": {
+        "type": "object",
+        "properties": {
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uri"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "connectionRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "viewRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assetRef": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "FieldMapping": {
+        "type": "object",
+        "properties": {
+          "region": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "measure": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "denominator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "region",
+          "date",
+          "measure",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "SourceInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "type": {
+            "$ref": "#/components/schemas/SourceType"
+          },
+          "config": {
+            "$ref": "#/components/schemas/SourceConfig"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/FieldMapping"
+          },
+          "refreshMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1440
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "config",
+          "mapping",
+          "refreshMinutes"
+        ],
+        "additionalProperties": false
+      },
+      "SourceAsset": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fileName": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "fileName",
+          "sizeBytes",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "SourceOptions": {
+        "type": "object",
+        "properties": {
+          "httpsEndpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "endpoint": {
+                  "type": "string",
+                  "format": "uri"
+                }
+              },
+              "required": [
+                "label",
+                "endpoint"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "mysqlConnections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                },
+                "label": {
+                  "type": "string",
+                  "maxLength": 120
+                },
+                "views": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                      },
+                      "label": {
+                        "type": "string",
+                        "maxLength": 120
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "views"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "httpsEndpoints",
+          "mysqlConnections"
+        ],
+        "additionalProperties": false
+      },
+      "NormalizedObservation": {
+        "type": "object",
+        "properties": {
+          "regionId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "observedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "measure": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "denominator": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "regionId",
+          "observedOn",
+          "measure",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "ConnectionTest": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "PASSED",
+              "FAILED"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "preview": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/NormalizedObservation"
+            }
+          },
+          "totalRows": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rejectedRows": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "status",
+          "message",
+          "fields",
+          "preview",
+          "totalRows",
+          "rejectedRows"
+        ],
+        "additionalProperties": false
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "RUNNING",
+          "SUCCEEDED",
+          "FAILED",
+          "REJECTED"
+        ]
+      },
+      "SyncRunInput": {
+        "type": "object",
+        "properties": {
+          "retryOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [],
+        "additionalProperties": false
+      },
+      "SyncRun": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "trigger": {
+            "type": "string",
+            "enum": [
+              "MANUAL",
+              "SCHEDULED",
+              "RETRY"
+            ]
+          },
+          "retryOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "batchId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rowsRead": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rowsAccepted": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "rowsRejected": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "sourceId",
+          "status",
+          "trigger",
+          "retryOf",
+          "batchId",
+          "startedAt",
+          "finishedAt",
+          "rowsRead",
+          "rowsAccepted",
+          "rowsRejected",
+          "message"
+        ],
+        "additionalProperties": false
+      },
+      "DatasetSummary": {
+        "type": "object",
+        "properties": {
+          "batchId": {
+            "type": "string"
+          },
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "rowCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "measures": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "batchId",
+          "syncedAt",
+          "rowCount",
+          "measures"
+        ],
+        "additionalProperties": false
+      },
+      "MetricInput": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "sourceId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "measure": {
+            "type": "string"
+          },
+          "aggregation": {
+            "type": "string",
+            "enum": [
+              "SUM",
+              "RATE"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "unit",
+          "sourceId",
+          "measure",
+          "aggregation",
+          "description"
+        ],
+        "additionalProperties": false
+      },
+      "PublishedMetric": {
+        "type": "object",
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/MetricInput"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "definition",
+          "version",
+          "publishedAt"
+        ],
+        "additionalProperties": false
+      },
+      "MetricRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "draft": {
+            "$ref": "#/components/schemas/MetricInput"
+          },
+          "published": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PublishedMetric"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "draft",
+          "published"
+        ],
+        "additionalProperties": false
+      },
+      "SourceRecord": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "type": {
+            "$ref": "#/components/schemas/SourceType"
+          },
+          "config": {
+            "$ref": "#/components/schemas/SourceConfig"
+          },
+          "mapping": {
+            "$ref": "#/components/schemas/FieldMapping"
+          },
+          "refreshMinutes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1440
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastSuccessBatchId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastSuccessfulAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastSyncStatus": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "config",
+          "mapping",
+          "refreshMinutes",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "lastSuccessBatchId",
+          "lastSuccessfulAt",
+          "lastSyncStatus"
+        ],
+        "additionalProperties": false
+      },
+      "CockpitDirectoryEntry": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "level",
+          "parentId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "level": {
+            "$ref": "#/components/schemas/CockpitLevel"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "本次请求的追踪标识",
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "responses": {
+      "Http500": {
+        "description": "服务暂时不可用",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        }
+      },
+      "Http400": {
+        "description": "请求不符合契约",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        }
+      },
+      "Http403": {
+        "description": "授权或 CSRF 检验失败",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        }
+      },
+      "Http401": {
+        "description": "需要有效会话",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        }
+      },
+      "Http404": {
+        "description": "项目或路径不存在",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        }
+      },
+      "Http409": {
+        "description": "播放发布版本已变化",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        }
+      },
+      "Http422": {
+        "description": "缺少可用的已同步数据",
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorBody"
+            }
+          }
+        }
+      }
+    }
+  }
+}

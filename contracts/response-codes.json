@@ -1,0 +1,74 @@
+[
+  {
+    "name": "OK",
+    "code": "0",
+    "httpStatus": 200,
+    "message": "success"
+  },
+  {
+    "name": "AUTH_REQUIRED",
+    "code": "AUTH_REQUIRED",
+    "httpStatus": 401,
+    "message": "请先建立演示会话"
+  },
+  {
+    "name": "ACCESS_DENIED",
+    "code": "ACCESS_DENIED",
+    "httpStatus": 403,
+    "message": "当前身份无权执行此操作"
+  },
+  {
+    "name": "CSRF_INVALID",
+    "code": "CSRF_INVALID",
+    "httpStatus": 403,
+    "message": "会话验证已失效，请刷新后重试"
+  },
+  {
+    "name": "INVALID_REQUEST",
+    "code": "INVALID_REQUEST",
+    "httpStatus": 400,
+    "message": "请求格式有误，请检查后重试"
+  },
+  {
+    "name": "PROJECT_NOT_FOUND",
+    "code": "PROJECT_NOT_FOUND",
+    "httpStatus": 404,
+    "message": "项目不存在或当前身份不可见"
+  },
+  {
+    "name": "RELEASE_CONFLICT",
+    "code": "RELEASE_CONFLICT",
+    "httpStatus": 409,
+    "message": "播放版本已更新，请重新加载"
+  },
+  {
+    "name": "NOT_FOUND",
+    "code": "NOT_FOUND",
+    "httpStatus": 404,
+    "message": "请求地址不存在"
+  },
+  {
+    "name": "INTERNAL_ERROR",
+    "code": "INTERNAL_ERROR",
+    "httpStatus": 500,
+    "message": "服务暂不可用，请稍后重试"
+  },
+  {
+    "name": "VERSION_CONFLICT",
+    "code": "VERSION_CONFLICT",
+    "httpStatus": 409,
+    "message": "配置版本已更新，请重新加载后再提交"
+  },
+  {
+    "name": "ALREADY_EXISTS",
+    "code": "ALREADY_EXISTS",
+    "httpStatus": 409,
+    "message": "此编号已存在，请使用其他编号"
+  },
+  {
+    "name": "DATASET_REQUIRED",
+    "code": "DATASET_REQUIRED",
+    "httpStatus": 422,
+    "message": "当前没有符合指标口径的成功数据批次"
+  }
+]
