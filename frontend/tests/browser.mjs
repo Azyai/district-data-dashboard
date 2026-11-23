@@ -26,13 +26,39 @@ async function waitForArea(page, name) {
   const area = page.getByRole('navigation', { name: '区域层级' })
   await area.locator('[aria-current="page"]').filter({ hasText: name }).waitFor()
   await page.getByRole('heading', { name: '空间态势' }).waitFor()
-  await page.locator('.district-terrain .terrain-surface canvas').waitFor()
+  await page.locator(name === '门头沟区' ? '.district-map > canvas' : '.terrain-surface canvas').waitFor()
+}
+
+async function verifyDistrictMap(page, stacked = false) {
+  const map = page.locator('.district-map')
+  const attribution = map.getByRole('link', { name: '© OpenStreetMap contributors' })
+  assert.equal(await attribution.getAttribute('href'), 'https://www.openstreetmap.org/copyright')
+  await map.getByRole('button', { name: '放大地图', exact: true }).click()
+  assert.equal(await map.getAttribute('data-zoomed'), 'true')
+  await map.getByRole('button', { name: '全域', exact: true }).click()
+  assert.equal(await map.getAttribute('data-zoomed'), 'false')
+
+  const layout = await page.evaluate(() => {
+    const bounds = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON()
+    return {
+      stage: bounds('.map-panel'), map: bounds('.district-map-extent'),
+      left: bounds('.cockpit-primary'), right: bounds('.cockpit-brief'),
+    }
+  })
+  if (stacked) {
+    assert.ok(layout.stage.bottom <= layout.left.top && layout.left.bottom <= layout.right.top, 'The map leads the mobile layout')
+  } else {
+    assert.ok(layout.left.right <= layout.map.left && layout.map.right <= layout.right.left, 'Desktop panels clear the map')
+    for (const rail of [layout.left, layout.right]) {
+      assert.ok(rail.top >= layout.stage.top && rail.bottom <= layout.stage.bottom, 'Panels float within the stage')
+    }
+  }
 }
 
 async function verifyRegionMenuLayout(page) {
   const trigger = page.locator('.region-picker > summary')
   const menu = page.getByRole('navigation', { name: '下辖区域' })
-  const anchors = ['.map-panel', '.cockpit-brief', '.cockpit-deck']
+  const anchors = ['.map-panel', '.cockpit-primary', '.cockpit-brief', '.cockpit-trend']
   await trigger.scrollIntoViewIfNeeded()
   const original = await pageLayout(page, anchors)
   await trigger.click()
@@ -63,6 +89,7 @@ try {
   await page.getByRole('button', { name: '身份核验' }).waitFor()
   await assertNoHorizontalOverflow(page)
   await page.setViewportSize({ width: 1072, height: 893 })
+  await verifyDistrictMap(page)
   await verifyRegionMenuLayout(page)
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, 'cockpit-1440.png')
@@ -139,8 +166,9 @@ try {
   await page.getByRole('link', { name: '返回门头沟区全域' }).click()
   await waitForArea(page, '门头沟区')
   await assertNoHorizontalOverflow(page)
+  await verifyDistrictMap(page, true)
   await verifyRegionMenuLayout(page)
-  console.log('PASS area selector preserves the cockpit layout at 1072px and 390px')
+  console.log('PASS offline district map, zoom/reset and stable panel layout at 1072px and 390px')
   await capture(page, 'cockpit-mobile.png')
   await verifyAs(page, /政务服务专项/)
   await page.waitForURL('**/play/public-services')

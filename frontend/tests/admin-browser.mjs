@@ -144,7 +144,7 @@ try {
   await capture(page, 'admin-cockpit-verification.png')
   assert.equal(await page.locator('main .cockpit-sources').count(), 0)
   const issueTrigger = page.getByRole('button', { name: '查看问题', exact: true })
-  const cockpitAnchors = ['.map-panel', '.cockpit-brief', '.cockpit-deck']
+  const cockpitAnchors = ['.map-panel', '.cockpit-primary', '.cockpit-brief', '.cockpit-trend']
   await issueTrigger.scrollIntoViewIfNeeded()
   const cockpitLayout = await pageLayout(page, cockpitAnchors)
   await issueTrigger.click()
