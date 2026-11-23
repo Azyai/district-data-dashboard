@@ -17,6 +17,44 @@ const client = new QueryClient({
   },
 })
 
+const districtTheme = {
+  algorithm: theme.darkAlgorithm,
+  token: {
+    colorPrimary: '#315ce0',
+    colorPrimaryHover: '#3b64e5',
+    colorPrimaryActive: '#274abd',
+    colorLink: '#8cddff',
+    colorLinkHover: '#b1eaff',
+    colorInfo: '#70dfff',
+    colorSuccess: '#62d9ae',
+    colorWarning: '#ffd78f',
+    colorError: '#ffaaa4',
+    colorText: '#eff6ff',
+    colorTextSecondary: '#aabbcf',
+    colorTextPlaceholder: '#859ab6',
+    colorBgBase: '#080f1c',
+    colorBgContainer: '#101e33',
+    colorBgElevated: '#101d31',
+    colorBorder: '#385475',
+    colorBorderSecondary: '#253954',
+    colorBgMask: 'rgba(3, 8, 17, .74)',
+    controlHeight: 40,
+    controlHeightLG: 46,
+    borderRadius: 9,
+    borderRadiusLG: 14,
+    fontFamily: 'system-ui, "Microsoft YaHei UI", "PingFang SC", sans-serif',
+  },
+  components: {
+    Button: {
+      defaultBg: '#15243b',
+      defaultHoverBg: '#1a304f',
+      defaultHoverBorderColor: '#73b7fe',
+      defaultHoverColor: '#eff6ff',
+      primaryShadow: '0 3px 12px rgba(18, 56, 176, .38)',
+    },
+  },
+}
+
 function Loading() {
   return <main className="center-state" aria-busy="true"><Spin /><span>正在加载页面</span></main>
 }
@@ -24,18 +62,7 @@ function Loading() {
 export function App() {
   return (
     <StyleProvider layer>
-      <ConfigProvider locale={zhCN} theme={{
-        algorithm: theme.darkAlgorithm,
-        token: {
-          colorPrimary: '#78bfff',
-          colorText: '#edf6ff',
-          colorBgBase: '#08142a',
-          colorBgContainer: '#0e203f',
-          colorBorder: '#355687',
-          borderRadius: 4,
-          fontFamily: 'system-ui, "Microsoft YaHei", sans-serif',
-        },
-      }}>
+      <ConfigProvider locale={zhCN} theme={districtTheme}>
         <QueryClientProvider client={client}>
           <BrowserRouter>
             <Session>

@@ -16,8 +16,9 @@ function PersonaOption({ title, description, persona, active, submit }: {
   submit: (persona: DemoPersona) => void
 }) {
   return (
-    <Button className="persona" disabled={active !== undefined && active !== persona}
+    <Button className="persona" data-persona={persona} disabled={active !== undefined && active !== persona}
       loading={active === persona} onClick={() => submit(persona)} block>
+      <span className="persona-glyph" aria-hidden="true" />
       <span className="persona-text"><strong>{title}</strong><small>{description}</small></span>
     </Button>
   )
@@ -85,7 +86,7 @@ export function Session({ children }: { children: (state: SessionState) => React
   const busy = login.isPending || logout.isPending
   const active = login.isPending ? login.variables : undefined
   const error = login.error ?? logout.error
-  const control = <Button className="identity-button" onClick={() => setOpen(true)}>
+  const control = <Button className="identity-button" data-verified={!!current} aria-haspopup="dialog" onClick={() => setOpen(true)}>
     {current ? current.displayName : '身份核验'}
   </Button>
 
@@ -108,10 +109,12 @@ export function Session({ children }: { children: (state: SessionState) => React
         signInForAdministration: () => login.mutate('data-admin'),
         signOut: () => logout.mutate(),
       })}
-      <Modal className="identity-dialog" title="身份核验" open={open} onCancel={close} footer={null}
+      <Modal className="identity-dialog" title="身份核验" centered open={open} onCancel={close} footer={null}
         mask={{ closable: !busy }} keyboard={!busy} closable={!busy} width="min(30rem, calc(100vw - 2rem))">
-        <p className="muted">演示核验</p>
-        {current && <p className="session-current">当前身份 <strong>{current.displayName}</strong></p>}
+        <div className="session-summary">
+          <p className="status-mark">演示核验</p>
+          {current && <p className="session-current">当前身份 <strong>{current.displayName}</strong></p>}
+        </div>
         <div className="identity-options">
           <PersonaOption title="常规身份" description="继续查看当前区域" persona="district" active={active} submit={login.mutate} />
           <PersonaOption title="政务服务专项" description="进入已授权的政务服务专题" persona="service" active={active} submit={login.mutate} />
