@@ -65,7 +65,7 @@
 .designer-actions { display: flex; gap: .5rem; margin-inline-start: auto; }
 .designer-actions .ant-btn { white-space: nowrap; }
 
-.designer-state, .designer-conflict {
+.designer-state {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -77,16 +77,6 @@
   color: var(--design-muted);
 }
 
-.designer-conflict {
-  margin-block-end: .75rem;
-  background: #29251f;
-  border-color: #72593b;
-  color: #ffe6b5;
-  justify-content: space-between;
-  font-size: .85rem;
-}
-
-.designer-conflict p { margin: 0; }
 .designer-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -96,7 +86,6 @@
   min-width: 0;
 }
 
-.designer-workspace[data-preview="true"] { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stage"; }
 .designer-stage, .designer-materials, .designer-inspector {
   min-width: 0;
   background: var(--design-surface);
@@ -127,7 +116,7 @@
 
 .designer-stage-controls { display: flex; gap: .35rem; align-items: center; flex-wrap: wrap; }
 .designer-stage-controls select { min-height: 2rem; font-size: .8rem; }
-.designer-screen-size, .designer-preview-title {
+.designer-screen-size {
   color: var(--design-muted);
   font-size: .78rem;
   font-variant-numeric: tabular-nums;
@@ -146,8 +135,18 @@
 }
 
 .designer-viewport[data-fit="true"] { display: grid; place-items: center; }
-.designer-viewport[data-preview="true"] { display: flex; min-height: 28rem; }
-.designer-viewport[data-preview="true"] .screen-area { width: 100%; align-self: stretch; }
+
+.designer-preview {
+  display: flex;
+  height: min(68svh, 42rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.designer-preview > p {
+  margin: auto;
+  color: var(--secondary);
+}
 
 .designer-canvas-size {
   position: relative;
@@ -283,10 +282,6 @@
   .designer-workspace { grid-template-columns: minmax(0, 1fr); grid-template-areas: "stage" "materials" "inspector"; }
   .designer-actions { margin-inline-start: 0; }
   .designer-viewport { height: 16rem; }
-}
-
-@media (max-width: 48rem) {
-  .designer-viewport[data-preview="true"] { display: block; height: auto; min-height: 0; }
 }
 
 @media (pointer: coarse) {

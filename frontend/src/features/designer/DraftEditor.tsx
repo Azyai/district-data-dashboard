@@ -93,6 +93,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
   const [history, setHistory] = useState(() => initialHistory(workspace.components))
   const [selection, setSelection] = useState<string | undefined>(workspace.components[0]?.id)
   const [preview, setPreview] = useState(false)
+  const [showSaveError, setShowSaveError] = useState(false)
   const [zoom, setZoom] = useState('fit')
   const [fitted, setFitted] = useState(0.5)
   const [transient, setTransient] = useState<{ componentId: string; geometry: Geometry }>()
@@ -262,13 +263,19 @@ function DraftBoard({ projectId, workspace, setProject }: {
   }
 
   function saveDraft() {
-    if (!dirty || busy || conflict) return
+    if (busy) return
+    if (conflict) {
+      setShowSaveError(true)
+      return
+    }
+    if (!dirty) return
     save.mutate(undefined, {
       onSuccess: result => {
         const next = { ...base, ...result }
         setBase(next)
         queryClient.setQueryData(projectKey(projectId), next)
       },
+      onError: () => setShowSaveError(true),
     })
   }
 
@@ -311,129 +318,146 @@ function DraftBoard({ projectId, workspace, setProject }: {
           <span data-dirty={dirty}>{dirty ? '有未保存的更改' : base.revision === 0 ? '模板布局' : '已保存'}</span>
         </p>
         <div className="designer-actions">
-          <Button onClick={() => setPreview(previous => !previous)} disabled={busy} aria-pressed={preview}>
-            {preview ? '返回编辑' : '预览草稿'}
-          </Button>
-          <Button type="primary" loading={save.isPending} disabled={!dirty || conflict || reload.isPending}
+          <Button onClick={() => setPreview(true)} disabled={busy} aria-haspopup="dialog">预览草稿</Button>
+          <Button type="primary" aria-label="保存草稿" aria-busy={save.isPending}
+            loading={save.isPending} disabled={(!dirty && !conflict) || reload.isPending}
             onClick={saveDraft}>保存草稿</Button>
         </div>
       </div>
-      {conflict ? (
-        <div className="designer-conflict" role="alert">
-          <p><strong>草稿版本有更新。</strong> 当前编辑已保留。加载服务器草稿前可继续预览。</p>
-          <Button onClick={() => setConfirmation({ kind: 'reload' })} disabled={busy}>加载服务器草稿</Button>
-        </div>
-      ) : <AdminError error={save.error} />}
-      <div className="designer-workspace" data-preview={preview}>
-        <section className="designer-stage" aria-label={preview ? '草稿预览' : '画布'} onKeyDown={canvasKeys}>
+      <div className="designer-workspace">
+        <section className="designer-stage" aria-label="画布" onKeyDown={canvasKeys}>
           <header className="designer-stage-bar">
             <span className="designer-screen-size">{canvas.width} × {canvas.height}</span>
-            {!preview && (
-              <div className="designer-stage-controls">
-                <Button size="small" autoInsertSpace={false} onClick={undo} disabled={busy || !history.past.length}>撤销</Button>
-                <Button size="small" autoInsertSpace={false} onClick={redo} disabled={busy || !history.future.length}>重做</Button>
-                <select aria-label="画布缩放" value={zoom} disabled={busy} onChange={event => setZoom(event.currentTarget.value)}>
-                  <option value="fit">适合窗口</option>
-                  <option value="0.5">50%</option>
-                  <option value="1">100%</option>
-                  <option value="1.5">150%</option>
-                </select>
-              </div>
-            )}
-            {preview && <span className="designer-preview-title">{base.template.title} · 草稿预览</span>}
+            <div className="designer-stage-controls">
+              <Button size="small" autoInsertSpace={false} onClick={undo} disabled={busy || !history.past.length}>撤销</Button>
+              <Button size="small" autoInsertSpace={false} onClick={redo} disabled={busy || !history.future.length}>重做</Button>
+              <select aria-label="画布缩放" value={zoom} disabled={busy} onChange={event => setZoom(event.currentTarget.value)}>
+                <option value="fit">适合窗口</option>
+                <option value="0.5">50%</option>
+                <option value="1">100%</option>
+                <option value="1.5">150%</option>
+              </select>
+            </div>
           </header>
-          <div ref={viewport} className="designer-viewport" data-preview={preview} data-fit={!preview && zoom === 'fit'}>
-            {previewResult ? (
-              <ScreenCanvas manifest={previewResult.manifest} snapshot={previewResult.snapshot} />
-            ) : (
-              <div className="designer-canvas-size" style={{ width: canvas.width * scale, height: canvas.height * scale }}>
-                <div className="designer-canvas" data-theme={base.template.theme}
-                  style={{ width: canvas.width, height: canvas.height, transform: `scale(${scale})` }}
-                  onDragOver={event => {
-                    if (!editingDisabled && components.length < maxComponents && event.dataTransfer.types.includes(materialTransfer)) {
-                      event.preventDefault()
-                      event.dataTransfer.dropEffect = 'copy'
-                    }
-                  }}
-                  onDrop={dropMaterial}>
-                  {components.map(component => {
-                    const geometry = transient?.componentId === component.id ? transient.geometry : component.geometry
-                    const isSelected = selection === component.id
-                    return (
-                      <article key={component.id} className="designer-widget" data-selected={isSelected}
-                        data-component-id={component.id} data-kind={component.type}
-                        style={{
-                          left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height,
-                          zIndex: isSelected ? 1001 : geometry.z,
-                          '--designer-handle-size': `${Math.round(34 / scale)}px`,
-                        } as CSSProperties}>
-                        <div className="designer-widget-content screen-component" data-kind={component.type} aria-hidden="true">
-                          <ScreenComponentContent component={component} data={values.get(component.metricId)} />
-                        </div>
-                        <button type="button" className="designer-widget-move" disabled={busy}
-                          aria-label={'移动 ' + component.title} aria-pressed={isSelected}
-                          onFocus={() => setSelection(component.id)} onClick={() => setSelection(component.id)}
-                          {...pointerControls(component, 'move')} />
-                        {isSelected && <button type="button" disabled={busy} className="designer-widget-resize"
-                          aria-label={'调整大小 ' + component.title} {...pointerControls(component, 'resize')} />}
-                      </article>
-                    )
-                  })}
-                </div>
+          <div ref={viewport} className="designer-viewport" data-fit={zoom === 'fit'}>
+            <div className="designer-canvas-size" style={{ width: canvas.width * scale, height: canvas.height * scale }}>
+              <div className="designer-canvas" data-theme={base.template.theme}
+                style={{ width: canvas.width, height: canvas.height, transform: `scale(${scale})` }}
+                onDragOver={event => {
+                  if (!editingDisabled && components.length < maxComponents && event.dataTransfer.types.includes(materialTransfer)) {
+                    event.preventDefault()
+                    event.dataTransfer.dropEffect = 'copy'
+                  }
+                }}
+                onDrop={dropMaterial}>
+                {components.map(component => {
+                  const geometry = transient?.componentId === component.id ? transient.geometry : component.geometry
+                  const isSelected = selection === component.id
+                  return (
+                    <article key={component.id} className="designer-widget" data-selected={isSelected}
+                      data-component-id={component.id} data-kind={component.type}
+                      style={{
+                        left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height,
+                        zIndex: isSelected ? 1001 : geometry.z,
+                        '--designer-handle-size': `${Math.round(34 / scale)}px`,
+                      } as CSSProperties}>
+                      <div className="designer-widget-content screen-component" data-kind={component.type} aria-hidden="true">
+                        <ScreenComponentContent component={component} data={values.get(component.metricId)} />
+                      </div>
+                      <button type="button" className="designer-widget-move" disabled={busy}
+                        aria-label={'移动 ' + component.title} aria-pressed={isSelected}
+                        onFocus={() => setSelection(component.id)} onClick={() => setSelection(component.id)}
+                        {...pointerControls(component, 'move')} />
+                      {isSelected && <button type="button" disabled={busy} className="designer-widget-resize"
+                        aria-label={'调整大小 ' + component.title} {...pointerControls(component, 'resize')} />}
+                    </article>
+                  )
+                })}
               </div>
-            )}
-            {!components.length && <p className="designer-canvas-empty">画布为空。{preview ? '返回编辑添加组件。' : '从组件库添加组件。'}</p>}
+            </div>
+            {!components.length && <p className="designer-canvas-empty">画布为空。从组件库添加组件。</p>}
           </div>
         </section>
-        {!preview && (
+        <aside className="designer-materials" aria-label="组件库和图层">
+          <div className="designer-panel-title"><h2>组件库</h2><span>{components.length} / {maxComponents}</span></div>
+          <ul className="designer-list">
+            {materials.map(material => (
+              <li key={material.id}>
+                <button type="button" className="designer-material" aria-label={'添加 ' + material.title}
+                  disabled={busy || components.length >= maxComponents} onClick={() => addMaterial(material)}
+                  draggable={!busy && components.length < maxComponents}
+                  onDragStart={event => {
+                    event.dataTransfer.effectAllowed = 'copy'
+                    event.dataTransfer.setData(materialTransfer, material.id)
+                  }}>
+                  <AdminIcon name="add" /><span>{material.title}<small>{kindNames[material.type]}</small></span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="designer-panel-title designer-layer-title"><h2>图层</h2></div>
+          {layers.length ? (
+            <ul className="designer-list designer-layers">
+              {layers.map(component => (
+                <li key={component.id}>
+                  <button type="button" className="designer-layer" aria-label={'组件 ' + component.title}
+                    aria-pressed={selection === component.id} disabled={busy} onClick={() => setSelection(component.id)}>
+                    <AdminIcon name="chart" /><span>{component.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : <p className="designer-empty">暂无组件</p>}
+        </aside>
+        <aside className="designer-inspector" aria-label="组件属性">
+          <div className="designer-panel-title"><h2>组件属性</h2>{selected && <span>{kindNames[selected.type]}</span>}</div>
+          {selected ? (
+            <Properties component={selected} materials={materials} disabled={busy} canvas={canvas}
+              update={update => updateComponent(selected.id, update)}
+              layer={placement => revise(current => setLayer(current, selected.id, placement))}
+              canLayer={components.length > 1}
+              remove={() => {
+                revise(current => current.filter(component => component.id !== selected.id))
+                setSelection(undefined)
+              }} />
+          ) : <p className="designer-empty">选择画布或图层中的组件。</p>}
+        </aside>
+      </div>
+      <Modal
+        title={base.template.title + ' · 草稿预览'}
+        open={preview}
+        centered
+        width={1152}
+        destroyOnHidden
+        onCancel={() => setPreview(false)}
+        footer={<Button onClick={() => setPreview(false)}>返回编辑</Button>}
+      >
+        {previewResult && (
+          <section className="designer-preview" aria-label="草稿预览">
+            {components.length ? <ScreenCanvas manifest={previewResult.manifest} snapshot={previewResult.snapshot} /> :
+              <p>画布为空。返回编辑添加组件。</p>}
+          </section>
+        )}
+      </Modal>
+      <Modal
+        title="保存草稿失败"
+        open={showSaveError && !!save.error}
+        centered
+        onCancel={() => setShowSaveError(false)}
+        footer={(
           <>
-            <aside className="designer-materials" aria-label="组件库和图层">
-              <div className="designer-panel-title"><h2>组件库</h2><span>{components.length} / {maxComponents}</span></div>
-              <ul className="designer-list">
-                {materials.map(material => (
-                  <li key={material.id}>
-                    <button type="button" className="designer-material" aria-label={'添加 ' + material.title}
-                      disabled={busy || components.length >= maxComponents} onClick={() => addMaterial(material)}
-                      draggable={!busy && components.length < maxComponents}
-                      onDragStart={event => {
-                        event.dataTransfer.effectAllowed = 'copy'
-                        event.dataTransfer.setData(materialTransfer, material.id)
-                      }}>
-                      <AdminIcon name="add" /><span>{material.title}<small>{kindNames[material.type]}</small></span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              <div className="designer-panel-title designer-layer-title"><h2>图层</h2></div>
-              {layers.length ? (
-                <ul className="designer-list designer-layers">
-                  {layers.map(component => (
-                    <li key={component.id}>
-                      <button type="button" className="designer-layer" aria-label={'组件 ' + component.title}
-                        aria-pressed={selection === component.id} disabled={busy} onClick={() => setSelection(component.id)}>
-                        <AdminIcon name="chart" /><span>{component.title}</span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : <p className="designer-empty">暂无组件</p>}
-            </aside>
-            <aside className="designer-inspector" aria-label="组件属性">
-              <div className="designer-panel-title"><h2>组件属性</h2>{selected && <span>{kindNames[selected.type]}</span>}</div>
-              {selected ? (
-                <Properties component={selected} materials={materials} disabled={busy} canvas={canvas}
-                  update={update => updateComponent(selected.id, update)}
-                  layer={placement => revise(current => setLayer(current, selected.id, placement))}
-                  canLayer={components.length > 1}
-                  remove={() => {
-                    revise(current => current.filter(component => component.id !== selected.id))
-                    setSelection(undefined)
-                  }} />
-              ) : <p className="designer-empty">选择画布或图层中的组件。</p>}
-            </aside>
+            <Button onClick={() => setShowSaveError(false)}>继续编辑</Button>
+            {conflict && <Button type="primary" onClick={() => {
+              setShowSaveError(false)
+              setConfirmation({ kind: 'reload' })
+            }}>加载服务器草稿</Button>}
           </>
         )}
-      </div>
+      >
+        {conflict ? (
+          <p role="alert"><strong>草稿版本有更新。</strong> 当前编辑已保留。加载服务器草稿前可继续预览。</p>
+        ) : <AdminError error={save.error} />}
+      </Modal>
       <Modal
         title={confirmation?.kind === 'reload' ? '加载服务器草稿' : '切换专题'}
         open={!!confirmation}
