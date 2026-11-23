@@ -45,6 +45,7 @@ jobs:
           pnpm lint
           pnpm typecheck
           pnpm test:intent
+          pnpm test:layout
           pnpm build
           pnpm audit --audit-level high
 
@@ -80,3 +81,4 @@ jobs:
           node scripts/smoke.mjs http://127.0.0.1:5173
           pnpm --dir frontend test:e2e
           pnpm --dir frontend test:e2e:admin
+          pnpm --dir frontend test:e2e:designer

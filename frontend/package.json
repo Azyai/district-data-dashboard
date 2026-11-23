@@ -18,6 +18,8 @@
     "contracts:check": "openapi-typescript ../contracts/openapi.json -o src/api/generated/openapi.ts --check",
     "test:e2e": "node tests/browser.mjs",
     "test:e2e:admin": "node tests/admin-browser.mjs",
+    "test:e2e:designer": "node tests/draft-browser.mjs",
+    "test:layout": "node --test tests/draft-layout.mjs",
     "test:intent": "node --test tests/cockpit-intent.mjs"
   },
   "dependencies": {
