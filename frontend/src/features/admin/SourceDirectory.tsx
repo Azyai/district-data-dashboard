@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { adminApi, adminQueryKeys } from './adminApi'
 import type { ConnectionTest, Source, SyncRun } from './adminApi'
-import { AdminError, AdminTablePages, DisplayTime, getAdminTablePage, number } from './AdminParts'
+import { AdminError, AdminIcon, AdminTablePages, DisplayTime, getAdminTablePage, number } from './AdminParts'
 import { SourceEditor, sourceTypes } from './SourceEditor'
 
 const statuses = {
@@ -15,6 +15,7 @@ const statuses = {
 } as const
 
 const triggers = { MANUAL: '手动', SCHEDULED: '定时', RETRY: '重试' } as const
+const sourceIcons = { HTTPS_JSON: 'link', MYSQL_VIEW: 'source', CSV: 'file' } as const
 
 function SyncStatus({ status }: { status?: SyncRun['status'] | null }) {
   return <span className="admin-status" data-state={status ?? 'idle'}>{status ? statuses[status] : '尚未同步'}</span>
@@ -89,7 +90,7 @@ function SourceDetail({ source, onEdit }: { source: Source; onEdit: () => void }
           <p>{source.id} · {sourceTypes[source.type]} · 配置版本 {source.version}</p>
         </div>
         <div className="admin-actions">
-          <Button onClick={onEdit} disabled={busy}>编辑配置</Button>
+          <Button onClick={onEdit} disabled={busy} aria-haspopup="dialog">编辑配置</Button>
           <Button onClick={() => test.mutate()} loading={test.isPending} disabled={sync.isPending}>测试并预览</Button>
           <Button type="primary" onClick={() => start()} loading={sync.isPending} disabled={test.isPending || running}>启动同步</Button>
         </div>
@@ -186,11 +187,11 @@ export function SourceDirectory() {
     <div className="admin-page">
       <header className="admin-page-heading">
         <div><h1>数据来源</h1><p>配置已批准的连接，预览标准化数据并执行同步。</p></div>
-        <Button type="primary" onClick={() => setEditor('new')}>新增来源</Button>
+        <Button type="primary" icon={<AdminIcon name="add" />} onClick={() => setEditor('new')} aria-haspopup="dialog">新增来源</Button>
       </header>
       <section className="admin-list" aria-label="来源目录">
         <div className="admin-list-tools">
-          <Input allowClear value={filter} onChange={event => {
+          <Input allowClear prefix={<AdminIcon name="search" />} value={filter} onChange={event => {
             setFilter(event.target.value)
             setPage(1)
           }}
@@ -202,7 +203,7 @@ export function SourceDirectory() {
             <option value="">全部接入方式</option>
             {Object.entries(sourceTypes).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
           </select>
-          {sources.data && <span className="admin-secondary" role="status">匹配 {visible.length} 个，共 {sources.data.length} 个</span>}
+          {sources.data && <span className="admin-result-count" role="status">匹配 {visible.length} 个，共 {sources.data.length} 个</span>}
         </div>
         {sources.isPending && <p className="admin-list-message" aria-busy="true"><Spin size="small" /> 正在查询来源</p>}
         <AdminError error={sources.error} retry={() => void sources.refetch()} />
@@ -215,7 +216,12 @@ export function SourceDirectory() {
               <thead><tr><th scope="col">来源</th><th scope="col">接入方式</th><th scope="col">最近同步</th><th scope="col">最近成功</th><th scope="col">操作</th></tr></thead>
               <tbody>{rows.map(source => (
                 <tr key={source.id} data-active={source.id === selectedId}>
-                  <th scope="row"><strong>{source.name}</strong><small>{source.id}</small></th>
+                  <th scope="row">
+                    <div className="admin-table-name">
+                      <span className="admin-row-mark" data-kind={source.type}><AdminIcon name={sourceIcons[source.type]} /></span>
+                      <div><strong>{source.name}</strong><small className="admin-code">{source.id}</small></div>
+                    </div>
+                  </th>
                   <td>{sourceTypes[source.type]}</td>
                   <td><SyncStatus status={source.lastSyncStatus} /></td>
                   <td><DisplayTime value={source.lastSuccessfulAt} /></td>

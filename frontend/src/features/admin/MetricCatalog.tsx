@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Drawer, Input, Modal, Spin } from 'antd'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
 import { adminApi, adminQueryKeys } from './adminApi'
 import type { Metric, MetricInput, Source } from './adminApi'
-import { AdminError, AdminTablePages, DisplayTime, Field, getAdminTablePage, number } from './AdminParts'
+import { AdminError, AdminIcon, AdminTablePages, DisplayTime, Field, getAdminTablePage, number } from './AdminParts'
 
 const aggregations = { SUM: '求和', RATE: '比率' } as const
 
@@ -25,6 +25,8 @@ function MetricEditor({ metric, sources, onClose, onSaved }: {
   onSaved: (metric: Metric) => void
 }) {
   const [draft, setDraft] = useState<MetricInput>(metric?.draft ?? emptyDraft)
+  const formId = useId()
+  const title = metric ? '编辑指标口径' : '新增指标'
   const selected = sources.find(source => source.id === draft.sourceId)
   const dataset = useQuery({
     queryKey: adminQueryKeys.dataset(draft.sourceId, selected?.lastSuccessBatchId ?? null),
@@ -53,19 +55,30 @@ function MetricEditor({ metric, sources, onClose, onSaved }: {
   }
 
   return (
-    <Drawer open title={metric ? '编辑指标口径' : '新增指标'} size="large" rootClassName="admin-drawer"
-      keyboard={!save.isPending} mask={{ closable: !save.isPending }} onClose={() => { if (!save.isPending) onClose() }}>
-      <form className="admin-form" onSubmit={submit}>
+    <Drawer open title={<span className="admin-overlay-title"><AdminIcon name="chart" />{title}</span>}
+      size="min(100vw, 40rem)" rootClassName="admin-drawer" keyboard={!save.isPending}
+      mask={{ closable: !save.isPending }} onClose={() => { if (!save.isPending) onClose() }}
+      footer={
+        <>
+          <AdminError error={save.error} />
+          <div className="admin-form-actions">
+            <Button disabled={save.isPending} onClick={onClose}>取消</Button>
+            <Button type="primary" htmlType="submit" form={formId} loading={save.isPending}
+              disabled={!dataset.data?.measures.includes(draft.measure)}>保存草稿</Button>
+          </div>
+        </>
+      }>
+      <form className="admin-form" id={formId} onSubmit={submit}>
         <fieldset disabled={save.isPending}>
-          <legend>指标定义</legend>
+          <legend><span><AdminIcon name="file" />指标定义</span></legend>
           <div className="admin-form-row">
             <Field label="指标名称"><Input value={draft.label} required onChange={event => patch('label', event.target.value)} /></Field>
-            <Field label="指标编码"><Input value={draft.id} required readOnly={Boolean(metric)} onChange={event => patch('id', event.target.value)} /></Field>
+            <Field label="指标编码"><Input value={draft.id} className="admin-code-input" required readOnly={Boolean(metric)} onChange={event => patch('id', event.target.value)} /></Field>
           </div>
           <Field label="口径说明"><Input.TextArea rows={3} value={draft.description} required onChange={event => patch('description', event.target.value)} /></Field>
         </fieldset>
         <fieldset disabled={save.isPending}>
-          <legend>来源与聚合</legend>
+          <legend><span><AdminIcon name="settings" />来源与聚合</span></legend>
           <Field label="绑定来源" help="来源须拥有成功同步批次。">
             <select value={draft.sourceId} required onChange={event => {
               const sourceId = event.target.value
@@ -106,12 +119,6 @@ function MetricEditor({ metric, sources, onClose, onSaved }: {
           {dataset.data && <p className="admin-secondary admin-break">当前批次 {dataset.data.batchId} · {number.format(dataset.data.rowCount)} 行</p>}
           <AdminError error={dataset.error} retry={() => void dataset.refetch()} />
         </fieldset>
-        <AdminError error={save.error} />
-        <div className="admin-form-actions">
-          <Button disabled={save.isPending} onClick={onClose}>取消</Button>
-          <Button type="primary" htmlType="submit" loading={save.isPending}
-            disabled={!dataset.data?.measures.includes(draft.measure)}>保存草稿</Button>
-        </div>
       </form>
     </Drawer>
   )
@@ -208,13 +215,13 @@ export function MetricCatalog() {
     <div className="admin-page">
       <header className="admin-page-heading">
         <div><h1>指标目录</h1><p>管理统计口径和版本。发布后的版本供驾驶舱使用。</p></div>
-        <Button type="primary" onClick={() => setEditor('new')} disabled={!sources.data}>新增指标</Button>
+        <Button type="primary" icon={<AdminIcon name="add" />} onClick={() => setEditor('new')} disabled={!sources.data} aria-haspopup="dialog">新增指标</Button>
       </header>
-      {notice && <p className="admin-success" role="status">{notice}</p>}
+      {notice && <p className="admin-success admin-notice" role="status">{notice}</p>}
       <AdminError error={sources.error} retry={() => void sources.refetch()} />
       <section className="admin-list" aria-label="指标目录">
         <div className="admin-list-tools">
-          <Input allowClear value={filter} onChange={event => {
+          <Input allowClear prefix={<AdminIcon name="search" />} value={filter} onChange={event => {
             setFilter(event.target.value)
             setPage(1)
           }}
@@ -225,7 +232,7 @@ export function MetricCatalog() {
           }}>
             <option value="">全部状态</option><option value="draft">待发布</option><option value="published">已发布</option>
           </select>
-          {metrics.data && <span className="admin-secondary" role="status">匹配 {visible.length} 个，共 {metrics.data.length} 个</span>}
+          {metrics.data && <span className="admin-result-count" role="status">匹配 {visible.length} 个，共 {metrics.data.length} 个</span>}
         </div>
         {metrics.isPending && <p className="admin-list-message" aria-busy="true"><Spin size="small" /> 正在查询指标</p>}
         <AdminError error={metrics.error} retry={() => void metrics.refetch()} />
@@ -238,7 +245,12 @@ export function MetricCatalog() {
               <thead><tr><th scope="col">指标</th><th scope="col">绑定来源</th><th scope="col">聚合方式</th><th scope="col">生效版本</th><th scope="col">操作</th></tr></thead>
               <tbody>{rows.map(metric => (
                 <tr key={metric.id} data-active={selectId === metric.id}>
-                  <th scope="row"><strong>{metric.draft.label}</strong><small>{metric.id}</small></th>
+                  <th scope="row">
+                    <div className="admin-table-name">
+                      <span className="admin-row-mark"><AdminIcon name="chart" /></span>
+                      <div><strong>{metric.draft.label}</strong><small className="admin-code">{metric.id}</small></div>
+                    </div>
+                  </th>
                   <td>{bySource.get(metric.draft.sourceId) ?? metric.draft.sourceId}</td>
                   <td>{aggregations[metric.draft.aggregation]}<small>{metric.draft.measure} · {metric.draft.unit}</small></td>
                   <td>{metric.published ? <span className="admin-status" data-state="SUCCEEDED">v{metric.published.version}</span> : '未发布'}
@@ -246,11 +258,12 @@ export function MetricCatalog() {
                   <td>
                     <div className="admin-inline">
                       <Button size="small" onClick={() => setSelectId(metric.id)} aria-label={'查看口径 ' + metric.draft.label}>查看口径</Button>
-                      <Button size="small" disabled={!sources.data} onClick={() => setEditor(metric)} aria-label={'编辑指标 ' + metric.draft.label}>编辑</Button>
+                      <Button size="small" disabled={!sources.data} onClick={() => setEditor(metric)} aria-haspopup="dialog"
+                        aria-label={'编辑指标 ' + metric.draft.label}>编辑</Button>
                       <Button size="small" type="primary" disabled={!hasChanges(metric)} onClick={() => {
                         publish.reset()
                         setConfirmation(metric)
-                      }} aria-label={'发布指标 ' + metric.draft.label}>发布</Button>
+                      }} aria-haspopup="dialog" aria-label={'发布指标 ' + metric.draft.label}>发布</Button>
                     </div>
                   </td>
                 </tr>

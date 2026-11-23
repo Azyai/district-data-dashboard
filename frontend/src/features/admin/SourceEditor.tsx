@@ -1,10 +1,10 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Button, Drawer, Input, Spin } from 'antd'
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import type { FormEvent } from 'react'
 import { adminApi, adminQueryKeys } from './adminApi'
 import type { Source, SourceInput } from './adminApi'
-import { AdminError, Field, number } from './AdminParts'
+import { AdminError, AdminIcon, Field, number } from './AdminParts'
 
 export const sourceTypes = {
   HTTPS_JSON: 'HTTPS JSON',
@@ -46,6 +46,9 @@ export function SourceEditor({ source, onClose, onSaved }: {
   const [draft, setDraft] = useState(() => initialDraft(source))
   const [file, setFile] = useState<File | null>(null)
   const [assetName, setAssetName] = useState<string | null>(null)
+  const formId = useId()
+  const fileId = useId()
+  const title = source ? '编辑来源' : '新增来源'
   const options = useQuery({
     queryKey: adminQueryKeys.options,
     queryFn: ({ signal }) => adminApi.sourceOptions(signal),
@@ -95,17 +98,33 @@ export function SourceEditor({ source, onClose, onSaved }: {
   }
 
   return (
-    <Drawer open title={source ? '编辑来源' : '新增来源'} size="large" rootClassName="admin-drawer"
-      keyboard={!busy} mask={{ closable: !busy }} onClose={() => { if (!busy) onClose() }}>
-      <form className="admin-form" onSubmit={submit}>
+    <Drawer open title={<span className="admin-overlay-title"><AdminIcon name="source" />{title}</span>}
+      size="min(100vw, 40rem)" rootClassName="admin-drawer" keyboard={!busy}
+      mask={{ closable: !busy }} onClose={() => { if (!busy) onClose() }}
+      footer={
+        <>
+          <AdminError error={save.error} />
+          <div className="admin-form-actions">
+            <Button disabled={busy} onClick={onClose}>取消</Button>
+            <Button type="primary" htmlType="submit" form={formId} disabled={incomplete || upload.isPending} loading={save.isPending}>
+              保存来源
+            </Button>
+          </div>
+        </>
+      }>
+      <form className="admin-form" id={formId} onSubmit={submit}>
         <fieldset disabled={save.isPending}>
-          <legend>来源标识</legend>
+          <legend><span><AdminIcon name="file" />来源标识</span></legend>
           <div className="admin-form-row">
-            <Field label="来源名称"><Input value={draft.name} onChange={event => patch('name', event.target.value)} maxLength={100} required /></Field>
-            <Field label="来源编码" help="小写英文字母开头，可包含小写字母、数字和连字符。">
-              <Input value={draft.id} onChange={event => patch('id', event.target.value)} readOnly={Boolean(source)} pattern="[a-z][a-z0-9\-]{0,63}" maxLength={64} required />
+            <Field label="来源名称"><Input value={draft.name} placeholder="例如：空气质量监测" onChange={event => patch('name', event.target.value)} maxLength={100} required /></Field>
+            <Field label="来源编码" help="小写字母开头。可含小写字母、数字和短横线。">
+              <Input value={draft.id} className="admin-code-input" placeholder="air-observations" onChange={event => patch('id', event.target.value)} readOnly={Boolean(source)} pattern="[a-z][a-z0-9\-]{0,63}" maxLength={64} required />
             </Field>
           </div>
+        </fieldset>
+
+        <fieldset disabled={save.isPending}>
+          <legend><span><AdminIcon name="link" />连接配置</span></legend>
           <Field label="接入方式">
             <select value={type} disabled={upload.isPending} onChange={event => {
               const value = event.target.value as SourceInput['type']
@@ -117,10 +136,6 @@ export function SourceEditor({ source, onClose, onSaved }: {
               {Object.entries(sourceTypes).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
             </select>
           </Field>
-        </fieldset>
-
-        <fieldset disabled={save.isPending}>
-          <legend>连接配置</legend>
           {type === 'HTTPS_JSON' && (
             <Field label="已批准接口">
               <select value={config.endpoint ?? ''} required onChange={event => patch('config', { endpoint: event.target.value })}>
@@ -148,14 +163,21 @@ export function SourceEditor({ source, onClose, onSaved }: {
           )}
           {type === 'CSV' ? (
             <>
-              <Field label="CSV 文件" help="使用 UTF-8 编码，并保留第一行字段名。">
-                <input key={config.assetRef ?? 'file'} type="file" accept=".csv,text/csv" disabled={upload.isPending} onChange={event => {
-                  setFile(event.target.files?.[0] ?? null)
-                  upload.reset()
-                }} />
-              </Field>
-              <div className="admin-inline">
-                <Button loading={upload.isPending} disabled={!file} onClick={() => { if (file) upload.mutate(file) }}>上传文件</Button>
+              <div className="admin-field">
+                <label htmlFor={fileId}>CSV 文件</label>
+                <div className="admin-upload">
+                  <div className="admin-file-choice">
+                    <AdminIcon name="file" />
+                    <span className="admin-break">{file?.name ?? '选择 CSV 文件'}</span>
+                    <input id={fileId} key={config.assetRef ?? 'file'} type="file" accept=".csv,text/csv"
+                      aria-describedby={fileId + '-help'} disabled={upload.isPending} onChange={event => {
+                        setFile(event.target.files?.[0] ?? null)
+                        upload.reset()
+                      }} />
+                  </div>
+                  <Button loading={upload.isPending} disabled={!file} onClick={() => { if (file) upload.mutate(file) }}>上传文件</Button>
+                </div>
+                <small id={fileId + '-help'}>使用 UTF-8 编码，第一行为字段名。最大 2 MB。</small>
                 {config.assetRef && <span className="admin-success" role="status">
                   已关联 {assetName ?? config.assetRef}{upload.data && ' · ' + number.format(upload.data.sizeBytes) + ' 字节'}
                 </span>}
@@ -175,25 +197,20 @@ export function SourceEditor({ source, onClose, onSaved }: {
         </fieldset>
 
         <fieldset disabled={save.isPending}>
-          <legend>字段映射</legend>
+          <legend><span><AdminIcon name="settings" />字段映射与同步</span></legend>
           <div className="admin-form-row">
             {mappingFields.map(([key, label]) => (
               <Field key={key} label={label}>
-                <Input value={mapping[key] ?? ''} onChange={event => patch('mapping', { ...mapping, [key]: event.target.value })}
+                <Input className="admin-code-input" value={mapping[key] ?? ''} onChange={event => patch('mapping', { ...mapping, [key]: event.target.value })}
                   required={key !== 'denominator'} />
               </Field>
             ))}
+            <Field label="自动同步间隔（分钟）" help="填 0 仅手动同步。最大 1440 分钟。">
+              <Input type="number" value={draft.refreshMinutes} min={0} max={1440} step={1} required
+                onChange={event => patch('refreshMinutes', Number(event.target.value))} />
+            </Field>
           </div>
-          <Field label="自动同步间隔（分钟）" help="填 0 仅手动同步。最大 1440 分钟。">
-            <Input type="number" value={draft.refreshMinutes} min={0} max={1440} step={1} required
-              onChange={event => patch('refreshMinutes', Number(event.target.value))} />
-          </Field>
         </fieldset>
-        <AdminError error={save.error} />
-        <div className="admin-form-actions">
-          <Button disabled={busy} onClick={onClose}>取消</Button>
-          <Button type="primary" htmlType="submit" disabled={incomplete || upload.isPending} loading={save.isPending}>保存来源</Button>
-        </div>
       </form>
     </Drawer>
   )
