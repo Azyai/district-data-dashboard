@@ -176,7 +176,10 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
 
   return (
     <div className="voice-assistant-body">
-      <p className="voice-assistant-scope">{area.name} · 可切换区域、查看问题或查询指标</p>
+      <div className="voice-assistant-context">
+        <p className="voice-assistant-scope">{area.name}</p>
+        <p>查询指标、查看问题或切换区域。</p>
+      </div>
       <ol ref={transcriptLog} className="voice-assistant-log" role="log" aria-label="问数记录">
         {turns.map(turn => (
           <li key={turn.id} className="voice-assistant-turn">
@@ -202,33 +205,35 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
           ))}
         </div>
       )}
-      <form className="voice-assistant-form" onSubmit={submit}>
-        <label htmlFor={inputId}>输入问题或指令</label>
-        <div className="voice-assistant-input-row">
-          <input
-            id={inputId}
-            value={question}
-            placeholder="例如：大台有哪些问题？"
-            maxLength={160}
-            disabled={working}
-            onChange={event => {
-              if (transcribing) stopTranscription()
-              setQuestion(event.target.value)
-            }}
-          />
-          <button type="submit" disabled={working || !question.trim()}>{working ? '处理中' : '发送'}</button>
+      <div className="voice-assistant-composer">
+        <form className="voice-assistant-form" onSubmit={submit}>
+          <label htmlFor={inputId}>输入问题或指令</label>
+          <div className="voice-assistant-input-row">
+            <input
+              id={inputId}
+              value={question}
+              placeholder="例如：大台有哪些问题？"
+              maxLength={160}
+              disabled={working}
+              onChange={event => {
+                if (transcribing) stopTranscription()
+                setQuestion(event.target.value)
+              }}
+            />
+            <button type="submit" disabled={working || !question.trim()}>{working ? '处理中' : '发送'}</button>
+          </div>
+        </form>
+        <div className="voice-assistant-actions">
+          <button type="button" disabled={working} onClick={transcribing ? stopTranscription : simulateVoice}>
+            {transcribing ? '取消模拟转写' : '模拟语音转写'}
+          </button>
+          {latest && systemVoice && (
+            <button type="button" onClick={readAnswer}>{speaking ? '停止朗读' : '朗读回复'}</button>
+          )}
         </div>
-      </form>
-      <div className="voice-assistant-actions">
-        <button type="button" disabled={working} onClick={transcribing ? stopTranscription : simulateVoice}>
-          {transcribing ? '取消模拟转写' : '模拟语音转写'}
-        </button>
-        {latest && systemVoice && (
-          <button type="button" onClick={readAnswer}>{speaking ? '停止朗读' : '朗读回复'}</button>
-        )}
+        <p className="voice-assistant-status" role="status">{transcriptionStatus(transcription)}</p>
+        {error && <p className="voice-assistant-error" role="alert">{error}</p>}
       </div>
-      <p className="voice-assistant-status" role="status">{transcriptionStatus(transcription)}</p>
-      {error && <p className="voice-assistant-error" role="alert">{error}</p>}
     </div>
   )
 }
@@ -240,7 +245,7 @@ export function VoiceAssistant({ open, onClose, ...content }: AssistantContentPr
   return (
     <Drawer
       title="AI 问数"
-      size="min(100vw, 30rem)"
+      size="min(100vw, 31rem)"
       open={open}
       onClose={onClose}
       destroyOnHidden

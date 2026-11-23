@@ -82,7 +82,7 @@ export function AreaIssuesDialog({ area, open, onClose, signalId }: AreaIssuesDi
       footer={<Button onClick={onClose}>关闭</Button>}
     >
       <p className="area-issues-snapshot">
-        <span>模拟数据</span><span>快照更新 <SnapshotTime value={area.updatedAt} /></span>
+        <span className="status-mark">模拟数据</span><span>快照更新 <SnapshotTime value={area.updatedAt} /></span>
       </p>
       <div className="area-issues-grid">
         <section aria-label="运行事项">
