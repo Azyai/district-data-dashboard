@@ -1,0 +1,14 @@
+/docs/
+
+# Generated builds and test evidence
+/backend/**/target/
+/frontend/node_modules/
+/frontend/dist/
+/frontend/test-results/
+/frontend/playwright-report/
+*.log
+
+# Machine-specific configuration
+.env
+.env.*
+*.local
