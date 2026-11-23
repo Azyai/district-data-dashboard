@@ -1,0 +1,82 @@
+name: Verify P1
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: backend/**/pom.xml
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.22.0'
+
+      - name: Verify backend
+        working-directory: backend
+        run: sh ./mvnw -B -ntp verify
+
+      - name: Check shared response code catalog
+        run: node scripts/generate-api-codes.mjs --check
+
+      - name: Install frontend tools and dependencies
+        working-directory: frontend
+        run: |
+          npm install --global pnpm@12.16.1
+          pnpm install --frozen-lockfile
+
+      - name: Verify frontend
+        working-directory: frontend
+        run: |
+          pnpm contracts:check
+          pnpm lint
+          pnpm typecheck
+          pnpm test:intent
+          pnpm build
+          pnpm audit --audit-level high
+
+      - name: Install test browser
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Verify local HTTP and browser flows
+        shell: bash
+        run: |
+          java -jar backend/bootstrap/target/district-dashboard.jar --spring.profiles.active=demo > "$RUNNER_TEMP/district-api.log" 2>&1 &
+          backend_pid=$!
+          pnpm --dir frontend preview --host 127.0.0.1 --port 5173 --strictPort > "$RUNNER_TEMP/district-web.log" 2>&1 &
+          frontend_pid=$!
+          cleanup() {
+            status=$?
+            if [ "$status" -ne 0 ]; then
+              tail -n 100 "$RUNNER_TEMP/district-api.log" "$RUNNER_TEMP/district-web.log"
+            fi
+            kill "$backend_pid" "$frontend_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          for attempt in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:8081/actuator/health >/dev/null &&
+               curl --fail --silent http://127.0.0.1:5173/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8081/actuator/health
+          curl --fail --silent --show-error http://127.0.0.1:5173/ >/dev/null
+          node scripts/smoke.mjs http://127.0.0.1:5173
+          pnpm --dir frontend test:e2e
+          pnpm --dir frontend test:e2e:admin
