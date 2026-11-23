@@ -72,7 +72,19 @@ public final class DemoPlaybackService {
         if (!project.manifest().releaseId().equals(releaseId)) {
             throw new ApiFailure(ApiCode.RELEASE_CONFLICT);
         }
+        return query(project, componentIds);
+    }
 
+    Manifest draftTemplate(String projectId) {
+        return project(projectId).manifest();
+    }
+
+    BatchQueryResult draftSnapshot(String projectId) {
+        Project project = project(projectId);
+        return query(project, project.manifest().components().stream().map(Component::id).toList());
+    }
+
+    private BatchQueryResult query(Project project, List<String> componentIds) {
         Map<String, Component> components = project.manifest().components().stream()
                 .collect(Collectors.toMap(Component::id, Function.identity()));
         if (new HashSet<>(componentIds).size() != componentIds.size()
@@ -93,13 +105,22 @@ public final class DemoPlaybackService {
                 .map(component -> renderResult(component, byMetric.get(component.metricId())))
                 .toList();
 
-        return new BatchQueryResult(projectId, releaseId, project.snapshotId(), SYNTHETIC_CAPTURE,
+        return new BatchQueryResult(project.manifest().projectId(), project.manifest().releaseId(),
+                project.snapshotId(), SYNTHETIC_CAPTURE,
                 "SIMULATED", results);
     }
 
     private Project visibleProject(CurrentIdentity viewer, String projectId) {
+        Project project = project(projectId);
+        if (!canView(viewer, project)) {
+            throw new ApiFailure(ApiCode.PROJECT_NOT_FOUND);
+        }
+        return project;
+    }
+
+    private Project project(String projectId) {
         return PROJECTS.stream()
-                .filter(project -> project.manifest().projectId().equals(projectId) && canView(viewer, project))
+                .filter(project -> project.manifest().projectId().equals(projectId))
                 .findFirst()
                 .orElseThrow(() -> new ApiFailure(ApiCode.PROJECT_NOT_FOUND));
     }
