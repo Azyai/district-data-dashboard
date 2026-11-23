@@ -378,7 +378,7 @@
   display: flex;
   flex-direction: column;
   gap: .92em;
-  padding: 1.02em 1em .32em;
+  padding: 1.02em 1em;
   background: linear-gradient(148deg, #142642, #0d192d 62%);
 }
 
@@ -421,8 +421,7 @@
 .issue-link { color: var(--panel-accent); font-size: .81em; min-height: 2.6em; }
 .issue-link .cockpit-icon { width: 1.05em; height: 1.05em; }
 
-.supporting-metrics, .cockpit-sources { border-top: 1px solid var(--panel-line); }
-.supporting-metrics { padding-top: .92em; }
+.supporting-metrics { padding-top: .92em; border-top: 1px solid var(--panel-line); }
 .supporting-metrics .brief-heading { font-size: .96em; }
 .supporting-metrics .cockpit-metrics {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -439,37 +438,6 @@
 .supporting-metrics .metric-reading strong { font-size: 1.58em; letter-spacing: -.02em; }
 .supporting-metrics .metric-delta { font-size: .72em; }
 .supporting-metrics dt { font-size: .79em; }
-
-.cockpit-sources { margin-top: auto; }
-.cockpit-sources > summary {
-  display: flex;
-  min-height: max(3.05em, 2.55rem);
-  align-items: center;
-  justify-content: space-between;
-  gap: .52em;
-  cursor: pointer;
-  color: var(--text-main);
-  font-size: .86em;
-  font-weight: 655;
-  list-style: none;
-}
-
-.cockpit-sources > summary:hover { color: var(--panel-accent); }
-.cockpit-sources > summary::-webkit-details-marker { display: none; }
-.cockpit-sources > summary span { margin-left: auto; color: var(--text-secondary); font-weight: 540; }
-.cockpit-sources > summary::after {
-  content: "";
-  width: .39em;
-  height: .39em;
-  border-bottom: 1px solid var(--panel-accent);
-  border-right: 1px solid var(--panel-accent);
-  transform: translateY(-.1em) rotate(45deg);
-}
-
-.cockpit-sources[open] > summary::after { transform: translateY(.1em) rotate(225deg); }
-.published-list { list-style: none; display: grid; gap: .65em; margin: 0; padding: .1em 0 .85em; }
-.published-list li { display: grid; gap: .2em; font-size: .8em; }
-.published-list small { color: var(--text-secondary); font-size: .94em; }
 
 .cockpit-deck { display: grid; gap: var(--panel-gap); margin-top: var(--panel-gap); }
 .cockpit-deck[data-paired="true"] { grid-template-columns: minmax(0, 2.8fr) minmax(15.8rem, 1fr); }

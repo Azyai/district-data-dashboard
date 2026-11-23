@@ -271,24 +271,6 @@ function Distribution({ area }: { area: CockpitArea }) {
   )
 }
 
-function PublishedPanel({ area }: { area: CockpitArea }) {
-  const published = area.metrics.flatMap(metric => metric.evidence ? [{ metric, evidence: metric.evidence }] : [])
-  if (published.length === 0) return null
-  return (
-    <details key={area.id} className="cockpit-sources">
-      <summary>数据来源 <span>{published.length} 项已发布</span></summary>
-      <ul className="published-list">
-        {published.map(({ metric, evidence }) => (
-          <li key={metric.id}>
-            <strong>{metric.label} · v{evidence.version}</strong>
-            <small>{evidence.sourceName}{evidence.observedOn ? ' · ' + evidence.observedOn : ''}</small>
-          </li>
-        ))}
-      </ul>
-    </details>
-  )
-}
-
 function TrendPanel({ area }: { area: CockpitArea }) {
   const first = area.trend.at(0)?.label
   const last = area.trend.at(-1)?.label
@@ -401,7 +383,6 @@ export default function Cockpit({ identityControl }: { identityControl: ReactNod
               <aside className="cockpit-brief" aria-label="区域运行信息">
                 <SignalPanel area={area} onInspect={openIssues} />
                 <MetricPanel metrics={metricGroups.supporting} />
-                <PublishedPanel area={area} />
               </aside>
             </div>
             <div className="cockpit-deck" data-paired={area.distribution.length > 0}>
