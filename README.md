@@ -68,6 +68,12 @@ java "-Djavax.net.ssl.trustStore=$fixtureTrust" '-Djavax.net.ssl.trustStoreType=
 
 三种夹具同时可用时，可在独立空的演示目录执行 `node scripts/p2-smoke.mjs` 生成验收配置并验证发布结果。管理后台浏览器回归使用 `pnpm --dir frontend test:e2e:admin`，有三路已登记夹具时可设 `E2E_VERIFY_ALL_CONNECTORS=1`。
 
+## P3 大屏编排
+
+使用新版后端启动后，进入 **数据管理 > 大屏编排** 并选择演示数据管理员。在城市运行和政务服务两个专题中，可添加指标组件、拖动和调整大小、修改标题与绑定、调整图层、撤销或重做。预览使用专题的模拟快照及与播放页相同的组件渲染。
+
+保存草稿会按版本写入数据库。版本冲突时，工作台保留当前编辑，由管理员决定是否加载服务器草稿。Flyway V6 创建草稿表，演示内存库中的草稿可在同一服务实例内刷新恢复。使用持久数据库的演示实例可跨服务重启保留草稿。
+
 ## 验证
 
 在前后端运行时从项目根目录执行接口冒烟，通过 Vite 代理校验会话、推荐和播放链路。
@@ -79,8 +85,10 @@ pnpm --dir frontend contracts:check
 pnpm --dir frontend lint
 pnpm --dir frontend typecheck
 pnpm --dir frontend test:intent
+pnpm --dir frontend test:layout
 pnpm --dir frontend build
 pnpm --dir frontend test:e2e
+pnpm --dir frontend test:e2e:designer
 ```
 
 端到端测试需要 Chromium。未安装时运行 `pnpm --dir frontend exec playwright install chromium`。后台健康探针位于 [本机 8081](http://127.0.0.1:8081/actuator/health)，演示接口契约位于 [contracts/openapi.json](contracts/openapi.json)。
