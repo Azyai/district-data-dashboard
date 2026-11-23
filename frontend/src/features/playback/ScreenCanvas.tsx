@@ -1,8 +1,34 @@
 import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react'
 import type { ComponentData, Manifest } from '../../api/client'
+import './playback.css'
 
 const DataChart = lazy(() => import('./DataChart'))
 const numberFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
+
+export function ScreenComponentContent({ component, data }: {
+  component: Manifest['components'][number]
+  data?: ComponentData['results'][number]
+}) {
+  const unit = data?.unit ?? component.unit
+  const plot = data?.points
+  return (
+    <div className="screen-component-body">
+      <header className="screen-component-heading">
+        <h2>{component.title}</h2>
+        {component.type !== 'kpi' && <span>单位 {unit}</span>}
+      </header>
+      {component.type === 'kpi' ? (
+        <p className="screen-metric" data-empty={typeof data?.value !== 'number'}>
+          {typeof data?.value === 'number' ? <><strong>{numberFormat.format(data.value)}</strong><small>{unit}</small></> : '暂无数据'}
+        </p>
+      ) : plot?.length ? (
+        <Suspense fallback={<p className="chart-fallback" aria-busy="true">正在加载图表</p>}>
+          <DataChart kind={component.type} label={component.title} points={plot} unit={unit} />
+        </Suspense>
+      ) : <p className="chart-fallback">暂无数据</p>}
+    </div>
+  )
+}
 
 export function ScreenCanvas({ manifest, snapshot }: { manifest: Manifest; snapshot: ComponentData }) {
   const area = useRef<HTMLDivElement>(null)
@@ -29,24 +55,10 @@ export function ScreenCanvas({ manifest, snapshot }: { manifest: Manifest; snaps
         <div className="screen-canvas" style={{ width, height, transform: 'scale(' + scale + ')' }}>
           {manifest.components.map(component => {
             const geometry = component.geometry
-            const data = byComponent.get(component.id)
-            const plot = data?.points ?? []
             return (
               <article key={component.id} className="screen-component" data-kind={component.type}
                 style={{ left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height, zIndex: geometry.z }}>
-                <header className="screen-component-heading">
-                  <h2>{component.title}</h2>
-                  {component.type !== 'kpi' && <span>单位 {data?.unit ?? component.unit}</span>}
-                </header>
-                {component.type === 'kpi' ? (
-                  <p className="screen-metric" data-empty={typeof data?.value !== 'number'}>
-                    {typeof data?.value === 'number' ? <><strong>{numberFormat.format(data.value)}</strong><small>{data.unit}</small></> : '暂无数据'}
-                  </p>
-                ) : plot.length ? (
-                  <Suspense fallback={<p className="chart-fallback" aria-busy="true">正在加载图表</p>}>
-                    <DataChart kind={component.type} label={component.title} points={plot} unit={data?.unit ?? component.unit} />
-                  </Suspense>
-                ) : <p className="chart-fallback">暂无数据</p>}
+                <ScreenComponentContent component={component} data={byComponent.get(component.id)} />
               </article>
             )
           })}

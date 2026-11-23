@@ -1,8 +1,11 @@
-.playback-shell {
+:where(.playback-shell, .screen-area, .screen-component) {
   --playback-ink: #edf6ff;
   --playback-subtle: #a0b4d3;
   --playback-border: #283e60;
   --playback-accent: #73def9;
+}
+
+.playback-shell {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -150,14 +153,23 @@
 
 .screen-component {
   position: absolute;
+  container-type: size;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: 26px 30px;
   border: 1px solid #304769;
   border-radius: 13px;
   background: #101e33;
   color: var(--playback-ink);
+}
+
+.screen-component-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: 26px 30px;
 }
 
 .screen-component[data-kind="kpi"] {
@@ -210,50 +222,61 @@
 .screen-component .data-chart { flex: 1; min-height: 0; min-width: 0; }
 .screen-component .chart-fallback { margin-block: auto; color: var(--playback-subtle); }
 
+@container (max-width: 380px) or (max-height: 136px) {
+  .screen-component-body { padding: 11px 12px; }
+  .screen-component-heading { gap: .13rem .4rem; }
+  .screen-component .screen-component-heading h2 { font-size: 14px; }
+  .screen-component-heading span { font-size: 11px; }
+  .screen-metric { font-size: clamp(22px, 17cqw, 42px); }
+  .screen-metric strong { overflow-wrap: anywhere; }
+  .screen-metric[data-empty="true"] { font-size: 14px; }
+}
+
 @media (max-width: 48rem) {
   .playback-shell {
-    --playback-chart-height: clamp(12rem, 56vw, 18rem);
     height: auto;
     gap: .85rem;
   }
   .playback-heading { padding-top: .45rem; }
   .playback-heading h1 { font-size: 1.9rem; }
   .playback-heading .muted { font-size: .875rem; }
-  .screen-area { display: block; overflow: visible; }
-  .screen-size, .screen-canvas { width: 100% !important; height: auto !important; }
-  .screen-canvas {
+  .screen-area { --playback-chart-height: clamp(12rem, 56vw, 18rem); display: block; overflow: visible; }
+  .screen-area .screen-size, .screen-area .screen-canvas { width: 100% !important; height: auto !important; }
+  .screen-area .screen-canvas {
     display: grid;
     grid-template-columns: repeat(6, minmax(0, 1fr));
     gap: .5rem;
     padding: .5rem;
     transform: none !important;
   }
-  .screen-component {
+  .screen-area .screen-component {
     grid-column: 1 / -1;
     position: relative;
+    container-type: normal;
     inset: auto !important;
     width: 100% !important;
     height: auto !important;
     border-radius: .625rem;
-    padding: .85rem;
   }
-  .screen-component[data-kind="kpi"] { grid-column: span 2; min-height: 6rem; padding: .6rem; }
-  .screen-component .data-chart {
+  .screen-area .screen-component-body { padding: .85rem; }
+  .screen-area .screen-component[data-kind="kpi"] { grid-column: span 2; min-height: 6rem; }
+  .screen-area .screen-component[data-kind="kpi"] .screen-component-body { padding: .6rem; }
+  .screen-area .screen-component .data-chart {
     flex: none;
     height: var(--playback-chart-height);
     margin-top: .15rem;
   }
-  .screen-component .chart-fallback {
+  .screen-area .screen-component .chart-fallback {
     display: grid;
     align-items: center;
     min-height: var(--playback-chart-height);
   }
-  .screen-component-heading h2 { font-size: 1rem; }
-  .screen-component[data-kind="kpi"] h2 { font-size: .76rem; }
-  .screen-component-heading span { font-size: .8rem; }
-  .screen-metric { font-size: clamp(1.2rem, 5.5vw, 2rem); }
-  .screen-metric small { font-size: .5em; }
-  .screen-metric[data-empty="true"] { font-size: .85rem; }
+  .screen-area .screen-component-heading h2 { font-size: 1rem; }
+  .screen-area .screen-component[data-kind="kpi"] h2 { font-size: .76rem; }
+  .screen-area .screen-component-heading span { font-size: .8rem; }
+  .screen-area .screen-metric { font-size: clamp(1.2rem, 5.5vw, 2rem); }
+  .screen-area .screen-metric small { font-size: .5em; }
+  .screen-area .screen-metric[data-empty="true"] { font-size: .85rem; }
 }
 
 @media (pointer: coarse) {
