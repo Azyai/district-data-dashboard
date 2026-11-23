@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QuerySpec",
+  "description": "服务端受控查询结构，不接受 SQL。播放 API 只接受组件引用，由服务端解析绑定。",
+  "type": "object",
+  "properties": {
+    "metricId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "metricVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "startDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "endDate": {
+      "type": "string",
+      "format": "date"
+    },
+    "groupBy": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]{0,63}$"
+      },
+      "maxItems": 3,
+      "minItems": 0
+    }
+  },
+  "required": [
+    "metricId",
+    "metricVersion",
+    "startDate",
+    "endDate"
+  ],
+  "additionalProperties": false
+}

@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "DashboardManifest",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "projectId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "releaseId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,63}$"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "theme": {
+      "$ref": "#/$defs/Theme"
+    },
+    "canvas": {
+      "$ref": "#/$defs/Canvas"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Component"
+      },
+      "maxItems": 20,
+      "minItems": 1
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "projectId",
+    "releaseId",
+    "title",
+    "description",
+    "theme",
+    "canvas",
+    "components"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "Theme": {
+      "type": "string",
+      "enum": [
+        "city",
+        "services"
+      ]
+    },
+    "Canvas": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 320,
+          "maximum": 8192
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 240,
+          "maximum": 8192
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "Geometry": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8192
+        },
+        "y": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8192
+        },
+        "width": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "z": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height",
+        "z"
+      ],
+      "additionalProperties": false
+    },
+    "Component": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "title": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "kpi",
+            "trend",
+            "ranking"
+          ]
+        },
+        "metricId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "geometry": {
+          "$ref": "#/$defs/Geometry"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "metricId",
+        "unit",
+        "geometry"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
