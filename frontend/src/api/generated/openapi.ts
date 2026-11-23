@@ -375,6 +375,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/dashboards/{projectId}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取演示专题草稿
+         * @description 数据管理员可读取专题模板、采样数据和草稿。无保存记录时返回模板布局和版本 0。
+         */
+        get: operations["getDashboardDraft"];
+        /**
+         * 按版本保存演示专题草稿
+         * @description 数据管理员提交组件及位置。组件须绑定专题模板允许的指标，保存草稿与版本更新在同一事务内完成。
+         */
+        put: operations["saveDashboardDraft"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -639,6 +663,37 @@ export interface components {
             name: string;
             level: components["schemas"]["CockpitLevel"];
             parentId: string | null;
+        };
+        DashboardDraftComponent: {
+            id: string;
+            title: string;
+            /** @enum {string} */
+            type: "kpi" | "trend" | "ranking";
+            metricId: string;
+            unit: string;
+            geometry: {
+                x: number;
+                y: number;
+                width: number;
+                height: number;
+                z: number;
+            };
+        };
+        DashboardDraftInput: {
+            /** @description 同专题内组件 ID 唯一，组件边界须落在画布内 */
+            components: components["schemas"]["DashboardDraftComponent"][];
+        };
+        DashboardDraftState: {
+            revision: number;
+            /** @description 同专题内组件 ID 唯一，组件边界须落在画布内 */
+            components: components["schemas"]["DashboardDraftComponent"][];
+        };
+        DashboardDraftWorkspace: {
+            template: components["schemas"]["dashboard-manifest.schema"];
+            snapshot: components["schemas"]["BatchQueryResult"];
+            revision: number;
+            /** @description 同专题内组件 ID 唯一，组件边界须落在画布内 */
+            components: components["schemas"]["DashboardDraftComponent"][];
         };
         Geometry: {
             x: number;
@@ -1540,6 +1595,81 @@ export interface operations {
                 };
             };
             401: components["responses"]["Http401"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getDashboardDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["DashboardDraftWorkspace"];
+                    };
+                };
+            };
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    saveDashboardDraft: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 从当前会话的 CSRF 接口取得 */
+                "X-CSRF-TOKEN": components["parameters"]["CsrfHeader"];
+                /** @description 草稿版本号，例如 "0" */
+                "If-Match": string;
+            };
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardDraftInput"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["DashboardDraftState"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            404: components["responses"]["Http404"];
+            409: components["responses"]["Http409"];
             500: components["responses"]["Http500"];
         };
     };
