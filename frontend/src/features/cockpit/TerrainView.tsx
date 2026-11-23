@@ -68,12 +68,13 @@ const fragmentShader = `
     vec3 normal = normalize(terrainNormal);
     float key = max(0.0, dot(normal, normalize(vec3(-0.68, 0.67, 0.32))));
     float fill = max(0.0, dot(normal, normalize(vec3(0.78, 0.11, 0.61))));
-    vec3 ground = mix(vec3(0.032, 0.087, 0.156), vec3(0.195, 0.352, 0.512), relief);
-    vec3 ink = ground * (0.62 + key * 0.83 + fill * 0.11);
-    ink += vec3(0.11, 0.17, 0.24) * pow(key, 3.0) * (0.18 + relief * 0.58);
-    float minor = contour(height * 17.0, 0.039) * 0.22;
-    float major = contour(height * 5.6667, 0.047) * 0.58;
-    ink += vec3(0.16, 0.28, 0.41) * (minor + major) * (0.32 + key * 0.52);
+    vec3 ground = mix(vec3(0.032, 0.087, 0.195), vec3(0.20, 0.37, 0.63), relief);
+    vec3 ink = ground * (0.69 + key * 0.87);
+    ink += vec3(0.13, 0.31, 0.42) * pow(key, 3.0) * (0.22 + relief * 0.56);
+    ink += vec3(0.13, 0.07, 0.32) * fill * (0.3 + relief * 0.36);
+    float minor = contour(height * 17.0, 0.038) * 0.30;
+    float major = contour(height * 5.6667, 0.046) * 0.70;
+    ink += vec3(0.23, 0.51, 0.71) * (minor + major) * (0.38 + key * 0.48);
     gl_FragColor = vec4(ink, 1.0);
   }
 `
@@ -161,7 +162,7 @@ function fitCamera(camera: THREE.OrthographicCamera, width: number, height: numb
   const center = bounds.getCenter(new THREE.Vector2())
   const sides = Math.min(width * .12, Math.max(13, width * .045))
   const top = Math.max(12, height * .052)
-  const bottom = 44
+  const bottom = 50
   const pixelsPerUnit = Math.min((width - 2 * sides) / size.x, (height - top - bottom) / size.y)
   const halfWidth = width / pixelsPerUnit / 2
   const halfHeight = height / pixelsPerUnit / 2
@@ -216,10 +217,10 @@ function drawPlan(canvas: HTMLCanvasElement, camera: THREE.OrthographicCamera, w
   for (const [index, upper] of crown.entries()) {
     const next = (index + 1) % crown.length
     path([upper, crown[next], bench[next], bench[index]])
-    context.fillStyle = '#152947'
+    context.fillStyle = '#1d365c'
     context.fill()
     path([bench[index], bench[next], foot[next], foot[index]])
-    context.fillStyle = '#0b152c'
+    context.fillStyle = '#101936'
     context.fill()
   }
 
@@ -230,9 +231,9 @@ function drawPlan(canvas: HTMLCanvasElement, camera: THREE.OrthographicCamera, w
       const altitude = elevation(x, z, phase)
       const grade = (elevation(x + step, z, phase) - altitude) / step
       const tone = Math.max(0, Math.min(1, altitude * 0.62 + 0.12 - grade * 0.19))
-      const contour = altitude * 17 % 1 < .21 ? 4 : 0
+      const contour = altitude * 17 % 1 < .21 ? 10 : 0
       context.fillStyle = 'rgb(' + (9 + tone * 63 + contour) + ' ' +
-        (26 + tone * 96 + contour) + ' ' + (50 + tone * 120 + contour) + ')'
+        (26 + tone * 110 + contour) + ' ' + (57 + tone * 143 + contour) + ')'
       path([point(x, z), point(x + step, z), point(x + step, z + step), point(x, z + step)])
       context.fill()
       context.strokeStyle = context.fillStyle
@@ -241,11 +242,11 @@ function drawPlan(canvas: HTMLCanvasElement, camera: THREE.OrthographicCamera, w
     }
   }
   path(foot)
-  context.strokeStyle = '#3a537b'
+  context.strokeStyle = '#586dad'
   context.lineWidth = .6
   context.stroke()
   path(crown)
-  context.strokeStyle = '#92b6d8'
+  context.strokeStyle = '#9ce8fe'
   context.lineWidth = .9
   context.stroke()
 }
@@ -254,11 +255,11 @@ function addScene(phase: number) {
   const scene = new THREE.Scene()
   scene.add(new THREE.Mesh(meshSurface(phase), new THREE.ShaderMaterial({ vertexShader, fragmentShader })))
   scene.add(
-    strata(phase, undefined, -.29, 0x254364, 0x111e37),
-    strata(phase, -.29, -.51, 0x1b2d49, 0x071026),
-    edge(phase, undefined, 0x9bc4e4, .85),
-    edge(phase, -.292, 0x628bbb, .53),
-    edge(phase, -.51, 0x415d87, .74),
+    strata(phase, undefined, -.29, 0x315989, 0x16284b),
+    strata(phase, -.29, -.51, 0x282f62, 0x090d24),
+    edge(phase, undefined, 0x9adffa, .9),
+    edge(phase, -.292, 0x7498eb, .69),
+    edge(phase, -.51, 0x696ab4, .73),
   )
   return scene
 }
@@ -312,7 +313,7 @@ function layoutMarkers(
   })
   const pinAreas = points.map(({ x, y }) => ({ left: x - 8, right: x + 8, top: y - 8, bottom: y + 8 }))
   const labels: Rect[] = []
-  const fontSize = width < 520 ? 11 : 12
+  const fontSize = width >= 1600 ? 19 : width >= 1200 ? 16 : width >= 900 ? 14 : width >= 520 ? 12 : 11
   if (measure) measure.font = '650 ' + fontSize + 'px system-ui, "Microsoft YaHei", sans-serif'
 
   return places.map((place, index): Marker => {
@@ -324,7 +325,7 @@ function layoutMarkers(
       : ['west', 'east', 'north', 'south']
     const selected = sides.find(side => {
       const box = labelBox(side, point, labelWidth, fontSize + 9)
-      const fits = box.left >= 8 && box.right <= width - 8 && box.top >= 8 && box.bottom <= height - 35
+      const fits = box.left >= 8 && box.right <= width - 8 && box.top >= 8 && box.bottom <= height - 43
       if (!fits || labels.some(label => overlaps(label, box))) return false
       if (pinAreas.some((pin, other) => index !== other && overlaps(pin, box))) return false
       labels.push(box)

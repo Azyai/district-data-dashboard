@@ -70,6 +70,36 @@ function SignalTime({ value }: { value: string }) {
 type Metric = CockpitArea['metrics'][number]
 const headlineMetrics = ['governance-events', 'service-cases', 'air-quality-rate', 'active-alerts']
 
+const iconPaths = {
+  grid: 'M3.5 3.5h6v6h-6zm11 0h6v6h-6zm-11 11h6v6h-6zm11 0h6v6h-6z',
+  spark: 'M12 3c0 4.97 4.03 9 9 9-4.97 0-9 4.03-9 9 0-4.97-4.03-9-9-9 4.97 0 9-4.03 9-9z',
+  pin: 'M20 10c0 5-8 10-8 10S4 15 4 10a8 8 0 1 1 16 0zM14.5 10a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z',
+  pulse: 'M3 12h4l3-6 4 12 3-6h4',
+  trend: 'M4 5v15h16M8 15l4-4 3 2 5-6',
+  arrow: 'M5 12h14m-6-6 6 6-6 6',
+  layers: 'm12 3 9 5-9 5-9-5 9-5zm-9 9 9 5 9-5m-18 4 9 5 9-5',
+  document: 'M7 3h7l4 4v14H6V3h1zm7 0v5h4M9 12h6m-6 4h6',
+  ventilation: 'M3 8h12.5a2.5 2.5 0 1 0-2.5-2.5M3 12h16a2 2 0 1 1-2 2M4 16h7.5A2.5 2.5 0 1 1 9 18.5',
+  alert: 'M12 4 3.5 19h17L12 4zm0 6v3m0 3h.01',
+} as const
+
+type IconName = keyof typeof iconPaths
+const metricIcons: Partial<Record<string, IconName>> = {
+  'governance-events': 'pulse',
+  'service-cases': 'document',
+  'air-quality-rate': 'ventilation',
+  'active-alerts': 'alert',
+}
+
+function CockpitIcon({ name }: { name: IconName }) {
+  return (
+    <svg className="cockpit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d={iconPaths[name]} />
+    </svg>
+  )
+}
+
 function organizeMetrics(metrics: Metric[]) {
   const rank = new Map(headlineMetrics.map((id, index) => [id, index]))
   const ordered = [...metrics].sort((left, right) =>
@@ -80,7 +110,7 @@ function organizeMetrics(metrics: Metric[]) {
 function Delta({ value, unit }: { value: number; unit: string }) {
   const suffix = unit === '%' || unit === '％' ? ' 个百分点' : unit ? ' ' + unit : ''
   const text = value === 0 ? '持平' : (value > 0 ? '+' : '') + values.format(value) + suffix
-  return <dd className="metric-delta" title={'较上个观测日 ' + text}>{text}</dd>
+  return <dd className="metric-delta" data-flat={value === 0} title={'较上个观测日 ' + text}>{text}</dd>
 }
 
 function Masthead({ identityControl, onAsk }: { identityControl: ReactNode; onAsk?: () => void }) {
@@ -93,9 +123,11 @@ function Masthead({ identityControl, onAsk }: { identityControl: ReactNode; onAs
         <h1>门头沟区数字驾驶舱</h1>
       </div>
       <nav className="cockpit-actions" aria-label="驾驶舱工具">
-        <Link to="/admin" className="cockpit-admin-link">数据管理</Link>
+        <Link to="/admin" className="cockpit-admin-link"><CockpitIcon name="grid" />数据管理</Link>
         {identityControl}
-        {onAsk && <button type="button" className="cockpit-ai-link" aria-haspopup="dialog" onClick={onAsk}>AI 问数</button>}
+        {onAsk && <button type="button" className="cockpit-ai-link" aria-haspopup="dialog" onClick={onAsk}>
+          <CockpitIcon name="spark" />AI 问数
+        </button>}
       </nav>
     </header>
   )
@@ -125,16 +157,17 @@ function MetricPanel({ metrics, headline }: { metrics: Metric[]; headline?: bool
   const titleId = headline ? 'area-metrics' : 'area-supporting'
   return (
     <section className={headline ? 'key-metrics' : 'supporting-metrics'} aria-labelledby={titleId}>
-      <h2 id={titleId} className={headline ? 'sr-only' : 'brief-heading'}>{headline ? '核心指标' : '其他指标'}</h2>
+      <h2 id={titleId} className={headline ? 'metrics-heading' : 'brief-heading'}>{headline ? '核心指标' : '其他指标'}</h2>
       {metrics.length === 0 ? <p className="cockpit-empty">当前区域暂无指标</p> : (
         <dl className="cockpit-metrics">
           {metrics.map(metric => {
             const reading = metric.status === 'NO_DATA' ? null : metric.value
             return (
-              <div key={metric.id} className="cockpit-metric" data-attention={metric.id === 'active-alerts'}>
+              <div key={metric.id} className="cockpit-metric" data-metric={metric.id}>
                 <dt title={metric.evidence
                   ? metric.label + ' · ' + metric.evidence.sourceName + ' · v' + metric.evidence.version : metric.label}>
-                  {metric.label}
+                  {headline && <span className="metric-symbol"><CockpitIcon name={metricIcons[metric.id] ?? 'trend'} /></span>}
+                  <span>{metric.label}</span>
                 </dt>
                 {reading != null ? (
                   <dd className="metric-reading"><strong>{values.format(reading)}</strong><span>{metric.unit}</span></dd>
@@ -154,7 +187,7 @@ function SignalPanel({ area, onInspect }: { area: CockpitArea; onInspect: (signa
   return (
     <section className="signals-panel" aria-labelledby="area-signals">
       <div className="brief-bar">
-        <h2 id="area-signals" className="brief-heading">运行态势</h2>
+        <h2 id="area-signals" className="brief-heading"><CockpitIcon name="pulse" />运行态势</h2>
         {attention.length > 0 && <span className="attention-count">{attention.length} 项待关注</span>}
       </div>
       {attention.length > 0 ? (
@@ -174,7 +207,9 @@ function SignalPanel({ area, onInspect }: { area: CockpitArea; onInspect: (signa
           })}
         </ol>
       ) : <p className="signal-empty">暂无待关注事项</p>}
-      <button type="button" className="issue-link" aria-haspopup="dialog" onClick={() => onInspect()}>查看问题</button>
+      <button type="button" className="issue-link" aria-haspopup="dialog" onClick={() => onInspect()}>
+        查看问题<CockpitIcon name="arrow" />
+      </button>
     </section>
   )
 }
@@ -184,7 +219,12 @@ function RegionMap({ area, onSelectArea }: { area: CockpitArea; onSelectArea: (a
   return (
     <section className="map-panel" aria-labelledby="area-map">
       <div className="map-toolbar">
-        <h2 id="area-map">空间态势</h2>
+        <div className="map-heading">
+          <h2 id="area-map"><CockpitIcon name="layers" />空间态势</h2>
+          {area.children.length > 0 && <span className="map-count">
+            {area.children.length} 个{area.level === 'district' ? '镇街' : '村社'}
+          </span>}
+        </div>
         <div className="map-actions">
           {parent && <Link className="level-up" to={areaPath(parent.id)} aria-label={'返回上一级 ' + parent.name}>上一级</Link>}
           {area.children.length > 0 && (
@@ -194,7 +234,7 @@ function RegionMap({ area, onSelectArea }: { area: CockpitArea; onSelectArea: (a
                 event.currentTarget.open = false
                 event.currentTarget.querySelector('summary')?.focus()
               }}>
-              <summary>{area.level === 'district' ? '选择镇街' : '选择村社'}</summary>
+              <summary><CockpitIcon name="pin" />{area.level === 'district' ? '选择镇街' : '选择村社'}</summary>
               <nav className="map-directory" aria-label="下辖区域">
                 {area.children.map(child => <Link to={areaPath(child.id)} key={child.id}>{child.name}</Link>)}
               </nav>
@@ -256,7 +296,7 @@ function TrendPanel({ area }: { area: CockpitArea }) {
   return (
     <section className="cockpit-trend" data-empty={area.trend.length === 0} aria-labelledby="area-trend">
       <div className="trend-heading">
-        <h2 id="area-trend">治理事件趋势</h2>
+        <h2 id="area-trend"><CockpitIcon name="trend" />治理事件趋势</h2>
         {first && last && <span>{first === last ? shortDate(first) : shortDate(first) + ' 至 ' + shortDate(last)}</span>}
       </div>
       {area.trend.length > 0 ? (
@@ -355,8 +395,8 @@ export default function Cockpit({ identityControl }: { identityControl: ReactNod
           <>
             <div ref={heading} className="area-focus" tabIndex={-1} aria-label={area.name}><AreaBar area={area} /></div>
 
-            <MetricPanel metrics={metricGroups.headline} headline />
             <div className="cockpit-main">
+              <MetricPanel metrics={metricGroups.headline} headline />
               <RegionMap area={area} onSelectArea={areaId => navigate(areaPath(areaId))} />
               <aside className="cockpit-brief" aria-label="区域运行信息">
                 <SignalPanel area={area} onInspect={openIssues} />
