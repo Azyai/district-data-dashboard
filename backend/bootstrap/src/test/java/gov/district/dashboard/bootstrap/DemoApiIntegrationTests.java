@@ -19,6 +19,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -78,6 +79,76 @@ class DemoApiIntegrationTests {
             browser.uploadCsv(null, ApiCode.CSRF_INVALID);
             JsonNode asset = browser.uploadCsv(browser.csrf(), ApiCode.OK);
             assertThat(asset.path("fileName").asString()).isEqualTo("observations.csv");
+        }
+    }
+
+    @Test
+    void protectsDashboardDraftsAndPreservesPublishedPlayback() throws Exception {
+        String path = draftPath(CITY);
+        try (var admin = new Browser(); var viewer = new Browser()) {
+            admin.get(path, ApiCode.AUTH_REQUIRED);
+            viewer.login("district");
+            viewer.get(path, ApiCode.ACCESS_DENIED);
+            JsonNode published = viewer.get(manifestPath(CITY), ApiCode.OK);
+            admin.login("data-admin");
+            admin.get(draftPath("missing-project"), ApiCode.PROJECT_NOT_FOUND);
+
+            JsonNode initial = admin.get(path, ApiCode.OK);
+            assertThat(initial.path("revision").asInt()).isZero();
+            assertThat(initial.path("template")).isEqualTo(published);
+            assertThat(initial.path("components")).isEqualTo(published.path("components"));
+            assertThat(initial.path("snapshot").path("results").size()).isEqualTo(initial.path("components").size());
+
+            var edited = JSON.createObjectNode();
+            var components = edited.putArray("components");
+            var first = (ObjectNode) initial.path("components").get(0).deepCopy();
+            first.put("title", "指挥席观察指标");
+            ((ObjectNode) first.path("geometry")).put("x", 71);
+            components.add(first);
+            var csrf = admin.csrf();
+            admin.putDraft(path, edited, "\"0\"", null, ApiCode.CSRF_INVALID);
+            admin.putDraft(path, edited, null, csrf, ApiCode.INVALID_REQUEST);
+            admin.putDraft(path, edited, "0", csrf, ApiCode.INVALID_REQUEST);
+
+            first.put("metricId", "received-cases");
+            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.INVALID_REQUEST);
+            first.put("metricId", published.path("components").get(0).path("metricId").asString());
+            ((ObjectNode) first.path("geometry")).put("width", 1920);
+            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.INVALID_REQUEST);
+            ((ObjectNode) first.path("geometry")).put("width", 400);
+            components.add(first.deepCopy());
+            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.INVALID_REQUEST);
+            components.remove(1);
+            assertThat(admin.get(path, ApiCode.OK).path("revision").asInt()).isZero();
+
+            JsonNode saved = admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.OK);
+            assertThat(saved.path("revision").asInt()).isEqualTo(1);
+            assertThat(saved.path("components")).isEqualTo(components);
+            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.VERSION_CONFLICT);
+            assertThat(admin.get(path, ApiCode.OK).path("components")).isEqualTo(components);
+            assertThat(viewer.get(manifestPath(CITY), ApiCode.OK)).isEqualTo(published);
+
+            components.removeAll();
+            JsonNode cleared = admin.putDraft(path, edited, "\"1\"", csrf, ApiCode.OK);
+            assertThat(cleared.path("revision").asInt()).isEqualTo(2);
+            assertThat(admin.get(path, ApiCode.OK).path("components").isEmpty()).isTrue();
+        }
+    }
+
+    @Test
+    void allowsOnlyOneConcurrentFirstDraftSave() throws Exception {
+        String path = draftPath(SERVICES);
+        try (var admin = new Browser()) {
+            admin.login("data-admin");
+            JsonNode initial = admin.get(path, ApiCode.OK);
+            var draft = JSON.createObjectNode().set("components", initial.path("components"));
+            var csrf = admin.csrf();
+            var first = admin.client.sendAsync(admin.draftRequest(path, draft, "\"0\"", csrf),
+                    HttpResponse.BodyHandlers.ofString());
+            var second = admin.client.sendAsync(admin.draftRequest(path, draft, "\"0\"", csrf),
+                    HttpResponse.BodyHandlers.ofString());
+            assertThat(List.of(first.get().statusCode(), second.get().statusCode())).containsExactlyInAnyOrder(200, 409);
+            assertThat(admin.get(path, ApiCode.OK).path("revision").asInt()).isEqualTo(1);
         }
     }
 
@@ -270,6 +341,10 @@ class DemoApiIntegrationTests {
         return "/playback/" + projectId + "/component-queries";
     }
 
+    private static String draftPath(String projectId) {
+        return "/admin/dashboards/" + projectId + "/draft";
+    }
+
     private HttpRequest.Builder request(String path) {
         return requestOnPort(port, "/api/v1" + path);
     }
@@ -341,6 +416,22 @@ class DemoApiIntegrationTests {
                     + "\r\nContent-Type: text/csv\r\n\r\nregion,date,measure,value\r\n"
                     + "dayu,2026-11-23,events,10\r\n--fixture--\r\n";
             return exchange(client, builder.POST(HttpRequest.BodyPublishers.ofString(body)).build(), expected);
+        }
+
+        private JsonNode putDraft(String path, JsonNode payload, String version, Csrf csrf, ApiCode expected)
+                throws Exception {
+            return exchange(client, draftRequest(path, payload, version, csrf), expected);
+        }
+
+        private HttpRequest draftRequest(String path, JsonNode payload, String version, Csrf csrf) {
+            var builder = request(path).header("Content-Type", "application/json");
+            if (version != null) {
+                builder.header("If-Match", version);
+            }
+            if (csrf != null) {
+                builder.header(csrf.headerName(), csrf.token());
+            }
+            return builder.PUT(HttpRequest.BodyPublishers.ofString(payload.toString())).build();
         }
 
         private Csrf csrf() throws Exception {
