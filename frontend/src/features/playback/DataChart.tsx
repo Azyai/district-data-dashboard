@@ -23,6 +23,26 @@ type DataChartProps = {
 const fontFamily = 'system-ui, "Microsoft YaHei", sans-serif'
 const axisNumber = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 8 })
 const observedNumber = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 16 })
+const marker = '#b4f3ff'
+const axisInk = '#a4b9d8'
+const guide = 'rgba(122, 158, 216, .18)'
+
+const lineGradient = {
+  type: 'linear', x: 0, y: 0, x2: 1, y2: 0,
+  colorStops: [
+    { offset: 0, color: '#698cff' },
+    { offset: 1, color: '#78e9ff' },
+  ],
+} satisfies NonNullable<LineSeriesOption['lineStyle']>['color']
+
+const areaGradient = {
+  type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+  colorStops: [
+    { offset: 0, color: 'rgba(65, 129, 250, .35)' },
+    { offset: .9, color: 'rgba(65, 129, 250, .035)' },
+    { offset: 1, color: 'rgba(65, 129, 250, 0)' },
+  ],
+} satisfies NonNullable<LineSeriesOption['areaStyle']>['color']
 
 function shortDate(value: string): string {
   const date = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -57,16 +77,13 @@ function chartDescription(label: string, points: Point[], unit: string, range: R
 }
 
 function compactTrend(points: Point[], width: number, range: ReturnType<typeof pointRange>): Options {
-  const accent = '#5ab5ff'
-  const guide = '#203d61'
   const mobile = width < 480
   const allZero = range.min === 0 && range.max === 0
   const labelWidth = Math.max(axisNumber.format(range.min).length, axisNumber.format(range.max).length)
-  const left = Math.min(Math.round(width * .29), Math.max(40, labelWidth * 6 + 14))
+  const left = Math.min(Math.round(width * .29), Math.max(46, labelWidth * 7 + 18))
   const fontSize = mobile ? 11 : 12
   return {
-    backgroundColor: '#091b32',
-    grid: { top: 13, right: mobile ? 19 : 25, bottom: 25, left },
+    grid: { top: 17, right: mobile ? 23 : 30, bottom: 28, left },
     xAxis: {
       type: 'category',
       data: points.map(point => point.label),
@@ -74,7 +91,7 @@ function compactTrend(points: Point[], width: number, range: ReturnType<typeof p
       axisLine: { onZero: false, lineStyle: { color: guide } },
       axisTick: { show: false },
       axisLabel: {
-        color: '#a2bbdc',
+        color: axisInk,
         fontSize,
         hideOverlap: true,
         showMinLabel: true,
@@ -89,33 +106,21 @@ function compactTrend(points: Point[], width: number, range: ReturnType<typeof p
       minInterval: points.every(point => Number.isInteger(point.value)) ? 1 : undefined,
       min: allZero ? 0 : undefined,
       max: allZero ? 1 : undefined,
-      axisLabel: { color: '#a2bbdc', fontSize, hideOverlap: true, formatter: (value: number) => axisNumber.format(value) },
-      splitLine: { lineStyle: { color: guide } },
+      axisLabel: { color: axisInk, fontSize, hideOverlap: true, formatter: (value: number) => axisNumber.format(value) },
+      splitLine: { lineStyle: { color: guide, type: 'dashed' } },
     },
     tooltip: {
-      axisPointer: { type: 'line', lineStyle: { color: '#779fce', type: 'dashed' } },
+      axisPointer: { type: 'line', lineStyle: { color: '#8bcaed', type: 'dashed' } },
     },
     series: {
       type: 'line',
       sampling: 'minmax',
       symbol: 'circle',
-      symbolSize: 7,
-      showSymbol: points.length === 1,
-      lineStyle: { width: mobile ? 2.2 : 2.5, color: accent },
-      itemStyle: { color: accent },
-      areaStyle: {
-        color: {
-          type: 'linear',
-          x: 0,
-          y: 0,
-          x2: 0,
-          y2: 1,
-          colorStops: [
-            { offset: 0, color: 'rgba(51, 151, 250, .32)' },
-            { offset: 1, color: 'rgba(51, 151, 250, .025)' },
-          ],
-        },
-      },
+      symbolSize: mobile ? 5 : 7,
+      showSymbol: points.length <= 12,
+      lineStyle: { width: mobile ? 2.3 : 2.8, color: lineGradient },
+      itemStyle: { color: marker, borderColor: '#165f93', borderWidth: 1.2 },
+      areaStyle: { color: areaGradient },
       data: points.map(point => point.value),
     },
   }
@@ -123,38 +128,62 @@ function compactTrend(points: Point[], width: number, range: ReturnType<typeof p
 
 function standardChart(kind: DataChartProps['kind'], points: Point[], width: number): Options {
   const narrow = width < 480
-  const guide = '#29456f'
+  const labelSize = narrow ? 12 : Math.min(26, Math.max(18, Math.round(width / 76)))
   const axisLabel = {
-    color: '#b7ceec',
-    fontSize: narrow ? 12 : Math.min(26, Math.max(17, Math.round(width / 84))),
+    color: axisInk,
+    fontSize: labelSize,
     hideOverlap: true,
   }
   const valueAxis = {
     type: 'value' as const,
     splitNumber: narrow || width > 1250 ? 3 : 5,
-    axisLabel,
-    splitLine: { lineStyle: { color: guide } },
+    axisLabel: { ...axisLabel, formatter: (value: number) => axisNumber.format(value) },
+    splitLine: { lineStyle: { color: guide, type: 'dashed' as const } },
   }
   const categoryAxis = {
     type: 'category' as const,
     data: points.map(point => point.label),
     axisLabel: { ...axisLabel, formatter: (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) ? value.slice(5) : value },
     axisLine: { lineStyle: { color: guide } },
+    axisTick: { show: false },
   }
+  const ranking = kind === 'ranking'
+  const showValues = ranking && points.length <= 8 && points.every(point => observedNumber.format(point.value).length <= 8)
+  const labelWidth = ranking ? points.reduce((size, point) => Math.max(size, point.label.length), 0) : 0
   return {
     grid: {
-      top: 20,
-      right: narrow ? 17 : 32,
-      bottom: narrow ? 30 : 40,
-      left: kind === 'ranking' ? (narrow ? 73 : 108) : (narrow ? 45 : 73),
+      top: 24,
+      right: showValues ? (narrow ? 48 : 72) : (narrow ? 22 : 36),
+      bottom: narrow ? 26 : 40,
+      left: ranking ? Math.min(Math.round(width * .33), Math.max(68, labelWidth * labelSize + 14)) : (narrow ? 44 : 65),
     },
-    xAxis: kind === 'ranking' ? valueAxis : categoryAxis,
-    yAxis: kind === 'ranking' ? { ...categoryAxis, inverse: true, axisTick: { show: false } } : valueAxis,
-    series: kind === 'ranking'
-      ? { type: 'bar', barMaxWidth: narrow ? 17 : 22, large: true, largeThreshold: 500, data: points.map(point => point.value) }
+    xAxis: ranking ? valueAxis : categoryAxis,
+    yAxis: ranking ? {
+      ...categoryAxis, inverse: true,
+      axisLabel: { ...axisLabel, width: Math.round(width * .26), overflow: 'truncate' },
+    } : valueAxis,
+    tooltip: { axisPointer: { type: ranking ? 'shadow' : 'line' } },
+    series: ranking
+      ? {
+        type: 'bar',
+        barMaxWidth: narrow ? 14 : 22,
+        large: true,
+        largeThreshold: 500,
+        showBackground: points.length <= 20,
+        backgroundStyle: { color: '#1a2d44', borderRadius: 4 },
+        itemStyle: { color: lineGradient, borderRadius: 4 },
+        label: {
+          show: showValues, position: 'right', color: '#cceaf9', fontSize: labelSize,
+          formatter: ({ value }) => typeof value === 'number' ? observedNumber.format(value) : '',
+        },
+        data: points.map(point => point.value),
+      }
       : {
-        type: 'line', sampling: 'minmax', showSymbol: points.length <= 48, symbolSize: 6,
-        lineStyle: { width: 2.5 }, areaStyle: { opacity: .17 }, data: points.map(point => point.value),
+        type: 'line', sampling: 'minmax', showSymbol: points.length <= 48, symbolSize: narrow ? 6 : 8,
+        lineStyle: { width: narrow ? 2.5 : 3.5, color: lineGradient },
+        itemStyle: { color: marker, borderColor: '#165f93', borderWidth: 1.2 },
+        areaStyle: { color: areaGradient },
+        data: points.map(point => point.value),
       },
   }
 }
@@ -185,16 +214,17 @@ export default function DataChart({ kind, label, points, unit, compact = false }
         chart.setOption({
           ...options,
           animation: false,
-          textStyle: { color: '#b7ceec', fontFamily },
-          color: ['#77bdff'],
+          textStyle: { color: axisInk, fontFamily },
+          color: [marker],
           tooltip: {
             ...options.tooltip,
             trigger: 'axis',
             triggerOn: 'mousemove|click',
             renderMode: 'richText',
             confine: true,
-            backgroundColor: '#112849',
-            borderColor: '#29456f',
+            backgroundColor: '#101e33',
+            borderColor: '#41648d',
+            padding: [9, 13],
             textStyle: { color: '#edf7fd' },
             valueFormatter: (value: unknown) => tooltip(value, unit),
           },
@@ -217,7 +247,7 @@ export default function DataChart({ kind, label, points, unit, compact = false }
   return (
     <div
       ref={host}
-      className="data-chart"
+      className={compact ? 'data-chart data-chart-compact' : 'data-chart'}
       style={{ minWidth: 0 }}
       role="img"
       aria-label={chartDescription(label, observed, unit, range)}

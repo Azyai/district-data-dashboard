@@ -6,6 +6,7 @@ import { ApiError, dashboardApi } from '../../api/client'
 import type { Me } from '../../api/client'
 import { Problem } from '../../shared/Problem'
 import { ScreenCanvas } from './ScreenCanvas'
+import './playback.css'
 
 const displayDate = new Intl.DateTimeFormat('zh-CN', {
   timeZone: 'Asia/Shanghai',
@@ -48,9 +49,9 @@ export default function Playback({ identity, identityControl }: { identity: Me; 
 
   const snapshot = dataQuery.data
   return (
-    <main className="playback-shell" aria-labelledby="screen-title">
+    <main className="playback-shell" data-theme={manifest.theme} aria-labelledby="screen-title">
       <header className="playback-bar">
-        <Link to="/" className="return-link">返回驾驶舱</Link>
+        <Link to="/" className="playback-back"><i aria-hidden="true" />返回驾驶舱</Link>
         {identityControl}
       </header>
       <section className="playback-heading">
@@ -58,10 +59,10 @@ export default function Playback({ identity, identityControl }: { identity: Me; 
           <h1 id="screen-title">{manifest.title}</h1>
           <p className="muted">{manifest.description}</p>
         </div>
-        <div className="playback-status">
+        <p className="playback-status">
           <span className="status-mark">模拟数据</span>
-          <p className="muted">数据时间 <time dateTime={snapshot.updatedAt}>{formatTimestamp(snapshot.updatedAt)}</time></p>
-        </div>
+          <time dateTime={snapshot.updatedAt} aria-label={'数据时间 ' + formatTimestamp(snapshot.updatedAt)}>{formatTimestamp(snapshot.updatedAt)}</time>
+        </p>
       </section>
       <ScreenCanvas manifest={manifest} snapshot={snapshot} />
     </main>

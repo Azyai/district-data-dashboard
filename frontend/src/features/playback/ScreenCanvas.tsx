@@ -34,13 +34,13 @@ export function ScreenCanvas({ manifest, snapshot }: { manifest: Manifest; snaps
             return (
               <article key={component.id} className="screen-component" data-kind={component.type}
                 style={{ left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height, zIndex: geometry.z }}>
-                <header className="component-heading">
+                <header className="screen-component-heading">
                   <h2>{component.title}</h2>
                   {component.type !== 'kpi' && <span>单位 {data?.unit ?? component.unit}</span>}
                 </header>
                 {component.type === 'kpi' ? (
-                  <p className="metric tabular-nums">
-                    {typeof data?.value === 'number' ? <>{numberFormat.format(data.value)}<small>{data.unit}</small></> : '暂无数据'}
+                  <p className="screen-metric" data-empty={typeof data?.value !== 'number'}>
+                    {typeof data?.value === 'number' ? <><strong>{numberFormat.format(data.value)}</strong><small>{data.unit}</small></> : '暂无数据'}
                   </p>
                 ) : plot.length ? (
                   <Suspense fallback={<p className="chart-fallback" aria-busy="true">正在加载图表</p>}>
