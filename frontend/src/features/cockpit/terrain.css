@@ -1,0 +1,136 @@
+.district-terrain {
+  isolation: isolate;
+  container-type: inline-size;
+  position: relative;
+  height: 100%;
+  min-height: 280px;
+  width: 100%;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 48% 40%, #152940 0%, #0c192b 53%, transparent 76%),
+    linear-gradient(170deg, #0b1527, #070e1c 67%);
+}
+
+.district-terrain::before {
+  content: "";
+  position: absolute;
+  inset: 41% 6% 7%;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, #030711b3 0%, transparent 72%);
+}
+
+.terrain-surface,
+.terrain-locators {
+  position: absolute;
+  inset: 0;
+}
+
+.terrain-surface canvas {
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.terrain-locators { pointer-events: none; }
+
+.terrain-location {
+  --pin: #afdbff;
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #e0efff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.terrain-location:hover,
+.terrain-location:focus-visible { --pin: #f7d09a; z-index: 4; }
+
+.terrain-location:focus-visible {
+  outline: 2px solid #e8bb85;
+  outline-offset: 0;
+}
+
+.terrain-label {
+  position: absolute;
+  display: block;
+  padding: 2px 5px;
+  border: 1px solid #91b4d473;
+  border-radius: 3px;
+  background: #091727f5;
+  color: #e0efff;
+  font: 650 12px / 1.25 system-ui, "Microsoft YaHei", sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.terrain-location[data-side="east"] .terrain-label { left: calc(50% + 12px); top: 50%; transform: translateY(-50%); }
+.terrain-location[data-side="west"] .terrain-label { right: calc(50% + 12px); top: 50%; transform: translateY(-50%); }
+.terrain-location[data-side="north"] .terrain-label { left: 50%; bottom: calc(50% + 12px); transform: translateX(-50%); }
+.terrain-location[data-side="south"] .terrain-label { left: 50%; top: calc(50% + 12px); transform: translateX(-50%); }
+
+.terrain-location:hover .terrain-label,
+.terrain-location:focus-visible .terrain-label { color: #ffe5bb; border-color: #bd9159; }
+.terrain-location[data-compact="true"]:not(:hover, :focus-visible) .terrain-label { visibility: hidden; }
+.terrain-location.is-current { pointer-events: none; }
+
+.terrain-pin,
+.terrain-legend i {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--pin, #afdbff);
+  box-shadow: 0 0 0 2px #0a1930, 0 0 0 4px #7daed389;
+}
+
+.terrain-location:hover .terrain-pin,
+.terrain-location:focus-visible .terrain-pin { box-shadow: 0 0 0 2px #2c2530, 0 0 0 4px #dca864; }
+
+.terrain-legend,
+.terrain-mode {
+  position: absolute;
+  z-index: 5;
+  bottom: 10px;
+  color: #b6cce6;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.terrain-legend {
+  left: 12px;
+  display: flex;
+  min-height: 25px;
+  align-items: center;
+  gap: 9px;
+}
+
+.terrain-legend span { display: inline-flex; align-items: center; gap: 8px; }
+.terrain-legend i { width: 5px; height: 5px; box-shadow: 0 0 0 2px #6584a285; }
+.terrain-legend small { color: #9aafc9; font-size: inherit; }
+
+.terrain-mode {
+  right: 12px;
+  min-height: 25px;
+  border: 1px solid #54749a;
+  border-radius: 3px;
+  background: #0b182b;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.terrain-mode:hover,
+.terrain-mode:focus-visible { color: #edf6ff; border-color: #a4cfff; }
+
+@container (max-width: 519px) {
+  .terrain-label { font-size: 11px; }
+}

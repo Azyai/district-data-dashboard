@@ -1,0 +1,385 @@
+.cockpit {
+  --page-ground: #071123;
+  --panel-ground: #101e34;
+  --panel-line: #263b55;
+  --panel-accent: #8ccaff;
+  --text-main: #eef5fc;
+  --text-secondary: #a7bdd7;
+  --amber: #ffcb8b;
+  --local-gutter: clamp(1rem, 2.2vw, 4.5rem);
+  --panel-gap: clamp(.8rem, 1.2vw, 2rem);
+  min-height: 100svh;
+  background: radial-gradient(ellipse at 42% 0%, #132b4e 0%, transparent 48%), var(--page-ground);
+  color: var(--text-main);
+  font-size: 15px;
+}
+
+.cockpit-masthead {
+  min-height: 4.45em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .8em 1.5em;
+  padding: .55em var(--local-gutter);
+  background: #0a172a;
+  border-bottom: 1px solid var(--panel-line);
+}
+
+.masthead-name, .cockpit-brand, .cockpit-actions {
+  display: flex;
+  align-items: center;
+}
+.masthead-name { min-width: 0; gap: .85em; }
+.masthead-name h1 {
+  font-size: 2em;
+  font-weight: 720;
+  line-height: 1.15;
+  letter-spacing: .005em;
+  text-wrap: balance;
+}
+
+.cockpit-brand {
+  justify-content: center;
+  flex: 0 0 2.55em;
+  width: 2.55em;
+  height: 2.55em;
+  border: 1px solid #3b658b;
+  border-radius: 8px;
+  background: #142b44;
+}
+.cockpit-brand:hover { border-color: var(--panel-accent); }
+.brand-symbol {
+  display: inline-flex;
+  align-items: end;
+  gap: .16em;
+  height: 1.15em;
+  transform: skew(-13deg);
+}
+.brand-symbol i { display: block; width: .25em; border-radius: 1px; background: var(--panel-accent); }
+.brand-symbol i:nth-child(1) { height: 50%; opacity: .67; }
+.brand-symbol i:nth-child(2) { height: 95%; }
+.brand-symbol i:nth-child(3) { height: 68%; opacity: .83; }
+
+.cockpit-actions { justify-content: flex-end; flex-wrap: wrap; gap: .55em; }
+.cockpit-actions .identity-button.ant-btn {
+  min-height: 2.6em;
+  border-color: #355070;
+  background: #101f34;
+  color: var(--text-main);
+  border-radius: 6px;
+}
+.cockpit-actions .identity-button.ant-btn:hover { border-color: var(--panel-accent); color: var(--panel-accent); }
+.cockpit-ai-link, .cockpit-admin-link, .level-up, .region-picker > summary, .issue-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.6em;
+  padding: .4em .78em;
+  border-radius: 6px;
+  white-space: nowrap;
+  font-size: .88em;
+  font-weight: 650;
+  cursor: pointer;
+}
+.cockpit-ai-link { color: #08182c; background: var(--panel-accent); border: 1px solid var(--panel-accent); }
+.cockpit-ai-link:hover { background: #b8e0ff; }
+.cockpit-admin-link { color: var(--text-secondary); }
+.cockpit-admin-link:hover { color: var(--text-main); background: #152943; }
+.level-up, .region-picker > summary, .issue-link {
+  color: var(--text-main);
+  border: 1px solid #385573;
+  background: #13263e;
+}
+.level-up:hover, .region-picker > summary:hover, .issue-link:hover,
+.region-picker[open] > summary { border-color: var(--panel-accent); color: var(--panel-accent); }
+
+.cockpit-body { width: min(100%, 256rem); margin-inline: auto; padding-inline: var(--local-gutter); padding-bottom: 1.4em; }
+.area-focus { scroll-margin-top: 1rem; }
+.area-focus:focus { outline: none; }
+.area-bar {
+  min-height: 3.15em;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .5em 1.1em;
+  padding-block: .65em;
+}
+.breadcrumbs ol, .area-meta { display: flex; align-items: center; flex-wrap: wrap; gap: .65em; }
+.breadcrumbs ol { margin: 0; padding: 0; list-style: none; }
+.breadcrumbs li { display: inline-flex; align-items: center; gap: .65em; font-weight: 630; font-size: .91em; }
+.breadcrumbs li + li::before {
+  content: "";
+  width: .34em;
+  height: .34em;
+  border-top: 1px solid #7596bb;
+  border-right: 1px solid #7596bb;
+  transform: rotate(45deg);
+}
+.breadcrumbs a { color: var(--text-secondary); padding: .2em 0; }
+.breadcrumbs a:hover { color: var(--panel-accent); text-decoration: underline; text-underline-offset: .23em; }
+.breadcrumbs [aria-current] { color: var(--text-main); }
+.area-meta { color: var(--text-secondary); font-size: .8em; }
+.area-meta time { font-variant-numeric: tabular-nums; }
+.data-status { display: inline-flex; align-items: center; gap: .45em; }
+.data-status::before { content: ""; width: .43em; height: .43em; border-radius: 50%; background: #88afdb; }
+.update-label { margin-left: .35em; }
+
+.key-metrics {
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: linear-gradient(105deg, #142743, #101c31 65%);
+  margin-bottom: var(--panel-gap);
+}
+.cockpit-metrics { display: grid; margin: 0; min-width: 0; }
+.key-metrics .cockpit-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.cockpit-metric {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  align-content: center;
+  gap: .28em .5em;
+  min-width: 0;
+}
+.key-metrics .cockpit-metric { min-height: 6.05em; padding: .75em 1.15em .83em; }
+.key-metrics .cockpit-metric + .cockpit-metric { border-left: 1px solid var(--panel-line); }
+.cockpit-metric dt {
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: .88em;
+  font-weight: 560;
+  line-height: 1.26;
+}
+.cockpit-metric dd { margin: 0; min-width: 0; }
+.metric-reading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .32em;
+  color: var(--text-main);
+}
+.metric-reading strong {
+  overflow-wrap: anywhere;
+  font-family: "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  font-weight: 650;
+  font-size: 2.5em;
+  line-height: 1;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+}
+.metric-reading span { color: var(--text-secondary); font-size: .78em; }
+.key-metrics .cockpit-metric[data-attention="true"] .metric-reading strong { color: var(--amber); }
+.metric-delta { color: var(--panel-accent); font-variant-numeric: tabular-nums; font-size: .75em; line-height: 1.3; }
+.metric-missing {
+  grid-column: 1 / -1;
+  padding-block: .28em;
+  color: var(--text-secondary);
+  font-size: .82em;
+  line-height: 1.3;
+}
+
+.cockpit-main { display: grid; grid-template-columns: minmax(0, 2.65fr) minmax(17rem, 1fr); gap: var(--panel-gap); }
+.map-panel, .cockpit-brief, .cockpit-trend, .distribution-panel {
+  min-width: 0;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: var(--panel-ground);
+}
+.map-panel {
+  min-height: clamp(24rem, 45svh, 54rem);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background: #0b1a2e;
+}
+.map-toolbar {
+  display: flex;
+  min-height: 3.28em;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75em;
+  padding: .52em 1.05em;
+  border-bottom: 1px solid var(--panel-line);
+}
+.map-toolbar h2, .brief-heading, .trend-heading h2 { font-size: 1em; font-weight: 670; line-height: 1.22; }
+.map-actions { display: flex; align-items: center; justify-content: end; gap: .42em; }
+.map-plot { display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); min-height: 0; overflow: hidden; border-radius: 0 0 9px 9px; }
+.map-plot > * { min-width: 0; }
+.map-wait { min-height: 280px; display: grid; place-items: center; color: var(--text-secondary); }
+.region-picker { position: relative; z-index: 7; }
+.region-picker > summary { list-style: none; gap: .55em; }
+.region-picker > summary::-webkit-details-marker { display: none; }
+.region-picker > summary::after {
+  content: "";
+  width: .37em;
+  height: .37em;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: translateY(-.12em) rotate(45deg);
+}
+.region-picker[open] > summary::after { transform: translateY(.12em) rotate(225deg); }
+.map-directory {
+  position: absolute;
+  right: 0;
+  top: calc(100% + .45em);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .22em;
+  width: min(19rem, calc(100vw - 2.6rem));
+  max-height: 46svh;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: .47em;
+  border: 1px solid #3e5e82;
+  border-radius: 7px;
+  background: #10243f;
+  box-shadow: 0 .7em 1.5em #03091580;
+}
+.map-directory a {
+  display: flex;
+  align-items: center;
+  min-height: max(2.8em, 2.5rem);
+  padding: .35em .55em;
+  color: #dceafa;
+  border-radius: 4px;
+  font-size: .88em;
+  line-height: 1.28;
+}
+.map-directory a:hover, .map-directory a:focus-visible { color: var(--text-main); background: #1c3b61; }
+.map-directory a:focus-visible { outline-offset: -2px; }
+
+.cockpit-brief { display: flex; flex-direction: column; padding: .95em 1.08em .35em; }
+.brief-bar, .trend-heading { display: flex; align-items: center; justify-content: space-between; gap: .5em; }
+.attention-count {
+  color: var(--amber);
+  font-size: .76em;
+  padding: .25em .55em;
+  border: 1px solid #775337;
+  border-radius: 4px;
+  background: #3b2b22;
+  white-space: nowrap;
+}
+.signals { list-style: none; padding: 0; margin: .5em 0 .35em; }
+.signal-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
+  min-height: max(2.75em, 2.5rem);
+  align-items: center;
+  column-gap: .56em;
+  text-align: start;
+  cursor: pointer;
+  color: var(--text-main);
+  font-size: .88em;
+  font-weight: 625;
+}
+.signal-title:hover { color: var(--panel-accent); }
+.signal-title time { color: var(--text-secondary); font-size: .91em; font-weight: 500; font-variant-numeric: tabular-nums; }
+.signal-dot { width: .43em; height: .43em; border-radius: 50%; background: var(--amber); }
+.signal-empty { padding-block: .72em .57em; color: var(--text-secondary); font-size: .83em; }
+.issue-link { color: var(--panel-accent); font-size: .81em; }
+.supporting-metrics, .cockpit-sources { margin-top: .93em; border-top: 1px solid var(--panel-line); }
+.supporting-metrics { padding-top: .85em; }
+.supporting-metrics .cockpit-metrics {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  max-height: 15.5em;
+  overflow-y: auto;
+  scrollbar-color: #4a6a8b transparent;
+  margin-top: .44em;
+}
+.supporting-metrics .cockpit-metric {
+  grid-template-columns: minmax(0, 1fr);
+  padding: .4em .42em .48em 0;
+}
+.supporting-metrics .metric-reading strong { font-size: 1.55em; letter-spacing: -.02em; }
+.supporting-metrics .metric-delta { font-size: .7em; }
+.supporting-metrics dt { font-size: .77em; }
+.cockpit-sources > summary {
+  display: flex;
+  min-height: max(2.8em, 2.55rem);
+  align-items: center;
+  justify-content: space-between;
+  gap: .35em;
+  cursor: pointer;
+  color: var(--text-main);
+  font-size: .85em;
+  font-weight: 610;
+  list-style: none;
+}
+.cockpit-sources > summary::-webkit-details-marker { display: none; }
+.cockpit-sources > summary span { margin-left: auto; color: var(--text-secondary); font-weight: 500; }
+.cockpit-sources > summary::after {
+  content: "";
+  width: .35em;
+  height: .35em;
+  border-bottom: 1px solid var(--panel-accent);
+  border-right: 1px solid var(--panel-accent);
+  transform: translateY(-.1em) rotate(45deg);
+}
+.cockpit-sources[open] > summary::after { transform: translateY(.1em) rotate(225deg); }
+.published-list { list-style: none; display: grid; gap: .7em; margin: 0; padding: .12em 0 .75em; }
+.published-list li { display: grid; gap: .19em; font-size: .8em; }
+.published-list small { color: var(--text-secondary); font-size: .92em; }
+
+.cockpit-deck { display: grid; gap: var(--panel-gap); margin-top: var(--panel-gap); }
+.cockpit-deck[data-paired="true"] { grid-template-columns: minmax(0, 2.65fr) minmax(17rem, 1fr); }
+.cockpit-trend {
+  display: flex;
+  flex-direction: column;
+  min-height: clamp(11.4rem, 22svh, 34rem);
+  background: #0d1b30;
+}
+.trend-heading { padding: .73em 1.05em .22em; }
+.trend-heading span { color: var(--text-secondary); font-size: .79em; font-variant-numeric: tabular-nums; }
+.cockpit-trend[data-empty="true"] { min-height: 0; }
+.trend-empty { padding: .5em 1.05em .9em; color: var(--text-secondary); font-size: .84em; }
+.cockpit-trend .data-chart { flex: 1; min-height: 8.9em; }
+.distribution-panel { padding: .8em .95em; }
+.distribution-list { list-style: none; display: grid; align-content: start; gap: .54em; padding: 0; margin: .7em 0 0; }
+.distribution-list li { display: grid; grid-template-columns: minmax(4em, auto) 1fr 3.2em; gap: .6em; align-items: center; font-size: .81em; }
+.distribution-list strong { text-align: right; font-variant-numeric: tabular-nums; font-size: .96em; }
+.distribution-track { height: .37em; background: #263b55; border-radius: 2px; overflow: hidden; }
+.distribution-track i { display: block; height: 100%; background: #70b6f3; }
+
+.cockpit-empty { padding: 1.1em; color: var(--text-secondary); }
+.cockpit-state { display: flex; flex-direction: column; align-items: start; min-height: 18rem; gap: .8em; padding: 2em 0; }
+.cockpit-state p { color: var(--text-secondary); }
+
+@media (min-width: 100rem) {
+  .cockpit { font-size: clamp(16px, 1vw, 31px); }
+}
+@media (max-width: 60rem) {
+  .cockpit { font-size: 14px; }
+  .masthead-name h1 { font-size: 1.7em; }
+  .key-metrics .cockpit-metric { padding-inline: .78em; }
+  .key-metrics .metric-reading strong { font-size: 2.13em; }
+  .key-metrics .metric-delta { grid-column: 1 / -1; }
+  .cockpit-main, .cockpit-deck[data-paired="true"] { grid-template-columns: minmax(0, 2.1fr) minmax(15.25rem, 1fr); }
+}
+@media (max-width: 48rem) {
+  .cockpit-masthead { flex-wrap: wrap; gap: .48em; padding-block: .62em; }
+  .masthead-name h1 { font-size: 1.52em; }
+  .masthead-name { width: 100%; }
+  .cockpit-actions { justify-content: flex-start; }
+  .area-meta { gap: .46em; }
+  .area-bar { min-height: 3.2em; }
+  .key-metrics .cockpit-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .key-metrics .cockpit-metric { min-height: 5.85em; }
+  .key-metrics .cockpit-metric:nth-child(odd) { border-left: 0; }
+  .key-metrics .cockpit-metric:nth-child(n+3) { border-top: 1px solid var(--panel-line); }
+  .cockpit-main, .cockpit-deck[data-paired="true"] { grid-template-columns: minmax(0, 1fr); }
+  .map-panel { min-height: 24rem; }
+  .map-plot { min-height: 18rem; }
+  .cockpit-brief { padding-inline: .9em; }
+  .supporting-metrics .cockpit-metrics { max-height: none; }
+  .supporting-metrics .cockpit-metric { padding-block: .5em; }
+  .cockpit-trend { min-height: 11.1rem; }
+}
+@media (pointer: coarse) {
+  .cockpit-brand, .cockpit-ai-link, .cockpit-admin-link, .level-up,
+  .region-picker > summary, .map-directory a, .signal-title, .issue-link,
+  .cockpit-actions .identity-button.ant-btn { min-height: 44px; }
+  .cockpit-brand { min-width: 44px; }
+}
