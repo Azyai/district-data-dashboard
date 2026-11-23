@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Drawer, Input, Modal, Spin } from 'antd'
-import { useId, useState } from 'react'
+import { Button, Drawer, Input, Modal, Spin, message } from 'antd'
+import { useId, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
 import { adminApi, adminQueryKeys } from './adminApi'
@@ -124,7 +124,7 @@ function MetricEditor({ metric, sources, onClose, onSaved }: {
   )
 }
 
-function MetricEvidence({ metric, sources }: { metric: Metric; sources: Source[] }) {
+function MetricEvidence({ metric, sources, onClose }: { metric: Metric; sources: Source[]; onClose: () => void }) {
   const published = metric.published
   const definition = published?.definition ?? metric.draft
   const source = sources.find(source => source.id === definition.sourceId)
@@ -134,10 +134,11 @@ function MetricEvidence({ metric, sources }: { metric: Metric; sources: Source[]
     enabled: Boolean(source?.lastSuccessBatchId),
   })
   return (
-    <section className="admin-detail" aria-labelledby="metric-evidence-title">
+    <Drawer open title={<span className="admin-overlay-title"><AdminIcon name="chart" />指标口径</span>}
+      size="min(100vw, 42rem)" rootClassName="admin-drawer" onClose={onClose}>
       <header className="admin-detail-head">
         <div>
-          <h2 id="metric-evidence-title">{definition.label}</h2>
+          <h2>{definition.label}</h2>
           <p>{published ? '生效口径 · v' + published.version : '草稿口径'}</p>
         </div>
         {published && <Link to="/" className="admin-text-link">到驾驶舱核对</Link>}
@@ -159,7 +160,7 @@ function MetricEvidence({ metric, sources }: { metric: Metric; sources: Source[]
         )}
         <AdminError error={dataset.error} retry={() => void dataset.refetch()} />
       </div>
-    </section>
+    </Drawer>
   )
 }
 
@@ -170,8 +171,9 @@ export function MetricCatalog() {
   const [page, setPage] = useState(1)
   const [editor, setEditor] = useState<Metric | 'new' | null>(null)
   const [selectId, setSelectId] = useState<string | null>(null)
+  const evidenceTrigger = useRef<HTMLElement>(null)
   const [confirmation, setConfirmation] = useState<Metric | null>(null)
-  const [notice, setNotice] = useState('')
+  const [feedback, feedbackHolder] = message.useMessage()
   const sources = useQuery({ queryKey: adminQueryKeys.sources, queryFn: ({ signal }) => adminApi.sources(signal) })
   const metrics = useQuery({ queryKey: adminQueryKeys.metrics, queryFn: ({ signal }) => adminApi.metrics(signal) })
 
@@ -192,7 +194,6 @@ export function MetricCatalog() {
         : [...current, metric]
     })
     void queryClient.invalidateQueries({ queryKey: adminQueryKeys.metrics })
-    setSelectId(metric.id)
   }
 
   const publish = useMutation({
@@ -200,14 +201,14 @@ export function MetricCatalog() {
     onSuccess: async metric => {
       updateCache(metric)
       setConfirmation(null)
-      setNotice(metric.draft.label + ' 已发布' + (metric.published ? ' v' + metric.published.version : ''))
+      void feedback.success(metric.draft.label + ' 已发布' + (metric.published ? ' v' + metric.published.version : ''))
       await queryClient.invalidateQueries({ queryKey: ['cockpit-area'] })
     },
   })
 
   function saved(metric: Metric) {
     setEditor(null)
-    setNotice(metric.draft.label + ' 草稿已保存')
+    void feedback.success(metric.draft.label + ' 草稿已保存')
     updateCache(metric)
   }
 
@@ -217,7 +218,7 @@ export function MetricCatalog() {
         <div><h1>指标目录</h1><p>管理统计口径和版本。发布后的版本供驾驶舱使用。</p></div>
         <Button type="primary" icon={<AdminIcon name="add" />} onClick={() => setEditor('new')} disabled={!sources.data} aria-haspopup="dialog">新增指标</Button>
       </header>
-      {notice && <p className="admin-success admin-notice" role="status">{notice}</p>}
+      {feedbackHolder}
       <AdminError error={sources.error} retry={() => void sources.refetch()} />
       <section className="admin-list" aria-label="指标目录">
         <div className="admin-list-tools">
@@ -257,7 +258,11 @@ export function MetricCatalog() {
                     {hasChanges(metric) && <small>编辑版本 {metric.revision} · 待发布</small>}</td>
                   <td>
                     <div className="admin-inline">
-                      <Button size="small" onClick={() => setSelectId(metric.id)} aria-label={'查看口径 ' + metric.draft.label}>查看口径</Button>
+                      <Button size="small" onClick={event => {
+                        evidenceTrigger.current = event.currentTarget
+                        setSelectId(metric.id)
+                      }} aria-haspopup="dialog"
+                        aria-label={'查看口径 ' + metric.draft.label}>查看口径</Button>
                       <Button size="small" disabled={!sources.data} onClick={() => setEditor(metric)} aria-haspopup="dialog"
                         aria-label={'编辑指标 ' + metric.draft.label}>编辑</Button>
                       <Button size="small" type="primary" disabled={!hasChanges(metric)} onClick={() => {
@@ -273,7 +278,11 @@ export function MetricCatalog() {
         )}
         <AdminTablePages pageCount={pageCount} current={currentPage} onChange={setPage} label="指标目录分页" />
       </section>
-      {selected && <MetricEvidence metric={selected} sources={sources.data ?? []} />}
+      {selected && <MetricEvidence key={selected.id} metric={selected} sources={sources.data ?? []}
+        onClose={() => {
+          setSelectId(null)
+          requestAnimationFrame(() => evidenceTrigger.current?.focus({ preventScroll: true }))
+        }} />}
       {editor && sources.data && <MetricEditor metric={editor === 'new' ? undefined : editor}
         sources={sources.data} onClose={() => setEditor(null)} onSaved={saved} />}
       {confirmation && (

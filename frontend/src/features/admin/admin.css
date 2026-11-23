@@ -168,7 +168,7 @@
 .admin-break { overflow-wrap: anywhere; }
 .admin-code, .admin-code-input { font-family: ui-monospace, Consolas, monospace; letter-spacing: 0; }
 
-.admin-list, .admin-detail {
+.admin-list {
   min-width: 0;
   border: 1px solid var(--admin-line);
   border-radius: var(--admin-radius);
@@ -247,14 +247,13 @@
 .admin-status[data-state="REJECTED"] { color: var(--admin-warm); background: #352b27; border-color: #6a5038; }
 
 .admin-detail-head {
-  padding: 1.15rem 1.18rem;
+  padding-bottom: 1.15rem;
   border-bottom: 1px solid var(--admin-line);
-  border-radius: var(--admin-radius) var(--admin-radius) 0 0;
-  background: linear-gradient(105deg, #172f51, #13233a 56%);
 }
-.admin-detail-head h2 { font-size: 1.23rem; font-weight: 710; }
-.admin-detail-body { display: grid; gap: 1.2rem; padding: 1.18rem; }
-.admin-kv { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .82rem 1.2rem; margin: 0; }
+.admin-detail-head h2 { font-size: 1.23rem; font-weight: 710; overflow-wrap: anywhere; }
+.admin-detail-head p { overflow-wrap: anywhere; }
+.admin-detail-body { display: grid; gap: 1.2rem; padding-top: 1.15rem; }
+.admin-kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .82rem 1.2rem; margin: 0; }
 .admin-kv div { min-width: 0; }
 .admin-kv dt { font-size: .81rem; color: var(--admin-muted); }
 .admin-kv dd { margin: .38rem 0 0; font-size: .9rem; }
@@ -267,22 +266,19 @@
 }
 .admin-history { display: grid; gap: .68rem; }
 .admin-evidence h3, .admin-history h3 { font-size: .99rem; font-weight: 690; }
-.admin-error, .admin-notice {
-  border: 1px solid #754756;
-  border-radius: 9px;
-  padding: .7rem .85rem;
-}
 .admin-error {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: .35rem .75rem;
+  padding: .7rem .85rem;
+  border: 1px solid #754756;
+  border-radius: 9px;
   background: #38242e;
   color: var(--admin-alert);
 }
 .admin-error small { color: #ffd1cb; overflow-wrap: anywhere; }
 .admin-list > .admin-error { margin: .85rem; }
-.admin-notice { border-color: #32665f; background: #122e35; }
 
 .admin-drawer { --editor-gutter: clamp(1rem, 2.3vw, 1.95rem); }
 .admin-drawer .ant-drawer-mask { background: rgb(3 8 18 / 76%); }
@@ -489,7 +485,6 @@
   .admin-nav a { min-height: 2.55rem; }
   .admin-environment { padding-inline: 0; white-space: nowrap; }
   .admin-content { padding-top: 1.7rem; }
-  .admin-kv { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 39rem) {
   .admin-page-heading h1 { font-size: 1.76rem; }
@@ -517,7 +512,6 @@
   .admin-form-row { grid-template-columns: 1fr; }
   .admin-form { gap: 1.3rem; }
   .admin-overlay-title { font-size: 1.12rem; }
-  .admin-detail-body { padding: .8rem; }
   .admin-nav a { gap: .35rem; padding-inline: .5rem; }
   .admin-nav a .admin-icon { width: 1rem; height: 1rem; }
   .admin-top-actions .ant-btn, .admin-return { font-size: .8rem; }

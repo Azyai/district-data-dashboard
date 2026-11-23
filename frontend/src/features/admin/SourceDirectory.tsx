@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Input, Spin } from 'antd'
-import { useState } from 'react'
+import { Button, Drawer, Input, Spin } from 'antd'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { adminApi, adminQueryKeys } from './adminApi'
 import type { ConnectionTest, Source, SyncRun } from './adminApi'
@@ -52,8 +52,14 @@ function Preview({ result }: { result: ConnectionTest }) {
   )
 }
 
-function SourceDetail({ source, onEdit }: { source: Source; onEdit: () => void }) {
+function SourceDetail({ source, onClose, onSaved }: {
+  source: Source
+  onClose: () => void
+  onSaved: (source: Source) => void
+}) {
   const queryClient = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const editTrigger = useRef<HTMLButtonElement>(null)
   const runs = useQuery({
     queryKey: adminQueryKeys.runs(source.id),
     queryFn: ({ signal }) => adminApi.runs(source.id, signal),
@@ -83,14 +89,16 @@ function SourceDetail({ source, onEdit }: { source: Source; onEdit: () => void }
   }
 
   return (
-    <section className="admin-detail" aria-labelledby="source-detail-heading">
+    <Drawer open title={<span className="admin-overlay-title"><AdminIcon name={sourceIcons[source.type]} />来源详情</span>}
+      size="min(100vw, 56rem)" rootClassName="admin-drawer" push={false}
+      keyboard={!editing} closable={!editing} mask={{ closable: !editing }} onClose={onClose}>
       <header className="admin-detail-head">
         <div>
-          <h2 id="source-detail-heading">{source.name}</h2>
+          <h2>{source.name}</h2>
           <p>{source.id} · {sourceTypes[source.type]} · 配置版本 {source.version}</p>
         </div>
         <div className="admin-actions">
-          <Button onClick={onEdit} disabled={busy} aria-haspopup="dialog">编辑配置</Button>
+          <Button ref={editTrigger} onClick={() => setEditing(true)} disabled={busy} aria-haspopup="dialog">编辑配置</Button>
           <Button onClick={() => test.mutate()} loading={test.isPending} disabled={sync.isPending}>测试并预览</Button>
           <Button type="primary" onClick={() => start()} loading={sync.isPending} disabled={test.isPending || running}>启动同步</Button>
         </div>
@@ -143,7 +151,14 @@ function SourceDetail({ source, onEdit }: { source: Source; onEdit: () => void }
           )}
         </section>
       </div>
-    </section>
+      {editing && <SourceEditor source={source} onClose={() => {
+        setEditing(false)
+        requestAnimationFrame(() => editTrigger.current?.focus({ preventScroll: true }))
+      }} onSaved={saved => {
+        setEditing(false)
+        onSaved(saved)
+      }} />}
+    </Drawer>
   )
 }
 
@@ -153,7 +168,8 @@ export function SourceDirectory() {
   const [filter, setFilter] = useState('')
   const [kind, setKind] = useState('')
   const [page, setPage] = useState(1)
-  const [editor, setEditor] = useState<Source | 'new' | null>(null)
+  const [addingSource, setAddingSource] = useState(false)
+  const detailTrigger = useRef<HTMLElement>(null)
   const sources = useQuery({
     queryKey: adminQueryKeys.sources,
     queryFn: ({ signal }) => adminApi.sources(signal),
@@ -161,6 +177,16 @@ export function SourceDirectory() {
   })
   const selectedId = params.get('source')
   const selected = sources.data?.find(source => source.id === selectedId)
+  useEffect(() => {
+    if (selectedId || !detailTrigger.current) return
+    const trigger = detailTrigger.current
+    const frame = requestAnimationFrame(() => {
+      detailTrigger.current = null
+      trigger.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [selectedId])
+
   const search = filter.trim().toLowerCase()
   const visible = (sources.data ?? []).filter(source =>
     (!kind || source.type === kind) && (!search || (source.name + ' ' + source.id).toLowerCase().includes(search)),
@@ -168,11 +194,20 @@ export function SourceDirectory() {
   const { currentPage, pageCount, rows } = getAdminTablePage(visible, page)
 
   function choose(source: Source) {
-    setParams({ source: source.id })
+    if (selectedId === source.id) return
+    const next = new URLSearchParams(params)
+    next.set('source', source.id)
+    setParams(next)
+  }
+
+  function closeDetail() {
+    const next = new URLSearchParams(params)
+    next.delete('source')
+    setParams(next, { replace: true })
   }
 
   function saved(source: Source) {
-    setEditor(null)
+    setAddingSource(false)
     queryClient.setQueryData<Source[]>(adminQueryKeys.sources, existing => {
       const current = existing ?? []
       return current.some(item => item.id === source.id)
@@ -187,7 +222,7 @@ export function SourceDirectory() {
     <div className="admin-page">
       <header className="admin-page-heading">
         <div><h1>数据来源</h1><p>配置已批准的连接，预览标准化数据并执行同步。</p></div>
-        <Button type="primary" icon={<AdminIcon name="add" />} onClick={() => setEditor('new')} aria-haspopup="dialog">新增来源</Button>
+        <Button type="primary" icon={<AdminIcon name="add" />} onClick={() => setAddingSource(true)} aria-haspopup="dialog">新增来源</Button>
       </header>
       <section className="admin-list" aria-label="来源目录">
         <div className="admin-list-tools">
@@ -225,7 +260,11 @@ export function SourceDirectory() {
                   <td>{sourceTypes[source.type]}</td>
                   <td><SyncStatus status={source.lastSyncStatus} /></td>
                   <td><DisplayTime value={source.lastSuccessfulAt} /></td>
-                  <td><Button size="small" onClick={() => choose(source)} aria-label={'查看来源 ' + source.name}>查看</Button></td>
+                  <td><Button size="small" onClick={event => {
+                    detailTrigger.current = event.currentTarget
+                    choose(source)
+                  }} aria-haspopup="dialog"
+                    aria-label={'查看来源 ' + source.name}>查看</Button></td>
                 </tr>
               ))}</tbody>
             </table>
@@ -233,8 +272,9 @@ export function SourceDirectory() {
         )}
         <AdminTablePages pageCount={pageCount} current={currentPage} onChange={setPage} label="来源目录分页" />
       </section>
-      {selected && <SourceDetail key={selected.id + ':' + selected.version} source={selected} onEdit={() => setEditor(selected)} />}
-      {editor && <SourceEditor source={editor === 'new' ? undefined : editor} onClose={() => setEditor(null)} onSaved={saved} />}
+      {selected && <SourceDetail key={selected.id + ':' + selected.version} source={selected}
+        onClose={closeDetail} onSaved={saved} />}
+      {addingSource && <SourceEditor onClose={() => setAddingSource(false)} onSaved={saved} />}
     </div>
   )
 }
