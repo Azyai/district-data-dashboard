@@ -2,10 +2,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button, Modal } from 'antd'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
-import { useLocation, useNavigate } from 'react-router'
+import { useLocation, useMatch, useNavigate } from 'react-router'
 import { ApiError, dashboardApi } from '../../api/client'
 import type { DemoPersona, Me } from '../../api/client'
 import { workspaceForPath } from '../../api/workspace'
+import { topicFor } from '../topics/topicCatalog'
 
 function PersonaOption({ title, description, persona, active, submit }: {
   title: string
@@ -24,8 +25,9 @@ function PersonaOption({ title, description, persona, active, submit }: {
 }
 
 function clearPrivateQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  const publicQueries = ['identity', 'cockpit-area', 'cockpit-locations', 'public-topic-manifest', 'public-topic-snapshot']
   queryClient.removeQueries({
-    predicate: query => !['identity', 'cockpit-area', 'cockpit-side-metrics'].includes(String(query.queryKey[0])),
+    predicate: query => !publicQueries.includes(String(query.queryKey[0])),
   })
 }
 
@@ -36,7 +38,6 @@ export type SessionState = {
   busy: boolean
   error: Error | null
   signInForAdministration: () => void
-  signInForReview: () => void
   signOut: () => void
 }
 
@@ -44,6 +45,8 @@ export function Session({ children }: { children: (state: SessionState) => React
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const topic = topicFor(useMatch('/topics/:topicId')?.params.topicId ?? null)
+  const areaData = Boolean(useMatch('/data/areas/:areaId'))
   const workspace = workspaceForPath(pathname)
   const management = workspace === 'management'
   const identityKey = ['identity', workspace] as const
@@ -86,9 +89,12 @@ export function Session({ children }: { children: (state: SessionState) => React
   }, [identity.isSuccess, identity.data, queryClient])
 
   useEffect(() => {
-    document.title = management ? '门头沟区数据管理'
-      : pathname.toLowerCase().replace(/\/$/, '') === '/workbench' ? '门头沟区数据工作台' : '门头沟区数字驾驶舱'
-  }, [management, pathname])
+    if (topic) document.title = topic.title + ' · 门头沟区'
+    else if (management) document.title = '门头沟区数据管理'
+    else if (areaData) document.title = '门头沟区区域数据'
+    else document.title = pathname.toLowerCase().replace(/\/$/, '') === '/workbench'
+      ? '门头沟区数据工作台' : '门头沟区数字驾驶舱'
+  }, [management, pathname, topic, areaData])
 
   const current = identity.data ?? null
   const busy = login.isPending || logout.isPending
@@ -115,7 +121,6 @@ export function Session({ children }: { children: (state: SessionState) => React
         busy,
         error: error ?? identity.error,
         signInForAdministration: () => login.mutate('data-admin'),
-        signInForReview: () => login.mutate('reviewer'),
         signOut: () => logout.mutate(),
       })}
       {!management && <Modal className="identity-dialog" title="身份核验" centered open={open} onCancel={close} footer={null}

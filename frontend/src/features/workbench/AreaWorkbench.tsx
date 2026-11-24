@@ -1,7 +1,7 @@
 import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'antd'
 import { lazy, Suspense, useState, type ReactNode } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router'
+import { Link, useLocation, useMatch, useNavigate } from 'react-router'
 import { ApiError, dashboardApi, type CockpitArea, type CockpitDirectory } from '../../api/client'
 import { answerFromSnapshot } from '../assistant/answer'
 import { interpretCockpitIntent } from '../assistant/intent'
@@ -27,8 +27,8 @@ type Props = {
   onTopicQuestion: (question: string, area: CockpitArea, signal: AbortSignal) => Promise<AssistantReply | null | undefined>
 }
 
-function workbenchPath(areaId: string) {
-  return areaId === districtId ? '/workbench' : '/workbench?area=' + encodeURIComponent(areaId)
+function areaDataPath(areaId: string) {
+  return '/data/areas/' + encodeURIComponent(areaId)
 }
 
 function displayPath(areaId: string) {
@@ -125,7 +125,8 @@ export default function AreaWorkbench({ identityControl, topicControl, onTopicQu
   const location = useLocation()
   const navigate = useNavigate()
   const client = useQueryClient()
-  const areaId = new URLSearchParams(location.search).get('area') || districtId
+  const routeAreaId = useMatch('/data/areas/:areaId')?.params.areaId
+  const areaId = routeAreaId ?? districtId
   const snapshot = useQuery({ ...areaQuery(areaId), refetchInterval: areaRefreshMs })
   const area = snapshot.data
   const directoryQuery = queryOptions({
@@ -152,7 +153,7 @@ export default function AreaWorkbench({ identityControl, topicControl, onTopicQu
 
   function changeArea(id: string) {
     setOverlay(null)
-    void navigate(workbenchPath(id))
+    void navigate(areaDataPath(id))
   }
 
   async function handleQuestion(question: string, previousMetricId: string | undefined, signal: AbortSignal): Promise<AssistantReply | null> {
@@ -196,18 +197,18 @@ export default function AreaWorkbench({ identityControl, topicControl, onTopicQu
     }
     if (intent.kind === 'problems') {
       setOverlay(null)
-      void navigate(workbenchPath(destination.id) + '#area-issues')
+      void navigate(areaDataPath(destination.id) + '#area-issues')
       return null
     }
     ensureCurrentView()
     if (!sameArea) {
       setOverlay('assistant')
-      void navigate(workbenchPath(destination.id))
+      void navigate(areaDataPath(destination.id))
     }
     return {
       answer: answerFromSnapshot(intent.question, destination, sameArea ? previousMetricId : undefined),
       scope: destination,
-      returnTo: sameArea ? undefined : { name: area.name, path: workbenchPath(area.id) },
+      returnTo: sameArea ? undefined : { name: area.name, path: location.pathname },
     }
   }
 
@@ -229,7 +230,7 @@ export default function AreaWorkbench({ identityControl, topicControl, onTopicQu
         </nav>
       </header>
 
-      <main className="workbench-main" aria-label="区域数据工作台">
+      <main className="workbench-main" aria-label={routeAreaId ? '区域数据' : '区域数据工作台'}>
         {area ? (
           <>
             <section className="workbench-scope" aria-labelledby="workbench-area">
@@ -237,7 +238,7 @@ export default function AreaWorkbench({ identityControl, topicControl, onTopicQu
                 {area.breadcrumbs.length > 1 && <nav aria-label="区域层级" className="workbench-breadcrumbs">
                   <ol>{area.breadcrumbs.map(crumb => <li key={crumb.id}>
                     {crumb.id === area.id ? <span aria-current="page">{crumb.name}</span>
-                      : <Link to={workbenchPath(crumb.id)} onClick={closeOverlay}>{crumb.name}</Link>}
+                      : <Link to={areaDataPath(crumb.id)} onClick={closeOverlay}>{crumb.name}</Link>}
                   </li>)}</ol>
                 </nav>}
                 <h1 id="workbench-area">{area.name}</h1>

@@ -1,20 +1,19 @@
 import { StyleProvider } from '@ant-design/cssinjs'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Button, ConfigProvider, Modal, Spin, theme } from 'antd'
+import { ConfigProvider, Spin, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
-import { lazy, Suspense, useState, type ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
 import type { CockpitArea } from '../api/client'
 import { Session } from '../features/session/Session'
-import { asksForInsight, matchTopics, topicFor, topics, type TopicId } from '../features/topics/topicCatalog'
+import { asksForInsight, matchTopics, topicFor, topicPath, topics } from '../features/topics/topicCatalog'
 
 const Cockpit = lazy(() => import('../features/cockpit/Cockpit'))
 const TwinScene = lazy(() => import('../features/cockpit/TwinScene'))
-const TopicDialog = lazy(() => import('../features/topics/TopicDialog'))
+const TopicPage = lazy(() => import('../features/topics/TopicPage'))
 const Playback = lazy(() => import('../features/playback/Playback'))
 const AreaWorkbench = lazy(() => import('../features/workbench/AreaWorkbench'))
 const Administration = lazy(() => import('../features/admin/Administration'))
-const DashboardReviewPage = lazy(() => import('../features/designer/DashboardReleases').then(module => ({ default: module.DashboardReviewPage })))
 
 const client = new QueryClient({
   defaultOptions: {
@@ -65,25 +64,12 @@ function Loading() {
   return <main className="center-state" aria-busy="true"><Spin /><span>正在加载页面</span></main>
 }
 
-function WorkbenchWithTopics({ identityControl }: { identityControl: ReactNode }) {
-  const [picking, setPicking] = useState(false)
+function DataWorkspace({ identityControl }: { identityControl: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const params = new URLSearchParams(location.search)
   const selected = topicFor(params.get('topic'))
-  const initialQuestion: unknown = location.state?.topicQuestion
-
-  function select(id: TopicId, question?: string) {
-    setPicking(false)
-    params.set('topic', id)
-    void navigate({ pathname: '/workbench', search: params.toString() },
-      { replace: Boolean(selected), state: { topicQuestion: question }, preventScrollReset: true })
-  }
-
-  function close() {
-    params.delete('topic')
-    void navigate({ pathname: '/workbench', search: params.toString() }, { replace: true, preventScrollReset: true })
-  }
+  const area = params.get('area')
 
   async function topicQuestion(question: string, area: CockpitArea, signal: AbortSignal) {
     signal.throwIfAborted()
@@ -95,32 +81,20 @@ function WorkbenchWithTopics({ identityControl }: { identityControl: ReactNode }
       return reply(area.name + '暂无可用的' + matched[0].title + '快照。可说「打开全区' + matched[0].title + '」。')
     }
     if (area.id !== 'mentougou') return undefined
-    setPicking(false)
-    params.set('topic', matched[0].id)
-    params.delete('area')
-    void navigate({ pathname: '/workbench', search: params.toString() },
-      { state: { topicQuestion: asksForInsight(question) ? question : undefined }, preventScrollReset: true })
+    void navigate(topicPath(matched[0].id),
+      { state: { topicQuestion: asksForInsight(question) ? question : undefined } })
     return null
   }
 
-  const topicControl = <Button className="workbench-topic" aria-haspopup="dialog" autoInsertSpace={false}
-    onClick={() => setPicking(true)}>专题</Button>
+  if (selected) return <Navigate to={topicPath(selected.id)} replace state={location.state} />
+  if (area && location.pathname.toLowerCase().replace(/\/$/, '') === '/workbench') {
+    return <Navigate to={'/data/areas/' + encodeURIComponent(area) + location.hash} replace />
+  }
+  const topicControl = <nav className="workbench-topic-links" aria-label="全区专题">
+    {topics.map(topic => <Link key={topic.id} to={topicPath(topic.id)} className="workbench-action">{topic.title}</Link>)}
+  </nav>
 
-  return (
-    <>
-      <AreaWorkbench identityControl={identityControl} topicControl={topicControl} onTopicQuestion={topicQuestion} />
-      <Modal title="全区专题" open={picking} onCancel={() => setPicking(false)}
-        centered width="min(26rem, calc(100vw - 1.5rem))" footer={null} destroyOnHidden>
-        <div className="topic-picker-choices">{topics.map(topic => (
-          <Button block key={topic.id} onClick={() => select(topic.id)}>{topic.title}</Button>
-        ))}</div>
-      </Modal>
-      {selected && <Suspense fallback={null}>
-        <TopicDialog topicId={selected.id} initialQuestion={typeof initialQuestion === 'string' ? initialQuestion.slice(0, 160) : ''}
-          onClose={close} onSelect={select} />
-      </Suspense>}
-    </>
-  )
+  return <AreaWorkbench identityControl={identityControl} topicControl={topicControl} onTopicQuestion={topicQuestion} />
 }
 
 function DisplayCockpit() {
@@ -129,10 +103,8 @@ function DisplayCockpit() {
   const params = new URLSearchParams(search)
   const linkedTopic = topicFor(params.get('topic'))
   const linkedPanel = hash === '#voice-assistant' || hash === '#area-issues'
-  if (linkedTopic || linkedPanel) {
-    if (area) params.set('area', area)
-    return <Navigate to={{ pathname: '/workbench', search: params.toString(), hash }} replace />
-  }
+  if (linkedTopic) return <Navigate to={topicPath(linkedTopic.id)} replace />
+  if (linkedPanel) return <Navigate to={(area ? '/data/areas/' + encodeURIComponent(area) : '/workbench') + hash} replace />
   return <Cockpit />
 }
 
@@ -151,14 +123,18 @@ export function App() {
                       <Route path="/areas/:areaId" />
                     </Route>
                     <Route path="/twins/:twinId" element={<TwinScene />} />
+                    <Route path="/topics/:topicId" element={<TopicPage />} />
                     <Route path="/play/:projectId" element={
                       session.checking ? <Loading /> : session.identity
                         ? <Playback identity={session.identity} identityControl={session.control} />
                         : <Navigate to="/" replace />
                     } />
                     <Route path="/admin/*" element={<Administration session={session} />} />
-                    <Route path="/review" element={<DashboardReviewPage session={session} />} />
-                    <Route path="/workbench" element={<WorkbenchWithTopics identityControl={session.control} />} />
+                    <Route path="/review" element={<Navigate to="/admin" replace />} />
+                    <Route element={<DataWorkspace identityControl={session.control} />}>
+                      <Route path="/workbench" />
+                      <Route path="/data/areas/:areaId" />
+                    </Route>
                     <Route path="*" element={<main className="center-state"><h1>页面不存在</h1><Link to="/" className="action-link">返回驾驶舱</Link></main>} />
                   </Routes>
                 </Suspense>
