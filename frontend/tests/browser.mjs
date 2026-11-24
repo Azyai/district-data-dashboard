@@ -195,6 +195,44 @@ async function verifyRegionMenuLayout(page) {
   assert.deepEqual(await pageLayout(page, mapLayoutAnchors), original)
 }
 
+async function verifyMapDeselection(page) {
+  const directory = page.getByRole('navigation', { name: '区域目录' })
+  await page.locator('.region-picker > summary').click()
+  await directory.getByRole('link', { name: '军庄镇', exact: true }).click()
+  await page.waitForURL('**/areas/junzhuang')
+  const town = await waitForArea(page, '军庄镇')
+  await town.getByRole('button', { name: '地图工具' }).click()
+  await town.getByRole('button', { name: '3D', exact: true }).click()
+  await town.and(page.locator('[data-view="3d"]')).waitFor()
+
+  await town.getByRole('button', { name: '查看灰峪村', exact: true }).click()
+  await page.waitForURL('**/areas/junzhuang-huiyu')
+  const huiyu = await waitForArea(page, '灰峪村')
+  const selectedMarker = huiyu.getByRole('button', { name: '查看灰峪村', exact: true })
+  assert.equal(await selectedMarker.getAttribute('aria-current'), 'location')
+  await selectedMarker.dblclick()
+  await page.waitForURL('**/areas/junzhuang')
+  await waitForArea(page, '军庄镇')
+  assert.equal(await town.getAttribute('data-view'), '3d')
+
+  await town.getByRole('button', { name: '查看军庄村', exact: true }).click()
+  await page.waitForURL('**/areas/junzhuang-junzhuang')
+  const village = await waitForArea(page, '军庄村')
+  const point = await freeMapPoint(village)
+  await page.mouse.dblclick(point.x, point.y)
+  await page.waitForURL('**/areas/junzhuang')
+  await waitForArea(page, '军庄镇')
+  const restoredMarker = town.getByRole('button', { name: '查看灰峪村', exact: true })
+  await restoredMarker.dblclick()
+  await page.waitForURL(url => url.pathname === '/')
+  const district = await waitForArea(page, '门头沟区')
+  assert.equal(await district.getAttribute('data-view'), '3d')
+  await district.getByRole('button', { name: '查看军庄镇', exact: true }).waitFor()
+  await district.getByRole('button', { name: '地图工具' }).click()
+  await district.getByRole('button', { name: '2D', exact: true }).click()
+  console.log('PASS double-click on the selected village and map surface restores parent regions and keeps 3D mode')
+}
+
 async function verifyAs(page, name) {
   const request = page.waitForResponse(response => response.url().endsWith('/api/v1/auth/demo-session'))
   const dialog = page.getByRole('dialog', { name: '身份核验' })
@@ -233,6 +271,7 @@ try {
   assert(await title.evaluate(el => Math.abs(el.getBoundingClientRect().left + el.clientWidth / 2 - innerWidth / 2) < 2))
   await verifyDistrictMap(page)
   await verifyRegionMenuLayout(page)
+  await verifyMapDeselection(page)
   await capture(page, 'cockpit-1106.png')
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, 'cockpit-1440.png')

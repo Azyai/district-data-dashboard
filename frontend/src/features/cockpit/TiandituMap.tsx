@@ -2,7 +2,7 @@ import { skipToken, useQuery } from '@tanstack/react-query'
 import { Map as MapLibreMap, Marker } from 'maplibre-gl'
 import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CockpitArea, CockpitDirectory } from '../../api/client'
 import { createAtlasScale } from './atlasScale'
@@ -33,6 +33,7 @@ const twinPoint: Coordinates = [116.122, 39.901]
 const districtBox: [Coordinates, Coordinates] = [[districtBounds.west, districtBounds.south], [districtBounds.east, districtBounds.north]]
 const initialPitch = 35
 const orbitThreshold = 4
+const doubleClickWindow = 320
 
 function readCamera(map: MapLibreMap) {
   return { zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() }
@@ -159,6 +160,7 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
   const focus = village || town || undefined
   const district = area.level === 'district'
   const townId = area.breadcrumbs[1]?.id
+  const parentId = area.breadcrumbs.at(-2)?.id
   const towns = useMemo(() => mapPlaces(directory?.filter(location => location.level === 'town')
     ?? (district ? area.children : []), atlas.data?.towns), [directory, district, area.children, atlas.data])
   const nearbyVillages = useMemo(() => mapPlaces(directory?.filter(location => location.level === 'village' && location.parentId === townId)
@@ -172,10 +174,31 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     }
     return result
   }, [district, focus, places])
-  const actions = useRef({ towns, nearbyVillages, townId, areaId: area.id, onSelectArea })
+  const pendingSelection = useRef<number | undefined>(undefined)
+  const actions = useRef({ towns, nearbyVillages, townId, areaId: area.id, parentId, onSelectArea })
   useEffect(() => {
-    actions.current = { towns, nearbyVillages, townId, areaId: area.id, onSelectArea }
-  }, [towns, nearbyVillages, townId, area.id, onSelectArea])
+    actions.current = { towns, nearbyVillages, townId, areaId: area.id, parentId, onSelectArea }
+  }, [towns, nearbyVillages, townId, area.id, parentId, onSelectArea])
+
+  const selectOnClick = useCallback((id: string, clickCount: number) => {
+    window.clearTimeout(pendingSelection.current)
+    const { areaId, parentId, onSelectArea } = actions.current
+    if (id === areaId) return
+    if (!parentId || clickCount === 0) {
+      onSelectArea(id)
+    } else if (clickCount === 1) {
+      // Let a double-click release the current area before a single-click changes the route.
+      pendingSelection.current = window.setTimeout(() => {
+        if (actions.current.areaId === areaId && !host.current?.closest('[inert]')) actions.current.onSelectArea(id)
+      }, doubleClickWindow)
+    }
+  }, [])
+
+  const clearSelection = useCallback(() => {
+    window.clearTimeout(pendingSelection.current)
+    const { parentId, onSelectArea } = actions.current
+    if (parentId) onSelectArea(parentId)
+  }, [])
 
   useEffect(() => {
     if (!host.current || !atlas.data) return
@@ -207,10 +230,19 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     instance.on('click', event => {
       if ((event.originalEvent.target as Element | null)?.closest('button, a')) return
       const place = placeAt([event.lngLat.lng, event.lngLat.lat])
-      if (place) actions.current.onSelectArea(place.id)
+      if (place) selectOnClick(place.id, event.originalEvent.detail)
     })
-    return () => { instance.remove(); setMap(undefined) }
-  }, [atlas.data])
+    instance.on('dblclick', event => {
+      if (!actions.current.parentId || (event.originalEvent.target as Element | null)?.closest('button, a')) return
+      event.preventDefault()
+      clearSelection()
+    })
+    return () => {
+      window.clearTimeout(pendingSelection.current)
+      instance.remove()
+      setMap(undefined)
+    }
+  }, [atlas.data, selectOnClick, clearSelection])
 
   useEffect(() => {
     if (!map || !token || !atlas.data) return
@@ -225,23 +257,27 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     }
     currentView.current = viewMode
     if (!map) return
-    const canvas = map.getCanvas()
     map.setTerrain(viewMode === '3d' ? { source: 'elevation', exaggeration: 1.35 } : null)
     map.jumpTo(viewMode === '3d' ? last3dPose.current : { pitch: 0, bearing: 0 })
     if (viewMode === '3d') {
-      canvas.setAttribute('aria-describedby', navigationHint)
       map.boxZoom.disable()
       map.dragRotate.enable()
       map.touchZoomRotate.enableRotation()
       map.touchPitch.enable()
       return bindOrbitDrag(map)
     }
-    canvas.removeAttribute('aria-describedby')
     map.boxZoom.enable()
     map.dragRotate.disable()
     map.touchZoomRotate.disableRotation()
     map.touchPitch.disable()
-  }, [map, viewMode, navigationHint])
+  }, [map, viewMode])
+
+  useEffect(() => {
+    const canvas = map?.getCanvas()
+    if (!canvas) return
+    if (parentId || viewMode === '3d') canvas.setAttribute('aria-describedby', navigationHint)
+    else canvas.removeAttribute('aria-describedby')
+  }, [map, parentId, viewMode, navigationHint])
 
   useEffect(() => {
     if (!map || !frame.current || (!district && !town) || (area.level === 'village' && villages.isPending)) return
@@ -290,7 +326,10 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     data-map-ready={failed ? 'unavailable' : map && scope ? 'ready' : 'loading'} data-map-scope={scope}
     aria-label={area.name + '区域地图'}>
     <div className="atlas-render" ref={host} />
-    {viewMode === '3d' && <p className="atlas-gesture-hint" id={navigationHint}>左键拖动旋转和俯仰，按住 Shift 拖动平移。键盘可用 Shift 加方向键调整视角。</p>}
+    {(viewMode === '3d' || parentId) && <p className="atlas-gesture-hint" id={navigationHint}>
+      {viewMode === '3d' && '左键拖动旋转和俯仰，按住 Shift 拖动平移。键盘可用 Shift 加方向键调整视角。'}
+      {parentId && '双击地图可取消选区并返回上一级。'}
+    </p>}
     <div className="atlas-camera-frame" ref={frame} aria-hidden="true" />
     {failed && <div className="atlas-static"><img src={reliefUrl} alt="门头沟区地形概览" />
       <p role="status">{graphicsError ? '浏览器图形加速不可用' : '区界数据暂不可用'}</p></div>}
@@ -304,7 +343,13 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
             <button type="button" onClick={() => onOpenTwin('jingxi')}>京西智谷</button></nav></div>
         : <button className="atlas-place" data-place={pin.id} data-featured={!district || featured.has(pin.id)}
           aria-label={'查看' + pin.name} aria-current={pin.id === area.id ? 'location' : undefined}
-          onClick={() => { if (pin.id !== area.id) onSelectArea(pin.id) }}>
+          title={pin.id === area.id ? '双击取消选区' : undefined}
+          onClick={event => selectOnClick(pin.id, event.detail)}
+          onDoubleClick={event => {
+            if (!parentId) return
+            event.stopPropagation()
+            clearSelection()
+          }}>
           <span className="atlas-pin-dot" /><span className="atlas-pin-label">{pin.name}</span></button>}
     </AreaPin>)}
     {(status || pendingBoundary) && <div className="atlas-status" aria-live="polite">{status && <span>{status}</span>}
