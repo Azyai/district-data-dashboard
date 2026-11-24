@@ -18,12 +18,15 @@ const townMapPoints = new Map([
 ]);
 
 export default function population(context) {
-  const { $, window, document, towns, area, population, onAreaChange } = context;
-  const pinned = area.level === "district" ? -1 : towns.findIndex(t => t.id === context.parentId);
+  const { $, window, document, towns, onAreaChange } = context;
+  let { area, population } = context;
+  const scopeTown = (scope) => scope.area.level === "district" ? -1 : towns.findIndex(t => t.id === scope.parentId);
+  let pinned = scopeTown(context);
+  let applyScope;
   const total = towns.reduce((sum, town) => sum + town.population, 0);
   const populationMix = ageLabels.map((_, index) => towns.reduce((sum, town) => sum + town.population * town.age[index] / 100, 0));
   const state = { filter: "all", town: pinned, townRank: "size", townExpanded: pinned >= 0, townNetworkOpen: true,
-    populationBranch: -1, populationLeaf: -1, populationAuto: pinned < 0 && !window.matchMedia("(prefers-reduced-motion: reduce)").matches };
+    populationBranch: -1, populationLeaf: -1, populationAuto: !window.matchMedia("(prefers-reduced-motion: reduce)").matches };
   const townPositions = towns.map(({ name }) => {
     const [x, y] = townMapPoints.get(name);
     return [260 + (x - 111) * 1.6, 158 + (y - 112) * 2.6];
@@ -544,7 +547,7 @@ export default function population(context) {
 
     function schedule(delay = populationIdleDelay) {
       window.clearTimeout(timer);
-      if (state.populationAuto && state.townNetworkOpen && tour.length && hoverTown < 0 && !hovering && !document.hidden) {
+      if (pinned < 0 && state.populationAuto && state.townNetworkOpen && tour.length && hoverTown < 0 && !hovering && !document.hidden) {
         timer = window.setTimeout(advance, delay);
       }
     }
@@ -760,8 +763,22 @@ export default function population(context) {
       autoplay.innerHTML = icon(state.populationAuto ? "pause" : "play");
       schedule();
     }, listener);
+    applyScope = () => {
+      hoverTown = -1;
+      hovering = false;
+      window.clearTimeout(hoverCloseTimer);
+      setHoverTown(-1);
+      lastTown = pinned;
+      // Village snapshots can change within the same town.
+      shownTown = undefined;
+      updateSelection();
+      autoplay.disabled = pinned >= 0;
+      autoplay.setAttribute("aria-pressed", String(pinned < 0 && state.populationAuto));
+      schedule();
+    };
     schedule();
     return () => {
+      applyScope = undefined;
       events.abort();
       window.clearTimeout(timer);
       window.clearTimeout(hoverCloseTimer);
@@ -777,6 +794,23 @@ export default function population(context) {
 
   return {
     markup: populationView, effect: animatePopulation,
+    updateScope(next, render) {
+      if (next.area.id === area.id) return;
+      area = next.area;
+      population = next.population;
+      pinned = scopeTown(next);
+      state.town = pinned;
+      state.townExpanded = pinned >= 0;
+      state.populationBranch = -1;
+      state.populationLeaf = -1;
+      if (!state.townNetworkOpen || (pinned >= 0 && !townVisible(towns[pinned]))) {
+        state.townNetworkOpen = true;
+        state.filter = "all";
+        render();
+      } else {
+        applyScope();
+      }
+    },
     onButton(target, render) {
       const { filter, pick, townRank, popBranch, popLeaf } = target.dataset;
       if (pick !== undefined) {

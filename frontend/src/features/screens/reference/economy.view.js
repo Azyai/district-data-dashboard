@@ -1,8 +1,11 @@
 import { bars, button, chart, drawing, filaments, fmt, icon, insightSection, insightSelect, insightTable, latest, monthlyChange, months, panel, pct, projectAlertGap, projectGap, projectList, signed } from "./graphics.js";
 
 export default function economy(context) {
-  const { $, economy, showDetail, scopeLabel: scopeTitle } = context;
-  const ecoModes = [["地区生产总值", economy.gdp], ["固定资产投资", economy.investment], ["社零总额", economy.sales]];
+  const { $, showDetail } = context;
+  let { economy, scopeLabel: scopeTitle } = context;
+  let section = context.section;
+  const modes = () => [["地区生产总值", economy.gdp], ["固定资产投资", economy.investment], ["社零总额", economy.sales]];
+  let ecoModes = modes();
   const industryColors = ["#8d92ff", "#60c5ee", "#b49dff", "#71d9c8"];
   const state = { eco: 0, ecoTopic: context.section === "projects" ? "projects" : "", ecoIndustry: 0, ecoProjectFilter: "all" };
   function economyWave() {
@@ -222,6 +225,16 @@ export default function economy(context) {
 
   return {
     markup: economyPage,
+    updateScope(next, render) {
+      economy = next.economy;
+      scopeTitle = next.scopeLabel;
+      ecoModes = modes();
+      if (section !== next.section) {
+        section = next.section;
+        state.ecoTopic = section === "projects" ? "projects" : "";
+      }
+      render();
+    },
     insights: { economy: economyInsight, projects: projectsInsight, services: servicesInsight, industries: industriesInsight },
     onProject: projectDetail,
     onField(key) { if (key === "eco-month") renderEconomyComparison(); },
