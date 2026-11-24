@@ -20,7 +20,6 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -70,41 +69,20 @@ class DemoApiIntegrationTests {
     }
 
     @Test
-    void publishesOnlyValidPublicSideMetricsWithAdminAndRevisionChecks() throws Exception {
-        String layout = "/cockpit/side-metrics";
-        String settings = "/admin/cockpit/side-metrics";
-        try (var admin = new Browser(); var viewer = new Browser()) {
-            JsonNode initial = viewer.get(layout, ApiCode.OK);
-            long revision = initial.path("revision").asLong();
-            String match = "\"" + revision + "\"";
-            assertThat(initial.path("left").size()).isEqualTo(2);
-            JsonNode edited = JSON.readTree("""
-                    {"left":["active-projects"],"right":["active-alerts","tourism-visits"]}
-                    """);
-            admin.putDraft(settings, edited, match, admin.csrf(), ApiCode.AUTH_REQUIRED);
-            viewer.login("district");
-            viewer.putDraft(settings, edited, match, viewer.csrf(), ApiCode.ACCESS_DENIED);
+    void retiresPresentationConfigurationEndpoints() throws Exception {
+        try (var admin = new Browser()) {
             admin.login("data-admin");
-            admin.putDraft(settings, edited, match, null, ApiCode.CSRF_INVALID);
-            Csrf csrf = admin.csrf();
-            admin.putDraft(settings, edited, null, csrf, ApiCode.INVALID_REQUEST);
-            for (String left : List.of("[]", "[\"unknown\"]", "[\"active-alerts\"]", "[\"active-projects\",\"active-projects\"]",
-                    "[\"governance-events\",\"service-cases\",\"active-projects\",\"road-traffic\"]")) {
-                JsonNode invalid = JSON.readTree("{\"left\":" + left + ",\"right\":[\"active-alerts\"]}");
-                admin.putDraft(settings, invalid, match, csrf, ApiCode.INVALID_REQUEST);
-            }
-            assertThat(viewer.get(layout, ApiCode.OK)).isEqualTo(initial);
-            JsonNode saved = admin.putDraft(settings, edited, match, csrf, ApiCode.OK);
-            assertThat(saved.path("revision").asLong()).isEqualTo(revision + 1);
-            assertThat(saved.path("left")).isEqualTo(edited.path("left"));
-            assertThat(saved.path("right")).isEqualTo(edited.path("right"));
-            admin.putDraft(settings, edited, match, csrf, ApiCode.VERSION_CONFLICT);
-            assertThat(viewer.get(layout, ApiCode.OK)).isEqualTo(saved);
+            var csrf = admin.csrf();
+            admin.get("/cockpit/side-metrics", ApiCode.NOT_FOUND);
+            admin.get("/admin/dashboards/city-operations/draft", ApiCode.NOT_FOUND);
+            admin.post("/admin/dashboards/city-operations/releases", "{}", csrf, ApiCode.NOT_FOUND);
+            admin.post("/dashboard-reviews/city-operations", "{}", csrf, ApiCode.NOT_FOUND);
+            admin.post("/auth/demo-session", persona("reviewer"), csrf, ApiCode.INVALID_REQUEST);
         }
     }
 
     @Test
-    void publicTopicsExposeOnlyActiveAggregateTemplatesAndMatchingSnapshots() throws Exception {
+    void publicTopicsExposeOnlyFixedAggregateDefinitionsAndMatchingSnapshots() throws Exception {
         try (var browser = new Browser()) {
             for (String topic : List.of("population", "hotline", "water")) {
                 String path = "/cockpit/topics/" + topic;
@@ -117,7 +95,6 @@ class DemoApiIntegrationTests {
                 assertThat(snapshot.path("results").size()).isEqualTo(manifest.path("components").size());
                 browser.get(path + "/snapshot?releaseId=previous-release", ApiCode.RELEASE_CONFLICT);
                 browser.get(path + "/snapshot?releaseId=INVALID", ApiCode.INVALID_REQUEST);
-                browser.get(draftPath(topic), ApiCode.AUTH_REQUIRED);
             }
             browser.get("/cockpit/topics/" + CITY + "/manifest", ApiCode.PROJECT_NOT_FOUND);
             browser.get("/cockpit/topics/" + SERVICES + "/snapshot?releaseId=services-release-1", ApiCode.PROJECT_NOT_FOUND);
@@ -136,76 +113,6 @@ class DemoApiIntegrationTests {
             browser.uploadCsv(null, ApiCode.CSRF_INVALID);
             JsonNode asset = browser.uploadCsv(browser.csrf(), ApiCode.OK);
             assertThat(asset.path("fileName").asString()).isEqualTo("observations.csv");
-        }
-    }
-
-    @Test
-    void protectsDashboardDraftsAndPreservesPublishedPlayback() throws Exception {
-        String path = draftPath(CITY);
-        try (var admin = new Browser(); var viewer = new Browser()) {
-            admin.get(path, ApiCode.AUTH_REQUIRED);
-            viewer.login("district");
-            viewer.get(path, ApiCode.ACCESS_DENIED);
-            JsonNode published = viewer.get(manifestPath(CITY), ApiCode.OK);
-            admin.login("data-admin");
-            admin.get(draftPath("missing-project"), ApiCode.PROJECT_NOT_FOUND);
-
-            JsonNode initial = admin.get(path, ApiCode.OK);
-            assertThat(initial.path("revision").asInt()).isZero();
-            assertThat(initial.path("template")).isEqualTo(published);
-            assertThat(initial.path("components")).isEqualTo(published.path("components"));
-            assertThat(initial.path("snapshot").path("results").size()).isEqualTo(initial.path("components").size());
-
-            var edited = JSON.createObjectNode();
-            var components = edited.putArray("components");
-            var first = (ObjectNode) initial.path("components").get(0).deepCopy();
-            first.put("title", "指挥席观察指标");
-            ((ObjectNode) first.path("geometry")).put("x", 71);
-            components.add(first);
-            var csrf = admin.csrf();
-            admin.putDraft(path, edited, "\"0\"", null, ApiCode.CSRF_INVALID);
-            admin.putDraft(path, edited, null, csrf, ApiCode.INVALID_REQUEST);
-            admin.putDraft(path, edited, "0", csrf, ApiCode.INVALID_REQUEST);
-
-            first.put("metricId", "received-cases");
-            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.INVALID_REQUEST);
-            first.put("metricId", published.path("components").get(0).path("metricId").asString());
-            ((ObjectNode) first.path("geometry")).put("width", 1920);
-            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.INVALID_REQUEST);
-            ((ObjectNode) first.path("geometry")).put("width", 400);
-            components.add(first.deepCopy());
-            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.INVALID_REQUEST);
-            components.remove(1);
-            assertThat(admin.get(path, ApiCode.OK).path("revision").asInt()).isZero();
-
-            JsonNode saved = admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.OK);
-            assertThat(saved.path("revision").asInt()).isEqualTo(1);
-            assertThat(saved.path("components")).isEqualTo(components);
-            admin.putDraft(path, edited, "\"0\"", csrf, ApiCode.VERSION_CONFLICT);
-            assertThat(admin.get(path, ApiCode.OK).path("components")).isEqualTo(components);
-            assertThat(viewer.get(manifestPath(CITY), ApiCode.OK)).isEqualTo(published);
-
-            components.removeAll();
-            JsonNode cleared = admin.putDraft(path, edited, "\"1\"", csrf, ApiCode.OK);
-            assertThat(cleared.path("revision").asInt()).isEqualTo(2);
-            assertThat(admin.get(path, ApiCode.OK).path("components").isEmpty()).isTrue();
-        }
-    }
-
-    @Test
-    void allowsOnlyOneConcurrentFirstDraftSave() throws Exception {
-        String path = draftPath(SERVICES);
-        try (var admin = new Browser()) {
-            admin.login("data-admin");
-            JsonNode initial = admin.get(path, ApiCode.OK);
-            var draft = JSON.createObjectNode().set("components", initial.path("components"));
-            var csrf = admin.csrf();
-            var first = admin.client.sendAsync(admin.draftRequest(path, draft, "\"0\"", csrf),
-                    HttpResponse.BodyHandlers.ofString());
-            var second = admin.client.sendAsync(admin.draftRequest(path, draft, "\"0\"", csrf),
-                    HttpResponse.BodyHandlers.ofString());
-            assertThat(List.of(first.get().statusCode(), second.get().statusCode())).containsExactlyInAnyOrder(200, 409);
-            assertThat(admin.get(path, ApiCode.OK).path("revision").asInt()).isEqualTo(1);
         }
     }
 
@@ -436,10 +343,6 @@ class DemoApiIntegrationTests {
         return "/playback/" + projectId + "/component-queries";
     }
 
-    private static String draftPath(String projectId) {
-        return "/admin/dashboards/" + projectId + "/draft";
-    }
-
     private HttpRequest.Builder request(String path) {
         return requestOnPort(port, "/api/v1" + path);
     }
@@ -524,22 +427,6 @@ class DemoApiIntegrationTests {
                     + "\r\nContent-Type: text/csv\r\n\r\nregion,date,measure,value\r\n"
                     + "dayu,2026-11-23,events,10\r\n--fixture--\r\n";
             return exchange(client, builder.POST(HttpRequest.BodyPublishers.ofString(body)).build(), expected);
-        }
-
-        private JsonNode putDraft(String path, JsonNode payload, String version, Csrf csrf, ApiCode expected)
-                throws Exception {
-            return exchange(client, draftRequest(path, payload, version, csrf), expected);
-        }
-
-        private HttpRequest draftRequest(String path, JsonNode payload, String version, Csrf csrf) {
-            var builder = request(path).header("Content-Type", "application/json");
-            if (version != null) {
-                builder.header("If-Match", version);
-            }
-            if (csrf != null) {
-                builder.header(csrf.headerName(), csrf.token());
-            }
-            return builder.PUT(HttpRequest.BodyPublishers.ofString(payload.toString())).build();
         }
 
         private Csrf csrf() throws Exception {

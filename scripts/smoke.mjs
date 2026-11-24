@@ -103,6 +103,7 @@ async function assertProjects(expectedIds) {
 
 const city = 'city-operations';
 const service = 'public-services';
+const publicTopics = ['population', 'hotline', 'water'];
 const manifestPath = (projectId) => '/playback/' + projectId + '/manifest';
 const queryPath = (projectId) => '/playback/' + projectId + '/component-queries';
 
@@ -123,6 +124,16 @@ assert.equal(village.children.length, 0);
 assert.deepEqual(village.metrics.map((item) => item.id), overview.metrics.map((item) => item.id));
 await request(areaPath('absent-area'), { status: 404 });
 
+for (const topic of publicTopics) {
+  const path = '/cockpit/topics/' + topic;
+  const definition = await request(path + '/manifest');
+  const snapshot = await request(path + '/snapshot?releaseId=' + encodeURIComponent(definition.releaseId));
+  assert.equal(definition.projectId, topic);
+  assert.equal(snapshot.quality, 'SIMULATED');
+  assert.equal(snapshot.releaseId, definition.releaseId);
+  assert.deepEqual(snapshot.results.map(result => result.componentId), definition.components.map(component => component.id));
+}
+
 await request('/me', { status: 401 });
 await request('/auth/demo-session', { method: 'POST', status: 403, payload: { persona: 'district' } });
 
@@ -133,7 +144,7 @@ const districtIdentity = await request('/auth/demo-session', {
 });
 assertIdentity(districtIdentity, city, '/');
 assert.deepEqual(await request('/me'), districtIdentity);
-await assertProjects([city, service]);
+await assertProjects([city, service, ...publicTopics]);
 
 const manifest = await request(manifestPath(city));
 assert.equal(manifest.schemaVersion, 1);
@@ -194,4 +205,4 @@ const serviceSession = cookieHeader();
 assert.equal(await request('/auth/logout', { method: 'POST', csrf: serviceCsrf }), null);
 await request('/me', { status: 401 });
 await request('/me', { status: 401, previousSession: serviceSession });
-console.log('PASS demo API smoke: anonymous cockpit, district/town/village, role landing, CSRF, session rotation, protected playback and logout.');
+console.log('PASS demo API smoke: anonymous cockpit and fixed topics, district/town/village, role landing, CSRF, session rotation, protected playback and logout.');
