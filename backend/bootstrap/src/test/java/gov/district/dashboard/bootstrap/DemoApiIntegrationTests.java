@@ -105,11 +105,11 @@ class DemoApiIntegrationTests {
     @Test
     void hotlineAggregatesReconcileAcrossDistrictTownAndVillage() throws Exception {
         try (var browser = new Browser()) {
-            JsonNode district = browser.get("/hotline/overview", ApiCode.OK);
+            JsonNode district = browser.get("/hotline/overview?month=2026-10", ApiCode.OK);
             assertThat(district.path("quality").asString()).isEqualTo("SIMULATED");
             assertThat(district.path("month").asString()).isEqualTo("2026-10");
             assertThat(district.path("snapshotOn").asString()).isEqualTo("2026-10-24");
-            assertThat(district.path("trend").size()).isEqualTo(10);
+            assertThat(district.path("trend").size()).isGreaterThanOrEqualTo(10);
             assertThat(district.path("areas").size()).isEqualTo(13);
             JsonNode totals = district.path("totals");
             assertThat(totals.path("received").asInt()).isEqualTo(2460);
@@ -123,16 +123,16 @@ class DemoApiIntegrationTests {
                 townTotal += area.path("received").asInt();
             }
             assertThat(townTotal).isEqualTo(totals.path("received").asInt());
-            JsonNode town = browser.get("/hotline/overview?areaId=datai", ApiCode.OK);
-            JsonNode village = browser.get("/hotline/overview?areaId=datai-qianjuntai", ApiCode.OK);
-            JsonNode neighbour = browser.get("/hotline/overview?areaId=datai-muchengjian", ApiCode.OK);
+            JsonNode town = browser.get("/hotline/overview?areaId=datai&month=2026-10", ApiCode.OK);
+            JsonNode village = browser.get("/hotline/overview?areaId=datai-qianjuntai&month=2026-10", ApiCode.OK);
+            JsonNode neighbour = browser.get("/hotline/overview?areaId=datai-muchengjian&month=2026-10", ApiCode.OK);
             assertThat(village.path("area").path("parentId").asString()).isEqualTo("datai");
             assertThat(village.path("areas").size()).isZero();
             assertThat(town.path("totals").path("received").asInt()).isEqualTo(66)
                     .isEqualTo(village.path("totals").path("received").asInt()
                             + neighbour.path("totals").path("received").asInt());
 
-            JsonNode analysis = browser.get("/hotline/analysis?areaId=datai-qianjuntai", ApiCode.OK);
+            JsonNode analysis = browser.get("/hotline/analysis?areaId=datai-qianjuntai&month=2026-10", ApiCode.OK);
             assertThat(analysis.path("totals")).isEqualTo(village.path("totals"));
             assertThat(ids(analysis.path("findings")))
                     .containsExactly("top-category", "month-change", "deadline-watch", "dispatch-watch");
@@ -189,9 +189,31 @@ class DemoApiIntegrationTests {
             browser.get("/hotline/tickets?page=-1", ApiCode.INVALID_REQUEST);
             browser.get("/hotline/tickets?lane=unknown", ApiCode.INVALID_REQUEST);
             browser.get("/hotline/tickets?category=unknown", ApiCode.INVALID_REQUEST);
-            browser.get("/hotline/overview?month=2026-11", ApiCode.INVALID_REQUEST);
+            browser.get("/hotline/overview?month=" + java.time.YearMonth.now(java.time.ZoneId.of("Asia/Shanghai")).plusMonths(1), ApiCode.INVALID_REQUEST);
             browser.get("/hotline/overview?areaId=unlisted", ApiCode.NOT_FOUND);
             browser.get("/hotline/tickets/HL-202610-99999", ApiCode.NOT_FOUND);
+        }
+    }
+
+    @Test
+    void hotlineDefaultsAgreeOnTheLatestAvailableSnapshot() throws Exception {
+        try (var browser = new Browser()) {
+            JsonNode overview = browser.get("/hotline/overview?areaId=datai", ApiCode.OK);
+            String latest = overview.path("month").asString();
+            JsonNode trend = overview.path("trend");
+            assertThat(trend.get(trend.size() - 1).path("month").asString()).isEqualTo(latest);
+            assertThat(overview.path("totals").path("received").asInt()).isPositive();
+            var today = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Shanghai"));
+            assertThat(java.time.LocalDate.parse(overview.path("snapshotOn").asString())).isBeforeOrEqualTo(today);
+            if (!today.isBefore(java.time.LocalDate.of(2026, 11, 1))) {
+                assertThat(latest).isEqualTo(java.time.YearMonth.from(today).toString());
+            }
+            JsonNode tickets = browser.get("/hotline/tickets?areaId=datai&size=1", ApiCode.OK);
+            JsonNode analysis = browser.get("/hotline/analysis?areaId=datai", ApiCode.OK);
+            assertThat(tickets.path("month").asString()).isEqualTo(latest);
+            assertThat(tickets.path("total").asInt()).isEqualTo(overview.path("totals").path("received").asInt());
+            assertThat(analysis.path("month").asString()).isEqualTo(latest);
+            assertThat(analysis.path("totals")).isEqualTo(overview.path("totals"));
         }
     }
 
