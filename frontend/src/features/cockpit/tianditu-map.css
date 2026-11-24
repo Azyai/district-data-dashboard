@@ -2,12 +2,14 @@
 .atlas-render { position: absolute; inset: 0; }
 .atlas-camera-frame { position: absolute; inset: 0 var(--atlas-inset, 0px); pointer-events: none; }
 .atlas-render .maplibregl-ctrl-bottom-left { bottom: 14px; left: var(--local-gutter, 16px); }
-.atlas-render .maplibregl-ctrl-scale { margin: 0; border: 1px solid #d8eaf0b3; border-top: 0;
-  color: #eff9ff; font: 10px/1.5 "Segoe UI", sans-serif; text-align: center; background: #142739bf; }
-.atlas-credit { position: absolute; z-index: 2; left: calc(var(--local-gutter, 16px) + 92px); bottom: 12px;
+.atlas-render .atlas-scale { display: grid; justify-items: start; gap: 3px; margin: 0;
+  color: #eff9ff; font: 11px/1.2 "Segoe UI", sans-serif; text-shadow: 0 1px 3px #07101d; }
+.atlas-scale span { padding: 2px 5px; border-radius: 3px; background: #0a1b2bdb; }
+.atlas-scale i { height: 5px; border: solid #e4f5ff; border-width: 0 1px 1px; filter: drop-shadow(0 1px 1px #091321); }
+.atlas-status { position: absolute; z-index: 2; left: calc(var(--local-gutter, 16px) + 92px); bottom: 12px;
   display: flex; align-items: center; gap: 6px; padding: 2px 7px; border-radius: 3px; color: #d5e1eb;
   background: #102031bd; font-size: .64rem; }
-.atlas-credit button { cursor: pointer; color: #99d7e6; text-decoration: underline; }
+.atlas-status button { cursor: pointer; color: #99d7e6; text-decoration: underline; }
 .atlas-render .maplibregl-marker { z-index: 1; font-family: inherit; }
 .atlas-render .maplibregl-marker:has(.atlas-population) { z-index: 2; }
 .atlas-render .maplibregl-marker:focus-within, .atlas-render .maplibregl-marker:hover { z-index: 4; }
@@ -24,6 +26,8 @@
   .atlas-place:is([data-place="yanchi"], [data-place="wangping"], [data-place="junzhuang"], [data-place="tanzhesi"])[data-featured="false"]:not(:hover, :focus-visible) .atlas-pin-label { display: block; }
 }
 .atlas-place[data-featured="false"] .atlas-pin-dot { width: 5px; height: 5px; box-shadow: 0 0 0 2px #325767aa; }
+.atlas-place[aria-current] .atlas-pin-dot { background: #edfaff; box-shadow: 0 0 0 4px #68d6e2a6, 0 0 15px #b7edf5a8; }
+.atlas-place[aria-current] { cursor: default; }
 .atlas-place:focus-visible, .atlas-population:focus-visible, .atlas-landmarks button:focus-visible {
   outline: 2px solid #d3f5ff; outline-offset: 3px; }
 .atlas-population .atlas-pin-dot { width: 12px; height: 12px; background: #d5effe; box-shadow: 0 0 0 5px #6dc9e875, 0 0 0 8px #a5dfe24a; }
@@ -44,7 +48,7 @@
 .atlas-static img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .atlas-static p { position: absolute; bottom: 8px; background: #102137e0; font-size: .8rem; padding: .3rem .7rem; }
 @media (max-width: 740px) {
-  .atlas-credit { bottom: 13px; left: 92px; max-width: calc(100% - 156px); font-size: .58rem; }
+  .atlas-status { bottom: 13px; left: 92px; max-width: calc(100% - 156px); font-size: .58rem; }
   .atlas-place { width: 22px; height: 22px; }
   .atlas-callout { min-width: 90px; }
   .atlas-pin-label { font-size: .64rem; top: 20px; }
