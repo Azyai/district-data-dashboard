@@ -492,6 +492,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cockpit/side-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取驾驶舱两侧指标配置 */
+        get: operations["getCockpitSideMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/cockpit/side-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * 保存全区驾驶舱两侧指标配置
+         * @description 数据管理员可为每侧选择 1–3 个有序公开指标，同一项只可出现一次。保存成功后所有展示终端生效。
+         */
+        put: operations["saveCockpitSideMetrics"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -819,6 +856,15 @@ export interface components {
             serial: number;
             activeRevision: number | null;
             releases: components["schemas"]["DashboardReleaseSummary"][];
+        };
+        CockpitSideSelection: {
+            left: string[];
+            right: string[];
+        };
+        CockpitSideMetrics: {
+            revision: number;
+            left: string[];
+            right: string[];
         };
         Geometry: {
             x: number;
@@ -2049,6 +2095,73 @@ export interface operations {
             401: components["responses"]["Http401"];
             403: components["responses"]["Http403"];
             404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getCockpitSideMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 当前生效的有序指标标识 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["CockpitSideMetrics"];
+                    };
+                };
+            };
+            500: components["responses"]["Http500"];
+        };
+    };
+    saveCockpitSideMetrics: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 从当前会话的 CSRF 接口取得 */
+                "X-CSRF-TOKEN": components["parameters"]["CsrfHeader"];
+                /** @description 当前配置的版本号 */
+                "If-Match": components["parameters"]["IfMatch"];
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CockpitSideSelection"];
+            };
+        };
+        responses: {
+            /** @description 当前生效的有序指标标识 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["CockpitSideMetrics"];
+                    };
+                };
+            };
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            409: components["responses"]["Http409"];
+            422: components["responses"]["Http422"];
             500: components["responses"]["Http500"];
         };
     };
