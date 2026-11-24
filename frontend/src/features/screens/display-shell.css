@@ -1,0 +1,117 @@
+.display-shell {
+  --display-line: #293652;
+  --display-soft: #a2aec7;
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  color: #edf3ff;
+  background: #05070e;
+  font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+}
+.display-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(6px, 1vw, 22px);
+  margin-inline: clamp(12px, 2.35vw, 55px);
+  min-height: clamp(55px, 6.6vh, 81px);
+  padding-block: 6px;
+  border-bottom: 1px solid var(--display-line);
+}
+.display-shell[data-screen="governance"] { background: linear-gradient(110deg, #111f2a, #182e36 65%, #19363c); }
+.display-identity, .display-tools, .display-nav, .display-nav a, .display-pickers {
+  display: flex;
+  align-items: center;
+}
+.display-identity { gap: clamp(7px, .85vw, 17px); }
+.display-emblem, .display-fullscreen {
+  display: grid;
+  flex: none;
+  place-items: center;
+  border: 1px solid #39616f;
+  border-radius: 10px;
+  background: linear-gradient(145deg, #1d3b4e, #131929);
+  color: #73e4f2;
+}
+.display-emblem { width: clamp(32px, 2.65vw, 49px); aspect-ratio: 1; box-shadow: 0 0 20px #53c9eb14; }
+.display-emblem svg { width: 64%; }
+.display-brand { min-width: 0; }
+.display-brand h1 {
+  font-size: clamp(15px, 1.13vw, 23px);
+  line-height: 1.5;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.display-pickers { gap: .45rem; }
+.display-pickers select {
+  cursor: pointer;
+  max-width: 10em;
+  min-width: 0;
+  padding: 1px 3px 1px 0;
+  color: #b5c9de;
+  font-size: clamp(11px, .72vw, 14px);
+  background: transparent;
+  border: 0;
+  line-height: 1.45;
+}
+.display-pickers select + select { border-inline-start: 1px solid #465577; padding-inline-start: .4rem; }
+.display-pickers option, .display-pickers optgroup { color: #edf3ff; background: #101726; }
+.display-nav {
+  justify-self: center;
+  gap: .25rem;
+  padding: .28rem;
+  border: 1px solid #313b5c;
+  border-radius: .75rem;
+  background: #0b1020b8;
+}
+.display-nav a {
+  gap: .42rem;
+  padding: clamp(6px, .72vh, 12px) clamp(8px, 1vw, 24px);
+  border: 1px solid transparent;
+  border-radius: .51rem;
+  color: var(--display-soft);
+  font-size: clamp(12px, .85vw, 17px);
+  white-space: nowrap;
+}
+.display-nav a:hover, .display-fullscreen:hover { background: #202840; color: #fff; }
+.display-nav a[aria-current] { color: #f0eeff; background: linear-gradient(120deg, #293950, #2c2449); border-color: #536086; }
+.display-nav svg, .display-fullscreen svg { width: 1.05em; height: 1.05em; }
+.display-tools { justify-content: end; gap: clamp(5px, .9vw, 22px); }
+.display-clock { text-align: end; font-family: Bahnschrift, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+.display-clock strong, .display-clock small { display: block; white-space: nowrap; }
+.display-clock strong { font-weight: 550; font-size: clamp(15px, 1.1vw, 23px); line-height: 1.1; }
+.display-clock small { color: var(--display-soft); font-size: clamp(10px, .72vw, 14px); }
+.display-fullscreen, .display-tools .screen-agent-trigger {
+  border: 1px solid #35435e;
+  border-radius: 7px;
+  background: #101727;
+  color: #cbd6ed;
+  min-height: 32px;
+  cursor: pointer;
+}
+.display-fullscreen { width: 32px; }
+.display-content { position: relative; min-width: 0; min-height: 0; }
+.display-state { display: grid; place-content: center; text-align: center; gap: 1rem; height: 100%; color: #bccee7; }
+.display-state a, .display-state button, .display-retry-directory { color: #73e4f2; text-decoration: underline; cursor: pointer; }
+.display-retry-directory { position: absolute; top: 0; left: 0; background: #101726; }
+@media (max-width: 840px) {
+  .display-head { grid-template-columns: minmax(0, 1fr) auto; }
+  .display-nav { display: none; }
+}
+@media (max-width: 540px) {
+  .display-head { margin-inline: 8px; }
+  .display-clock { display: none; }
+  .display-head { min-height: 55px; }
+  .display-identity { gap: 6px; }
+  .display-fullscreen { width: 29px; }
+  .display-tools .screen-agent-trigger { font-size: 11px; padding-inline: 5px; gap: 3px; }
+}
+@media (max-height: 500px) {
+  .display-head { min-height: 42px; padding-block: 2px; }
+  .display-brand h1 { font-size: 13px; }
+}
