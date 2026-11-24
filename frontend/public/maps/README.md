@@ -17,6 +17,9 @@ node --max-old-space-size=4096 frontend/scripts/prepare-mentougou-model.mjs
 node frontend/scripts/prepare-mentougou-texture.mjs
 node frontend/scripts/prepare-mentougou-geodata.mjs
 python frontend/scripts/prepare-mentougou-atlas.py
+python frontend/scripts/prepare-landmark-context.py
 ```
 
 两处地标优先加载 `tianjie-detail.glb` 和 `jingxi-detail.glb`，保留源立面网格与纹理，使用 Meshopt 压缩。离线地形与在线天地图瓦片分别加载。
+
+地标周边简图从项目原始路网和水域模型裁取，生成两份 `*-context.json`。页面将道路、水面与示意绿地投到模型底部。缺少简图文件时仍可查看建筑和场地底座。建筑配色在浏览器渲染时应用。
