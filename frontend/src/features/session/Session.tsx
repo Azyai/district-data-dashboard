@@ -7,7 +7,6 @@ import { ApiError, dashboardApi } from '../../api/client'
 import type { DemoPersona, Me } from '../../api/client'
 import { workspaceForPath } from '../../api/workspace'
 import { topicFor } from '../topics/topicCatalog'
-import { screens } from '../screens/screenCatalog'
 
 function PersonaOption({ title, description, persona, active, submit }: {
   title: string
@@ -47,9 +46,6 @@ export function Session({ children }: { children: (state: SessionState) => React
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const topic = topicFor(useMatch('/topics/:topicId')?.params.topicId ?? null)
-  const areaData = Boolean(useMatch('/data/areas/:areaId'))
-  const screenId = useMatch('/screens/:screenId')?.params.screenId
-  const displayScreen = screens.find(item => item.id === screenId)
   const workspace = workspaceForPath(pathname)
   const management = workspace === 'management'
   const identityKey = ['identity', workspace] as const
@@ -92,13 +88,10 @@ export function Session({ children }: { children: (state: SessionState) => React
   }, [identity.isSuccess, identity.data, queryClient])
 
   useEffect(() => {
-    if (displayScreen) document.title = displayScreen.title + ' · 门头沟区治理与发展大屏'
-    else if (topic) document.title = topic.title + ' · 门头沟区'
+    if (topic) document.title = topic.title + ' · 门头沟全域数字中心'
     else if (management) document.title = '门头沟区数据管理'
-    else if (areaData) document.title = '门头沟区区域数据'
-    else document.title = pathname.toLowerCase().replace(/\/$/, '') === '/workbench'
-      ? '门头沟区数据工作台' : '门头沟区数字驾驶舱'
-  }, [management, pathname, topic, areaData, displayScreen])
+    else if (pathname.toLowerCase().replace(/\/$/, '') === '/workbench') document.title = '门头沟区数据工作台'
+  }, [management, pathname, topic])
 
   const current = identity.data ?? null
   const busy = login.isPending || logout.isPending
