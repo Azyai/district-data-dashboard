@@ -36,11 +36,12 @@ try {
     }
     Object.defineProperty(window, 'SpeechRecognition', { value: LocalSpeechFixture, configurable: true })
   })
-  await page.goto('/')
-  const map = page.getByRole('main', { name: '区域驾驶舱' })
+  await page.goto('/workbench')
+  const workbench = page.getByRole('main', { name: '区域数据工作台' })
   const assistant = page.getByRole('button', { name: 'AI 问数' })
   await assistant.waitFor()
-  const initialBounds = await map.boundingBox()
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+  const initialBounds = await workbench.boundingBox()
   assert(initialBounds)
   await assistant.click()
   await page.getByRole('button', { name: '语音提问', exact: true }).click()
@@ -50,7 +51,7 @@ try {
   await hotline.getByText('柱状图', { exact: true }).waitFor()
   await hotline.getByText('分类网络图', { exact: true }).waitFor()
   await hotline.locator('.data-chart canvas').first().waitFor()
-  assert.deepEqual(await map.boundingBox(), initialBounds, 'Topic overlay must preserve the home stage')
+  assert.deepEqual(await workbench.boundingBox(), initialBounds, 'Topic overlay must preserve the workbench')
   await capture(page, 'hotline-voice-insight')
 
   const prompt = page.getByRole('textbox', { name: '追问当前专题' })
@@ -75,7 +76,7 @@ try {
   await prompt.fill('返回地图')
   await prompt.press('Enter')
   await water.waitFor({ state: 'hidden' })
-  assert.deepEqual(await map.boundingBox(), initialBounds)
+  assert.deepEqual(await workbench.boundingBox(), initialBounds)
 
   await page.getByRole('button', { name: '专题', exact: true }).click()
   await page.getByRole('button', { name: '人口专题', exact: true }).click()

@@ -83,16 +83,19 @@ async function identity(page, headers) {
 }
 
 try {
-  const display = await browser.newPage({ baseURL: baseUrl, viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
+  const context = await browser.newContext({ baseURL: baseUrl, viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
+  const display = await context.newPage()
   const errors = []
   display.on('pageerror', error => errors.push(error.message))
   await display.goto('/')
-  await display.getByRole('button', { name: '身份核验' }).click()
-  await display.getByRole('button', { name: /政务服务专项/ }).click()
-  await display.getByRole('heading', { name: '政务服务', exact: true }).waitFor()
-  await display.getByRole('link', { name: '返回驾驶舱' }).click()
+  const workbench = await context.newPage()
+  await workbench.goto(new URL('/workbench', baseUrl).toString())
+  await workbench.getByRole('button', { name: '身份核验' }).click()
+  await workbench.getByRole('button', { name: /政务服务专项/ }).click()
+  await workbench.getByRole('heading', { name: '政务服务', exact: true }).waitFor()
+  await workbench.goto(new URL('/workbench', baseUrl).toString())
   const originalUrl = new URL('/', baseUrl).toString()
-  const page = await openSeparateTab(display, display.getByRole('link', { name: '数据管理', exact: true }))
+  const page = await openSeparateTab(workbench, workbench.getByRole('link', { name: '数据管理', exact: true }))
   page.setDefaultTimeout(15_000)
   page.on('pageerror', error => errors.push(error.message))
 
@@ -166,11 +169,11 @@ try {
   const metricsLayout = await pageLayout(page, listAnchors)
   await page.getByRole('button', { name: '查看口径 ' + metricName, exact: true }).click()
   const metricDetail = page.getByRole('dialog', { name: '指标口径', exact: true })
-  await metricDetail.getByRole('link', { name: '到驾驶舱核对' }).waitFor()
+  await metricDetail.getByRole('link', { name: '到工作台核对' }).waitFor()
   assert.deepEqual(await pageLayout(page, listAnchors), metricsLayout, 'Metric detail should overlay the list')
   await capture(page, 'admin-metric-published.png')
 
-  const verifyTab = await openSeparateTab(page, metricDetail.getByRole('link', { name: '到驾驶舱核对' }))
+  const verifyTab = await openSeparateTab(page, metricDetail.getByRole('link', { name: '到工作台核对' }))
   await metricDetail.waitFor()
   assert.match(page.url(), /\/admin\/metrics/)
   const issues = verifyTab.getByRole('dialog', { name: '门头沟区问题诊断' })
@@ -179,13 +182,13 @@ try {
   await metricRow.getByText(sourceName, { exact: false }).waitFor()
   await metricRow.getByText(/^73\s*件$/).waitFor()
   await capture(verifyTab, 'admin-cockpit-verification.png')
-  const cockpitAnchors = ['.map-panel', '.district-local-model']
-  const cockpitLayout = await pageLayout(verifyTab, cockpitAnchors)
+  const workbenchAnchors = ['.workbench-scope', '.workbench-roster']
+  const workbenchLayout = await pageLayout(verifyTab, workbenchAnchors)
   await issues.getByRole('button', { name: '关闭', exact: true }).last().click()
   await issues.waitFor({ state: 'hidden' })
-  assert.deepEqual(await pageLayout(verifyTab, cockpitAnchors), cockpitLayout)
+  assert.deepEqual(await pageLayout(verifyTab, workbenchAnchors), workbenchLayout)
   await verifyTab.close()
-  console.log('PASS metric publication, separate verification tab and stable cockpit evidence')
+  console.log('PASS metric publication, separate verification tab and stable workbench evidence')
 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(new URL('/admin/sources', baseUrl).toString())
