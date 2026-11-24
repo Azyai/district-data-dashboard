@@ -13,9 +13,13 @@ export const districtBounds = { west: 115.416805, east: 116.169245, south: 39.81
 const dataRoot = import.meta.env.BASE_URL + 'maps/local-model/data/'
 const sourceNames: Record<string, string> = { 'yongding-xixincheng': '西辛称村' }
 
+export function modelAreaName(area: { id: string; name: string }) {
+  return sourceNames[area.id] ?? area.name
+}
+
 export function boundaryFor(area: { id: string; name: string }, boundaries?: GeoBoundary[]) {
   return boundaries?.find(boundary => boundary.name === area.name)
-    ?? boundaries?.find(boundary => boundary.name === sourceNames[area.id])
+    ?? boundaries?.find(boundary => boundary.name === modelAreaName(area))
 }
 
 export async function readBoundaries(signal: AbortSignal, townCode?: string): Promise<GeoBoundary[]> {
