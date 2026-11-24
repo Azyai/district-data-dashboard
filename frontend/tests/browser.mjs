@@ -185,14 +185,31 @@ async function verifyDistrictMap(page) {
 async function verifyRegionMenuLayout(page) {
   const trigger = page.locator('.region-picker > summary')
   const menu = page.getByRole('navigation', { name: '区域目录' })
+  const anchors = [...mapLayoutAnchors, '.map-toolbar', '.map-plot', '.rail-left', '.rail-right']
   await trigger.scrollIntoViewIfNeeded()
-  const original = await pageLayout(page, mapLayoutAnchors)
+  const original = await pageLayout(page, anchors)
   await trigger.click()
   await menu.waitFor()
-  assert.deepEqual(await pageLayout(page, mapLayoutAnchors), original, 'The area menu should overlay the map')
+  assert.deepEqual(await pageLayout(page, anchors), original, 'Opening the area menu should preserve dashboard layout')
+  const placement = await menu.evaluate(element => {
+    const menuRect = element.getBoundingClientRect()
+    const toolbar = document.querySelector('.map-toolbar')
+    const toolbarRect = toolbar.getBoundingClientRect()
+    const mapRect = document.querySelector('.map-plot').getBoundingClientRect()
+    const rails = [...document.querySelectorAll('.metric-rail')].map(rail => rail.getBoundingClientRect())
+    return {
+      transparentToolbar: getComputedStyle(toolbar).backgroundColor === 'rgba(0, 0, 0, 0)' && mapRect.top <= toolbarRect.top,
+      belowToolbar: menuRect.top >= toolbarRect.bottom,
+      insideMap: menuRect.left >= mapRect.left && menuRect.right <= mapRect.right && menuRect.bottom <= mapRect.bottom,
+      overlapsRail: rails.some(rail => menuRect.left < rail.right && menuRect.right > rail.left &&
+        menuRect.top < rail.bottom && menuRect.bottom > rail.top),
+    }
+  })
+  assert.deepEqual(placement, { transparentToolbar: true, belowToolbar: true, insideMap: true, overlapsRail: false })
   await trigger.press('Escape')
   await menu.waitFor({ state: 'hidden' })
-  assert.deepEqual(await pageLayout(page, mapLayoutAnchors), original)
+  assert.equal(await trigger.evaluate(element => element === document.activeElement), true)
+  assert.deepEqual(await pageLayout(page, anchors), original)
 }
 
 async function verifyMapDeselection(page) {

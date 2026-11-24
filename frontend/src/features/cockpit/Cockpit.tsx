@@ -139,28 +139,26 @@ function RegionModel({ area, directory, directoryState, viewMode, onViewModeChan
   const isDistrict = area.level === 'district'
   const parent = area.breadcrumbs.at(-2)
   return (
-    <>
-      <section className="map-panel" data-level={area.level} aria-labelledby="area-model">
-        <div className="map-toolbar">
-          <div className="map-heading">
-            {parent && <Link className="map-parent" to={areaPath(parent.id)} aria-label={'返回上一级 ' + parent.name}>‹ {parent.name}</Link>}
-            <h2 id="area-model">{area.name}{isDistrict && <span>全域</span>}</h2>
-          </div>
-          <div className="map-actions">
-            <RegionPicker key={area.id} area={area} directory={directory} directoryState={directoryState} />
-            {!isDistrict && <a className="level-up" href={'/data/areas/' + encodeURIComponent(area.id) + '#area-issues'}
-              target="_blank" rel="noopener noreferrer">区域数据 <span aria-hidden="true">↗</span></a>}
-          </div>
+    <section className="map-panel" data-level={area.level} aria-labelledby="area-model">
+      <div className="map-toolbar">
+        <div className="map-heading">
+          {parent && <Link className="map-parent" to={areaPath(parent.id)} aria-label={'返回上一级 ' + parent.name}>‹ {parent.name}</Link>}
+          <h2 id="area-model">{area.name}{isDistrict && <span>全域</span>}</h2>
         </div>
-        <div className="map-plot">
-          <Suspense fallback={<div className="map-wait" role="status">正在打开区域地图</div>}>
-            <TiandituMap area={area} directory={directory} viewMode={viewMode} onViewModeChange={onViewModeChange}
-              onSelectArea={onSelectArea} onOpenTwin={onOpenTwin} />
-          </Suspense>
+        <div className="map-actions">
+          <RegionPicker key={area.id} area={area} directory={directory} directoryState={directoryState} />
+          {!isDistrict && <a className="level-up" href={'/data/areas/' + encodeURIComponent(area.id) + '#area-issues'}
+            target="_blank" rel="noopener noreferrer">区域数据 <span aria-hidden="true">↗</span></a>}
         </div>
-      </section>
+      </div>
+      <div className="map-plot">
+        <Suspense fallback={<div className="map-wait" role="status">正在打开区域地图</div>}>
+          <TiandituMap area={area} directory={directory} viewMode={viewMode} onViewModeChange={onViewModeChange}
+            onSelectArea={onSelectArea} onOpenTwin={onOpenTwin} />
+        </Suspense>
+      </div>
       <MetricRails area={area} />
-    </>
+    </section>
   )
 }
 
