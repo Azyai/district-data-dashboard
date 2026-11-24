@@ -5,7 +5,7 @@ import struct
 import sys
 
 import numpy as np
-from shapely import line_merge
+from shapely import line_merge, polygons, union_all
 from shapely.geometry import LineString, MultiLineString, Point, Polygon
 from shapely.strtree import STRtree
 
@@ -77,15 +77,26 @@ catalog["villages"] = [dict({key: row[key] for key in ("name", "town", "micro", 
 for water in catalog["waters"]:
     water["village"] = village_at([water["lon"], water["lat"]], water["town"])
 
-with (source / "门头沟模型/路网.glb").open("rb") as f:
-    f.seek(12)
-    size, _ = struct.unpack("<I4s", f.read(8))
-    gltf = json.loads(f.read(size))
-    size, _ = struct.unpack("<I4s", f.read(8))
-    buffer = f.read(size)
+def load_meshes(name):
+    with (source / "门头沟模型" / name).open("rb") as file:
+        file.seek(12)
+        size, _ = struct.unpack("<I4s", file.read(8))
+        gltf = json.loads(file.read(size))
+        size, _ = struct.unpack("<I4s", file.read(8))
+        buffer = file.read(size)
+    for node in gltf["nodes"]:
+        if "mesh" not in node:
+            continue
+        primitives = []
+        for primitive in gltf["meshes"][node["mesh"]]["primitives"]:
+            coords = accessor(gltf, buffer, primitive["attributes"]["POSITION"]) * node.get("scale", [1, 1, 1])
+            coords = coords @ rotation(node.get("rotation", [0, 0, 0, 1])).T + node.get("translation", [0, 0, 0])
+            indices = accessor(gltf, buffer, primitive["indices"])
+            primitives.append((coords[:, [0, 2]], indices))
+        yield node["name"], primitives
 
 
-def accessor(index):
+def accessor(gltf, buffer, index):
     item = gltf["accessors"][index]
     view = gltf["bufferViews"][item["bufferView"]]
     columns = 3 if item["type"] == "VEC3" else 1
@@ -133,15 +144,13 @@ def short_segment(coords):
 
 roads = {road["name"]: road for road in catalog["roads"]}
 features = []
-for node in gltf["nodes"]:
-    if "mesh" not in node or node.get("name") not in roads:
+for name, primitives in load_meshes("路网.glb"):
+    if name not in roads:
         continue
-    road = roads[node["name"]]
+    road = roads[name]
     lines = []
-    for primitive in gltf["meshes"][node["mesh"]]["primitives"]:
-        coords = accessor(primitive["attributes"]["POSITION"]) * np.array(node.get("scale", [1,1,1]))
-        coords = coords @ rotation(node.get("rotation", [0,0,0,1])).T + node.get("translation", [0,0,0])
-        lines.extend(ribbon_lines(coords[:,[0,2]], accessor(primitive["indices"])))
+    for coords, indices in primitives:
+        lines.extend(ribbon_lines(coords, indices))
     if not lines:
         continue
     # A village road is counted once, by its representative point on the longest path.
@@ -154,3 +163,18 @@ for node in gltf["nodes"]:
 save("roads.geojson", dict(type="FeatureCollection", features=features))
 save("catalog.json", catalog)
 print(f"{len(features)} road geometries; {len(villages)} village boundaries; {len(catalog['waters'])} water sites")
+
+hydrography = []
+for name, primitives in load_meshes("水域.glb"):
+    # Dissolve projected surface triangles so the display draws the shoreline,
+    # including narrow river branches, without exposing the triangulation.
+    triangles = np.concatenate([coords[indices.ravel()].reshape((-1, 3, 2)) for coords, indices in primitives])
+    surface = union_all(polygons(triangles), grid_size=1).simplify(4)
+    parts = surface.geoms if hasattr(surface, "geoms") else [surface]
+    rings = [[geographic(ring.coords) for ring in [part.exterior, *part.interiors]]
+             for part in parts if part.geom_type == "Polygon" and part.area > 5]
+    if rings:
+        hydrography.append(dict(type="Feature", properties={"name": name},
+                                geometry=dict(type="MultiPolygon", coordinates=rings)))
+save("waterways.geojson", dict(type="FeatureCollection", features=hydrography))
+print(f"{len(hydrography)} water surfaces")
