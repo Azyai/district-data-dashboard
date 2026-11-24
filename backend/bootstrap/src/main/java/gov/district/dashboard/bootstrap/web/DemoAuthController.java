@@ -1,5 +1,6 @@
 package gov.district.dashboard.bootstrap.web;
 
+import gov.district.dashboard.bootstrap.security.WorkspaceSecurity;
 import gov.district.dashboard.demo.DemoIdentityService;
 import gov.district.dashboard.demo.DemoIdentityService.CurrentIdentity;
 import gov.district.dashboard.platform.api.ApiResult;
@@ -15,27 +16,23 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.logout.CookieClearingLogoutHandler;
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfToken;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.WebUtils;
 
 @RestController
 @Profile("demo")
 class DemoAuthController {
 
     private final DemoIdentityService identities;
-    private final HttpSessionSecurityContextRepository sessions;
-    private final HttpSessionCsrfTokenRepository csrfTokens;
+    private final WorkspaceSecurity workspace;
 
-    DemoAuthController(DemoIdentityService identities, HttpSessionSecurityContextRepository sessions,
-                       HttpSessionCsrfTokenRepository csrfTokens) {
+    DemoAuthController(DemoIdentityService identities, WorkspaceSecurity workspace) {
         this.identities = identities;
-        this.sessions = sessions;
-        this.csrfTokens = csrfTokens;
+        this.workspace = workspace;
     }
 
     @GetMapping("/api/v1/auth/csrf")
@@ -47,16 +44,20 @@ class DemoAuthController {
     ApiResult<CurrentIdentity> login(@Valid @RequestBody DemoSessionRequest body,
                                      HttpServletRequest request, HttpServletResponse response) {
         CurrentIdentity identity = identities.forPersona(body.persona());
-        request.getSession(true);
-        request.changeSessionId();
-        csrfTokens.saveToken(null, request, response);
-
         var authorities = identity.roles().stream().map(role -> new SimpleGrantedAuthority("ROLE_" + role)).toList();
         var authentication = UsernamePasswordAuthenticationToken.authenticated(identity, null, authorities);
         var freshContext = SecurityContextHolder.createEmptyContext();
         freshContext.setAuthentication(authentication);
-        SecurityContextHolder.setContext(freshContext);
-        sessions.saveContext(freshContext, request, response);
+        var session = request.getSession(true);
+        synchronized (WebUtils.getSessionMutex(session)) {
+            // A concurrent login may have already rotated the ID for this same browser session.
+            if (session.getId().equals(request.getRequestedSessionId())) {
+                request.changeSessionId();
+            }
+            workspace.saveToken(null, request, response);
+            SecurityContextHolder.setContext(freshContext);
+            workspace.saveContext(freshContext, request, response);
+        }
         return ApiResult.ok(identity);
     }
 
@@ -67,10 +68,21 @@ class DemoAuthController {
 
     @PostMapping("/api/v1/auth/logout")
     ApiResult<Void> logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
-        var handler = new SecurityContextLogoutHandler();
-        handler.setSecurityContextRepository(sessions);
-        handler.logout(request, response, authentication);
-        new CookieClearingLogoutHandler("DISTRICT_SESSION").logout(request, response, authentication);
+        var session = request.getSession(false);
+        if (session != null) {
+            synchronized (WebUtils.getSessionMutex(session)) {
+                boolean keepSession = workspace.containsOtherContext(request);
+                var handler = new SecurityContextLogoutHandler();
+                handler.setSecurityContextRepository(workspace);
+                handler.setInvalidateHttpSession(!keepSession);
+                handler.logout(request, response, authentication);
+                if (keepSession) {
+                    workspace.saveToken(null, request, response);
+                } else {
+                    new CookieClearingLogoutHandler("DISTRICT_SESSION").logout(request, response, authentication);
+                }
+            }
+        }
         return ApiResult.ok(null);
     }
 

@@ -18,30 +18,22 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.security.web.csrf.CsrfTokenRequestHandler;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 
 @Configuration(proxyBeanMethods = false)
 class SecurityConfiguration {
 
     @Bean
-    HttpSessionSecurityContextRepository sessionSecurityContextRepository() {
-        return new HttpSessionSecurityContextRepository();
-    }
-
-    @Bean
-    HttpSessionCsrfTokenRepository sessionCsrfTokenRepository() {
-        return new HttpSessionCsrfTokenRepository();
+    WorkspaceSecurity workspaceSecurity() {
+        return new WorkspaceSecurity();
     }
 
     @Bean
     SecurityFilterChain applicationSecurity(HttpSecurity http, Environment environment, ApiErrorWriter errors,
-                                           HttpSessionSecurityContextRepository sessions,
-                                           HttpSessionCsrfTokenRepository csrfTokens) {
+                                           WorkspaceSecurity workspace) {
         boolean demoEnabled = environment.acceptsProfiles(Profiles.of("demo"));
         return http
                 .authorizeHttpRequests(access -> {
@@ -57,8 +49,8 @@ class SecurityConfiguration {
                     }
                     access.anyRequest().denyAll();
                 })
-                .securityContext(context -> context.securityContextRepository(sessions))
-                .csrf(csrf -> csrf.csrfTokenRepository(csrfTokens).csrfTokenRequestHandler(new HeaderCsrfTokens()))
+                .securityContext(context -> context.securityContextRepository(workspace))
+                .csrf(csrf -> csrf.csrfTokenRepository(workspace).csrfTokenRequestHandler(new HeaderCsrfTokens()))
                 .logout(AbstractHttpConfigurer::disable)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .exceptionHandling(handling -> handling
