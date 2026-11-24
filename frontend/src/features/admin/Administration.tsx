@@ -8,6 +8,7 @@ import { SourceDirectory } from './SourceDirectory'
 import './admin.css'
 
 const DraftEditor = lazy(() => import('../designer/DraftEditor'))
+const CockpitSettings = lazy(() => import('./CockpitSettings'))
 
 export default function Administration({ session }: { session: SessionState }) {
   const authorized = session.identity?.roles.includes('DATA_ADMIN')
@@ -33,6 +34,7 @@ export default function Administration({ session }: { session: SessionState }) {
               <NavLink to="/admin/sources"><AdminIcon name="source" />数据来源</NavLink>
               <NavLink to="/admin/metrics"><AdminIcon name="chart" />指标目录</NavLink>
               <NavLink to="/admin/dashboards"><AdminIcon name="layout" />大屏编排</NavLink>
+              <NavLink to="/admin/cockpit"><AdminIcon name="settings" />驾驶舱侧栏</NavLink>
             </nav>
             <span className="admin-environment">演示环境</span>
           </aside>
@@ -42,6 +44,9 @@ export default function Administration({ session }: { session: SessionState }) {
               <Route index element={<Navigate to="sources" replace />} />
               <Route path="sources" element={<SourceDirectory />} />
               <Route path="metrics" element={<MetricCatalog />} />
+              <Route path="cockpit" element={<Suspense fallback={<p className="muted" role="status">正在加载侧栏配置</p>}>
+                <CockpitSettings />
+              </Suspense>} />
               <Route path="dashboards" element={
                 <Suspense fallback={<p className="muted" role="status">正在加载大屏编排</p>}>
                   <DraftEditor />
