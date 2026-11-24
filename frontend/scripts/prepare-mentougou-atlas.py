@@ -89,8 +89,8 @@ def render_atlas():
     heights = np.nan_to_num(heights)
     dy, dx = np.gradient(heights, (south - north) / HEIGHT, (east - west) / WIDTH)
     shading = (.8 + dx * .95 + dy * .62) / np.sqrt(1 + dx ** 2 + dy ** 2)
-    palette = [(0, (32, 68, 82)), (350, (36, 86, 97)), (800, (49, 100, 110)),
-               (1400, (78, 118, 124)), (2200, (123, 147, 148))]
+    palette = [(0, (17, 43, 27)), (350, (22, 58, 34)), (800, (32, 72, 43)),
+               (1400, (47, 86, 51)), (2200, (75, 105, 66))]
     colors = np.stack([np.interp(heights, [h for h, _ in palette], [c[k] for _, c in palette])
                        for k in range(3)], axis=-1)
     minor = np.maximum(0, 1 - np.abs((heights + 45) % 90 - 45) / 5)

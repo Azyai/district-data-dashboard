@@ -8,11 +8,11 @@ let sequence = 0
 const origin = MercatorCoordinate.fromLngLat([115.8, 40])
 const outsidePalette = Array.from({ length: 256 }, (_, luminance) => {
   const shade = Math.min(1, Math.max(0, (luminance / 255 - .05) / .78)) ** .8
-  return [9 + 86 * shade, 16 + 118 * shade, 26 + 148 * shade] as const
+  return [5 + 45 * shade, 18 + 94 * shade, 42 + 160 * shade] as const
 })
 
 function gradeSurroundings(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  // The reference uses a steel-blue luminance ramp to retain the terrain texture.
+  // Map luminance to a blue ramp while preserving ridges and valleys.
   const pixels = ctx.getImageData(0, 0, width, height)
   const { data } = pixels
   for (let index = 0; index < data.length; index += 4) {
@@ -88,8 +88,11 @@ export function connectImagery(map: MapLibreMap, token: string, boundary: Polygo
         ctx.setTransform(world, 0, 0, world, origin.x * world - x * 256, origin.y * world - y * 256)
         ctx.clip(outline, 'evenodd')
         ctx.resetTransform()
-        ctx.filter = 'saturate(.87) contrast(1.12) brightness(.8)'
+        ctx.filter = 'saturate(1.35) contrast(1.16) brightness(.76)'
         ctx.drawImage(bitmap, 0, 0)
+        ctx.filter = 'none'
+        ctx.fillStyle = 'rgba(12, 53, 27, .16)'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
         ctx.restore()
         const data = await createImageBitmap(canvas)
         if (requestSignal.aborted) { data.close(); requestSignal.throwIfAborted() }
