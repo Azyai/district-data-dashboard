@@ -4,6 +4,7 @@ import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Matrix3, Matrix4, Quaternion, Vector3 } from 'three'
 import { MeshoptSimplifier } from 'three/addons/libs/meshopt_simplifier.module.js'
+import { glbBuffer, landmarkSource, packLandmarkDetail } from './pack-landmark-detail.mjs'
 
 const modelDirectory = new URL('../../docs/地图模型/', import.meta.url)
 const outputDirectory = new URL('../public/maps/local-model/', import.meta.url)
@@ -83,11 +84,11 @@ function readGlb(file, nodeName, consume) {
       return { positions, indices, normals, uvs }
     }
 
-    const image = id => {
+    const bufferBytes = id => {
       const view = entries.bufferViews[id]
       return readBytes(fd, binStart + (view.byteOffset ?? 0), view.byteLength)
     }
-    return consume({ entries, parts, meshPart, image })
+    return consume({ entries, parts, meshPart, bufferBytes })
   } finally {
     closeSync(fd)
   }
@@ -132,7 +133,7 @@ function surfaceImage(source, bytes) {
     writeFileSync(temporaryInput, bytes)
     const converted = spawnSync(process.env.DASHBOARD_FFMPEG ?? 'ffmpeg', [
       '-hide_banner', '-loglevel', 'error', '-y', '-i', temporaryInput,
-      '-vf', 'scale=8192:-2:flags=lanczos', '-frames:v', '1', '-q:v', '3', temporaryOutput,
+      '-vf', 'scale=8192:-2:flags=lanczos', '-frames:v', '1', '-threads:v', '1', '-q:v', '3', temporaryOutput,
     ], { stdio: 'inherit' })
     if (converted.error || converted.status !== 0) throw new Error('地形纹理转换失败，请将 FFmpeg 放入 PATH', { cause: converted.error })
     const image = readFileSync(temporaryOutput)
@@ -146,7 +147,7 @@ function surfaceImage(source, bytes) {
 }
 
 function prepareSurfaces(source) {
-  return readGlb(source.file, source.node, ({ entries, parts, meshPart, image }) => {
+  return readGlb(source.file, source.node, ({ entries, parts, meshPart, bufferBytes }) => {
     const retainedImages = new Map()
     let sourceCount = 0
     let reducedCount = 0
@@ -181,7 +182,7 @@ function prepareSurfaces(source) {
         const textureSource = entries.textures[textureInfo.index]
         const sourceImage = entries.images[textureSource.source]
         if (!retainedImages.has(textureSource.source)) {
-          const bytes = image(sourceImage.bufferView)
+          const bytes = bufferBytes(sourceImage.bufferView)
           retainedImages.set(textureSource.source, source.texture ? surfaceImage(source, bytes) : {
             bytes, mimeType: sourceImage.mimeType, name: sourceImage.name,
           })
@@ -310,23 +311,11 @@ function packGlb(meshes, sources) {
   }
   for (const key of ['materials', 'textures', 'images', 'samplers']) if (!gltf[key].length) delete gltf[key]
   gltf.buffers.push({ byteLength: byteOffset })
-  const metadata = Buffer.from(JSON.stringify(gltf))
-  const padding = Buffer.alloc((4 - metadata.length % 4) % 4, 0x20)
-  const header = Buffer.alloc(20)
-  header.write('glTF')
-  header.writeUInt32LE(2, 4)
-  header.writeUInt32LE(28 + metadata.length + padding.length + byteOffset, 8)
-  header.writeUInt32LE(metadata.length + padding.length, 12)
-  header.write('JSON', 16)
-  const binHeader = Buffer.alloc(8)
-  binHeader.writeUInt32LE(byteOffset)
-  binHeader.write('BIN\0', 4)
-  return Buffer.concat([header, metadata, padding, binHeader, ...binary])
+  return glbBuffer(gltf, binary, byteOffset)
 }
 
-function writeModel(filename, items, budget) {
+function writeModelFile(filename, buffer, budget) {
   const targetFile = fileURLToPath(new URL(filename, outputDirectory))
-  const buffer = packGlb(items.map(item => item.retention ? prepareSurfaces(item) : prepareOverlay(item)), items)
   if (buffer.length > budget) throw new Error(`${filename} 超过模型预算（${buffer.length} 字节）`)
   if (existsSync(targetFile) && readFileSync(targetFile).equals(buffer)) {
     console.info(`已是最新：${targetFile}`)
@@ -343,6 +332,16 @@ function writeModel(filename, items, budget) {
   console.info(`已生成 ${targetFile}（${(buffer.length / 1_000_000).toFixed(2)} MB）`)
 }
 
+function writeModel(filename, items, budget) {
+  writeModelFile(filename, packGlb(items.map(item => item.retention ? prepareSurfaces(item) : prepareOverlay(item)), items), budget)
+}
+
 await MeshoptSimplifier.ready
 writeModel('mentougou-hd.glb', sources, 25_000_000)
-for (const landmark of landmarks) writeModel(landmark.output, [landmark], 26_000_000)
+for (const landmark of landmarks) {
+  writeModel(landmark.output, [landmark], 26_000_000)
+  const source = readGlb(landmark.file, landmark.node,
+    ({ entries, bufferBytes }) => landmarkSource(entries, landmark.node, bufferBytes))
+  const detail = await packLandmarkDetail(source)
+  writeModelFile(landmark.output.replace('-hd.glb', '-detail.glb'), detail, 36_000_000)
+}
