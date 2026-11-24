@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import LocalDistrictModel from './LocalDistrictModel'
 import { isTwinId, twinPath, twinSites } from './twinSites'
+import { displayPath } from '../screens/screenCatalog'
 import { CenterMasthead } from '../screens/DisplayHeader'
 import './cockpit.css'
 import './twin-scene.css'
@@ -15,8 +16,9 @@ export default function TwinScene() {
   const location = useLocation()
   const navigate = useNavigate()
   const backArea: unknown = location.state?.backArea
-  const backPath = typeof backArea === 'string' && backArea !== 'mentougou'
-    && /^[a-z0-9-]{1,100}$/.test(backArea) ? '/areas/' + backArea : '/'
+  const areaId = typeof backArea === 'string' && /^[a-z0-9-]{1,100}$/.test(backArea) ? backArea : 'mentougou'
+  const topic: unknown = location.state?.backTopic
+  const backPath = displayPath(topic === 'grid' || topic === 'waters' ? topic : 'roads', areaId)
 
   if (!isTwinId(twinId)) {
     return <main className="center-state"><h1>孪生场景不存在</h1><Link to={backPath} className="action-link">返回驾驶舱</Link></main>
