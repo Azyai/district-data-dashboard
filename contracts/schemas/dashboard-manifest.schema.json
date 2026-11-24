@@ -54,7 +54,10 @@
       "type": "string",
       "enum": [
         "city",
-        "services"
+        "services",
+        "population",
+        "hotline",
+        "water"
       ]
     },
     "Canvas": {

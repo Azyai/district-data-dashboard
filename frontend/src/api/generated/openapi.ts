@@ -375,6 +375,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cockpit/topics/{projectId}/manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取公开专题生效模板
+         * @description 仅演示模式开放，读取已生效的全区汇总专题。
+         */
+        get: operations["getPublicTopicManifest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cockpit/topics/{projectId}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取公开专题生效模板的成批指标
+         * @description 仅演示模式开放，读取已生效的全区汇总专题。
+         */
+        get: operations["getPublicTopicSnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/dashboards/{projectId}/draft": {
         parameters: {
             query?: never;
@@ -459,7 +499,7 @@ export interface components {
         /** @enum {string} */
         Persona: "district" | "service" | "data-admin" | "reviewer";
         /** @enum {string} */
-        Theme: "city" | "services";
+        Theme: "city" | "services" | "population" | "hotline" | "water";
         CsrfToken: {
             token: string;
             headerName: string;
@@ -818,7 +858,7 @@ export interface components {
             components: components["schemas"]["Component"][];
             $defs: {
                 /** @enum {string} */
-                Theme: "city" | "services";
+                Theme: "city" | "services" | "population" | "hotline" | "water";
                 Canvas: {
                     width: number;
                     height: number;
@@ -1690,6 +1730,70 @@ export interface operations {
                 };
             };
             401: components["responses"]["Http401"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getPublicTopicManifest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["dashboard-manifest.schema"];
+                    };
+                };
+            };
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getPublicTopicSnapshot: {
+        parameters: {
+            query: {
+                releaseId: string;
+            };
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["BatchQueryResult"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            404: components["responses"]["Http404"];
+            409: components["responses"]["Http409"];
             500: components["responses"]["Http500"];
         };
     };

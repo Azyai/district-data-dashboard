@@ -1550,6 +1550,139 @@
         }
       }
     },
+    "/api/v1/cockpit/topics/{projectId}/manifest": {
+      "get": {
+        "operationId": "getPublicTopicManifest",
+        "summary": "读取公开专题生效模板",
+        "description": "仅演示模式开放，读取已生效的全区汇总专题。",
+        "tags": [
+          "cockpit"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Manifest"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/cockpit/topics/{projectId}/snapshot": {
+      "get": {
+        "operationId": "getPublicTopicSnapshot",
+        "summary": "读取公开专题生效模板的成批指标",
+        "description": "仅演示模式开放，读取已生效的全区汇总专题。",
+        "tags": [
+          "cockpit"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "releaseId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]{0,63}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/BatchQueryResult"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
     "/api/v1/admin/dashboards/{projectId}/draft": {
       "get": {
         "operationId": "getDashboardDraft",
@@ -2138,7 +2271,10 @@
         "type": "string",
         "enum": [
           "city",
-          "services"
+          "services",
+          "population",
+          "hotline",
+          "water"
         ]
       },
       "CsrfToken": {
