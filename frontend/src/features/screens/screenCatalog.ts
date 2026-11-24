@@ -1,13 +1,17 @@
-export const screens = [
+export const mapScreens = [
   { id: 'overview', title: '路网监测' },
   { id: 'grid', title: '网格治理' },
   { id: 'waters', title: '水域态势' },
+] as const
+
+export const businessScreens = [
   { id: 'population', title: '城镇人口' },
   { id: 'governance', title: '基层治理' },
   { id: 'economy', title: '经济发展' },
   { id: 'diagnosis', title: '区域诊断' },
 ] as const
 
+export const screens = [...mapScreens, ...businessScreens] as const
 export type ScreenId = (typeof screens)[number]['id']
 export type DisplayPage = Exclude<ScreenId, 'overview'> | 'roads'
 

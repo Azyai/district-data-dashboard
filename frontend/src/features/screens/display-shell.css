@@ -40,17 +40,74 @@
 }
 .center-controls select:hover, .center-controls a:hover { color: #fff; border-color: #72accc; }
 .center-controls option, .center-controls optgroup { background: #102133; color: #e8f1ff; }
+.center-masthead[data-family="map"] {
+  --picker-bg: #102b39;
+  --picker-panel: #102431;
+  --picker-line: #49748a;
+  --picker-active: #78d9ee;
+  --picker-hover: #1f4252;
+}
+.center-masthead[data-family="business"] {
+  --picker-bg: #191b36;
+  --picker-panel: #14172d;
+  --picker-line: #59567e;
+  --picker-active: #c6b5ff;
+  --picker-hover: #302b51;
+}
+.center-controls .display-picker {
+  max-width: min(11em, 39%);
+  min-width: 0;
+  appearance: none;
+  color: #e5edf9;
+  background: linear-gradient(45deg, transparent 50%, var(--picker-active) 50%) right 12px center / 4px 4px no-repeat,
+    linear-gradient(135deg, var(--picker-active) 50%, transparent 50%) right 8px center / 4px 4px no-repeat,
+    var(--picker-bg);
+  border-color: var(--picker-line);
+  padding-inline: .7em 1.65em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.center-masthead[data-family="business"] .display-picker { border-radius: 99px; }
+.center-controls .display-picker:focus-visible,
+.center-controls .display-switch:focus-visible { outline: 2px solid var(--picker-active); outline-offset: 2px; }
+.center-controls .display-switch {
+  display: inline-flex; align-items: center; gap: .28em;
+  padding-inline: .58em; max-width: none; flex: none; white-space: nowrap;
+  color: var(--picker-active); background: transparent; border-color: transparent;
+}
+.center-controls .display-switch:hover { color: var(--picker-active); background: var(--picker-hover); border-color: var(--picker-line); }
+@supports (appearance: base-select) {
+  .center-controls .display-picker, .display-picker::picker(select) { appearance: base-select; }
+  .center-controls .display-picker { background: var(--picker-bg); padding-inline: .7em; overflow: hidden; }
+  .display-picker::picker-icon { color: var(--picker-active); font-size: .77em; align-self: center; }
+  .display-picker:open::picker-icon { transform: rotate(.5turn); }
+  .display-picker::picker(select) {
+    margin-block: 6px; max-height: min(60dvh, 26rem); min-width: 8.6rem; padding: 5px;
+    border: 1px solid var(--picker-line); border-radius: 9px; background: var(--picker-panel);
+    color: #e5edf9; box-shadow: 0 14px 40px #020711c4; scrollbar-width: thin;
+  }
+  .display-picker option { cursor: pointer; padding: .52em .7em; border-radius: 4px; background: transparent; }
+  .display-picker option:is(:hover,:focus-visible) { background: var(--picker-hover); }
+  .display-picker option:checked, .display-picker option::checkmark { color: var(--picker-active); }
+  .display-picker optgroup { background: transparent; color: #b4c4d6; }
+  .display-picker optgroup option { padding-inline-start: 1.15em; }
+}
 .center-clock { justify-self: end; display: flex; align-items: baseline; gap: 10px; color: #dbe9f8; font: 500 clamp(15px,1.15vw,25px) Bahnschrift, "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
 .center-clock span { font-size: .67em; color: #a1b4ce; }
 .center-clock strong { font-weight: 600; }
 @media (max-width: 760px) {
-  .center-masthead { height: 78px; grid-template: 1fr auto / 1fr auto 1fr; align-content: center; gap: 2px 5px; padding-block: 5px; }
-  .center-heading { grid-area: 1/1/2/4; }
+  .center-masthead {
+    height: 78px; grid-template: max-content max-content / minmax(0, 1fr) max-content;
+    align-content: center; gap: 4px 6px; padding-block: 5px;
+  }
+  .center-heading { grid-column: 1 / -1; grid-row: 1; }
   .center-heading h1 { font-size: clamp(15px,3.4vw,22px); }
   .center-heading p { margin-top: 1px; font-size: 10px; }
-  .center-controls { grid-area: 2/1/3/3; }
+  .center-controls { grid-area: 2/1/3/2; }
   .center-controls select, .center-controls a { min-height: 25px; padding-block: 1px; font-size: 11px; }
-  .center-clock { grid-area: 2/3; font-size: 14px; }
+  .center-controls .display-picker { max-width: 40%; }
+  .center-controls .display-switch { gap: .17em; padding-inline: .25em; }
+  .center-clock { grid-area: 2/2; font-size: 14px; }
   .center-clock span { display: none; }
 }
 @media (max-height: 500px) and (min-width: 761px) { .center-masthead { height: 48px; } }
