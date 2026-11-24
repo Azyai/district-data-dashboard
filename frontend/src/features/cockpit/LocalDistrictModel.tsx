@@ -6,6 +6,8 @@ import {
 } from 'three'
 import type { BufferGeometry, Material, Object3D } from 'three'
 import { Link } from 'react-router'
+import { district as populationSample, formatNumber } from '../screens/screenData'
+import { screenPath } from '../screens/screenCatalog'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
@@ -42,7 +44,7 @@ type DistrictModelProps = {
 }
 
 const displayedTowns = new Set(['qingshui', 'zhaitang', 'datai', 'junzhuang'])
-const demoPopulation = new Intl.NumberFormat('zh-CN').format(392_000 / 10_000)
+const demoPopulation = formatNumber(populationSample.population / 10_000)
 const initialPosition = new Vector3(5, 44, 63)
 const twinPosition = new Vector3(38, 52, 73)
 const topPosition = new Vector3(0, 76, 0)
@@ -599,7 +601,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         {district && population && (
           <div className="model-population" style={{ left: population.x + '%', top: population.y + '%' }}>
             <span className="model-beacon" aria-hidden="true" />
-            <Link className="model-callout" to="/topics/population" target="_blank" rel="noopener noreferrer" aria-label="查看全区人口专题">
+            <Link className="model-callout" to={screenPath('population')} aria-label="查看全区人口专题">
               <span>门头沟区常住人口</span>
               <p><strong>{demoPopulation}</strong> 万人</p>
               <small>演示数据</small>

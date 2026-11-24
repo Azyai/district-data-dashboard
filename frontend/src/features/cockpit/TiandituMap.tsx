@@ -4,6 +4,9 @@ import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router'
+import { district as populationSample, formatNumber } from '../screens/screenData'
+import { screenPath } from '../screens/screenCatalog'
 import type { CockpitArea, CockpitDirectory } from '../../api/client'
 import { createAtlasScale } from './atlasScale'
 import MapGlobeControl from './MapGlobeControl'
@@ -334,10 +337,9 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     {failed && <div className="atlas-static"><img src={reliefUrl} alt="门头沟区地形概览" />
       <p role="status">{graphicsError ? '浏览器图形加速不可用' : '区界数据暂不可用'}</p></div>}
     {map && pins.map(pin => <AreaPin key={pin.id} map={map} pin={pin}>
-      {pin.id === 'population' ? <a className="atlas-population" href="/topics/population"
-        target="_blank" rel="noopener noreferrer" aria-label="查看全区人口专题">
+      {pin.id === 'population' ? <Link className="atlas-population" to={screenPath('population')} aria-label="查看全区人口专题">
         <span className="atlas-pin-dot" /><span className="atlas-callout"><small>全区常住人口</small>
-          <strong>39.2 <em>万人</em></strong></span></a>
+          <strong>{formatNumber(populationSample.population / 10_000)} <em>万人</em></strong></span></Link>
         : pin.id === 'landmarks' ? <div className="atlas-landmarks"><span className="atlas-pin-dot" />
           <nav aria-label="重点地标"><button type="button" onClick={() => onOpenTwin('tianjie')}>长安天街</button>
             <button type="button" onClick={() => onOpenTwin('jingxi')}>京西智谷</button></nav></div>
