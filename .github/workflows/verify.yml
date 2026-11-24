@@ -81,3 +81,5 @@ jobs:
           pnpm --dir frontend test:e2e
           pnpm --dir frontend test:e2e:admin
           pnpm --dir frontend test:e2e:topics
+          pnpm --dir frontend test:e2e:areas
+          pnpm --dir frontend test:e2e:voice
