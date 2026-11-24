@@ -2124,11 +2124,10 @@
       "HotlineMonth": {
         "name": "month",
         "in": "query",
-        "description": "目前的演示数据覆盖 2026 年 1–10 月",
+        "description": "受理月份。省略时使用数据库最近有快照的月份，响应返回实际月份",
         "schema": {
           "type": "string",
-          "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$",
-          "default": "2026-10"
+          "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$"
         }
       }
     },

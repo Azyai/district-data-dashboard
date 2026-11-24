@@ -1092,7 +1092,7 @@ export interface components {
         IdempotencyKey: string;
         /** @description 区、镇街或村社的区域 ID */
         HotlineAreaId: string;
-        /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+        /** @description 受理月份。省略时使用数据库最近有快照的月份，响应返回实际月份 */
         HotlineMonth: string;
     };
     requestBodies: never;
@@ -1928,7 +1928,7 @@ export interface operations {
             query?: {
                 /** @description 区、镇街或村社的区域 ID */
                 areaId?: components["parameters"]["HotlineAreaId"];
-                /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+                /** @description 受理月份。省略时使用数据库最近有快照的月份，响应返回实际月份 */
                 month?: components["parameters"]["HotlineMonth"];
             };
             header?: never;
@@ -1962,7 +1962,7 @@ export interface operations {
             query?: {
                 /** @description 区、镇街或村社的区域 ID */
                 areaId?: components["parameters"]["HotlineAreaId"];
-                /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+                /** @description 受理月份。省略时使用数据库最近有快照的月份，响应返回实际月份 */
                 month?: components["parameters"]["HotlineMonth"];
                 /** @description 办理时限分类 */
                 lane?: "all" | "open" | "due" | "late" | "closed";
@@ -2038,7 +2038,7 @@ export interface operations {
             query?: {
                 /** @description 区、镇街或村社的区域 ID */
                 areaId?: components["parameters"]["HotlineAreaId"];
-                /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+                /** @description 受理月份。省略时使用数据库最近有快照的月份，响应返回实际月份 */
                 month?: components["parameters"]["HotlineMonth"];
             };
             header?: never;
