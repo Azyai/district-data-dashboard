@@ -26,6 +26,7 @@
   display: block;
   cursor: grab;
 }
+.district-local-model:not([data-model-ready="ready"]) .district-local-model-canvas { visibility: hidden; }
 .district-local-model-canvas canvas:active { cursor: grabbing; }
 .district-local-model[data-view="2d"] canvas { cursor: crosshair; }
 
@@ -38,7 +39,7 @@
   height: 32px;
   transform: translate(-50%, -50%);
 }
-.model-population, .model-twin-point, .model-place-current { pointer-events: none; }
+.model-population, .model-twin-point { pointer-events: none; }
 .model-population { z-index: 4; }
 .model-twin-point { z-index: 3; }
 .model-place:is(:hover, :focus-visible) { z-index: 5; }
@@ -111,7 +112,9 @@
 .model-callout small { color: #c2b9ae; font-size: .71rem; }
 .model-callout:hover { border-color: #ffdcac; }
 .model-place { cursor: pointer; }
-.model-place-current { cursor: default; }
+.model-place[data-featured="false"] .model-beacon { width: 7px; height: 7px; }
+.model-place[data-featured="false"] .model-beacon::after { inset: -5px; }
+.model-place[data-featured="false"]:not(:hover, :focus-visible) .model-place-name { visibility: hidden; }
 .model-place-name {
   top: calc(50% + 13px);
   left: 50%;
@@ -201,7 +204,51 @@
 }
 .district-local-landmarks button:hover, .district-local-model-detail button:hover { background: #24597d; }
 .district-local-model :is(a, button, select):focus-visible { outline: 2px solid #9ee7f9; outline-offset: 2px; }
-.district-local-model .navigation-map-tools { z-index: 5; }
+.local-model-tools {
+  position: absolute;
+  right: calc(var(--district-map-inset-right, 0px) + 14px);
+  bottom: 13px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--map-control-ink);
+  font-size: .75rem;
+  line-height: 1.25;
+}
+.local-model-tool-group {
+  display: flex;
+  overflow: hidden;
+  border: 1px solid var(--map-control-line);
+  border-radius: 7px;
+  background: var(--map-control-background);
+  box-shadow: var(--map-control-shadow);
+}
+.local-model-tools button {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 36px;
+  padding-inline: .55rem;
+  font-weight: 670;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.local-model-tools button + button { border-left: 1px solid var(--map-control-line); }
+.local-model-tools button:hover { background: #244c70; }
+.local-model-tools button[aria-pressed="true"] { color: #eaf8ff; background: #20679a; }
+.local-model-tools button:focus-visible { outline-offset: -3px; }
+.model-region-note {
+  position: absolute;
+  left: 15px;
+  bottom: 69px;
+  margin: 0;
+  padding: .35rem .6rem;
+  color: #ccdeef;
+  background: #0d202adf;
+  border-radius: 5px;
+  font-size: .75rem;
+}
 .district-local-model-detail {
   bottom: 117px;
   max-width: min(14rem, calc(100% - 32px));
@@ -227,11 +274,13 @@
 
 @container (max-width: 610px) {
   .district-local-model-canvas { inset: 85px 0 100px; }
+  .local-model-tools { right: 10px; bottom: 9px; gap: 3px; }
+  .local-model-tools button { padding-inline: .35rem; }
+  .model-region-note { left: 12px; bottom: 105px; }
   .district-local-model[data-twin="true"] .district-local-model-canvas { bottom: 65px; }
   .model-callout { right: auto; left: calc(50% - 90px); bottom: calc(50% + 23px); min-width: 9.5rem; padding: .55rem .62rem; }
   .model-callout::after { left: 87px; top: 100%; width: 24px; transform: rotate(90deg); }
   .model-place-name { font-size: .64rem; padding: .2rem .35rem; }
-  .model-place[data-place="zhaitang"] .model-place-name { top: auto; bottom: calc(50% + 13px); }
   .model-twin-label { right: calc(50% + 14px); top: calc(50% + 15px); }
   .model-twin-label button { padding-inline: .28rem; font-size: .68rem; }
   .district-local-model-key { bottom: 76px; left: 12px; }
@@ -241,5 +290,6 @@
   .district-local-model:has(.district-local-landmarks) .district-local-model-detail { bottom: 154px; }
 }
 @media (pointer: coarse) {
-  .model-twin-label button, .district-local-landmarks button { min-height: 44px; }
+  .model-twin-label button, .district-local-landmarks button, .local-model-tools button { min-height: 44px; }
+  .local-model-tools button { min-width: 44px; }
 }

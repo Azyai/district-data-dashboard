@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { skipToken, useQuery } from '@tanstack/react-query'
 import {
   AmbientLight, Box3, BufferAttribute, Color, DirectionalLight, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, OrthographicCamera, Raycaster, Scene, SRGBColorSpace, TextureLoader, Vector2, Vector3, WebGLRenderer,
@@ -8,25 +9,30 @@ import { Link } from 'react-router'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import type { CockpitArea } from '../../api/client'
+import {
+  boundaryCenter, boundaryContains, boundaryFor, clearBoundaryMask, districtBounds, geoCoordinates,
+  maskToBoundary, modelCoordinates, readBoundaries, terrainSurfaceIndex,
+} from './localModelGeography'
+import type { GeoBoundary } from './localModelGeography'
 import { twinSites, type TwinId } from './twinSites'
-import './navigation-map.css'
 import './local-model.css'
 
 const assetRoot = import.meta.env.BASE_URL + 'maps/local-model/'
 const mapRoot = import.meta.env.BASE_URL + 'maps/'
 const imageryBounds = { west: 115.405, east: 116.181, south: 39.798, north: 40.19 }
-const districtBounds = { west: 115.416805, east: 116.169245, south: 39.810992, north: 40.177916 }
 const surfaceLabels = { terrain: '地形', roads: '路网', water: '水系' }
 type Surface = keyof typeof surfaceLabels
 type Pick = { label: string; source: string; height?: number }
 type View = '2d' | '3d'
-type ModelPlace = { id: string; name: string; coordinates: readonly [number, number] }
+type ModelPlace = { id: string; name: string; boundary: GeoBoundary }
 type ModelMarker = { id: string; x: number; y: number; visible: boolean }
 type DistrictModelProps = {
   area?: CockpitArea
   onSelectArea?: (areaId: string) => void
   onOpenTwin?: (id: TwinId) => void
   standaloneTwin?: TwinId
+  viewMode?: View
+  onViewModeChange?: (mode: View) => void
 }
 
 const displayedTowns = new Set(['qingshui', 'zhaitang', 'datai', 'junzhuang'])
@@ -35,20 +41,6 @@ const initialPosition = new Vector3(5, 44, 63)
 const topPosition = new Vector3(0, 76, 0)
 const north = new Vector3(0, 0, -1)
 const up = new Vector3(0, 1, 0)
-
-async function readPlaces(signal: AbortSignal): Promise<ModelPlace[]> {
-  const response = await fetch(mapRoot + 'mentougou.geojson', { signal })
-  if (!response.ok) return []
-  const collection = await response.json() as {
-    features: Array<{ properties?: { id?: string; name?: string; kind?: string }; geometry?: { type?: string; coordinates?: unknown } }>
-  }
-  return collection.features.flatMap(({ properties, geometry }) => {
-    const coordinates = geometry?.coordinates
-    if (properties?.kind !== 'place' || !properties.id || !properties.name || geometry?.type !== 'Point'
-      || !Array.isArray(coordinates) || coordinates.length !== 2 || !coordinates.every(Number.isFinite)) return []
-    return [{ id: properties.id, name: properties.name, coordinates: coordinates as [number, number] }]
-  })
-}
 
 async function readModel(file: string, limit: number, signal: AbortSignal) {
   const response = await fetch(assetRoot + file, { signal })
@@ -124,20 +116,55 @@ function applyImagery(terrain: Mesh, texture: Texture) {
   terrain.material.needsUpdate = true
 }
 
-type ModelTools = { zoom: (amount: number) => void; reset: () => void; view: (mode: View) => void; focus: (areaId: string) => void }
+type ModelTools = {
+  zoom: (amount: number) => void
+  reset: () => void
+  view: (mode: View) => void
+  scope: (boundary: GeoBoundary | undefined, places: ModelPlace[]) => void
+}
 type ModelPhase = 'loading' | 'ready' | 'unavailable'
 
-export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, standaloneTwin }: DistrictModelProps) {
+export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, standaloneTwin, viewMode, onViewModeChange }: DistrictModelProps) {
   const mount = useRef<HTMLDivElement>(null)
   const tools = useRef<ModelTools | undefined>(undefined)
   const [phase, setPhase] = useState<ModelPhase>('loading')
+  const [appliedScope, setAppliedScope] = useState<{ id: string; boundary?: GeoBoundary }>()
+  const [scopeError, setScopeError] = useState<string>()
   const [picked, setPicked] = useState<Pick>()
-  const [view, setView] = useState<View>('3d')
+  const [localView, setLocalView] = useState<View>('3d')
+  const view = viewMode ?? localView
   const [markers, setMarkers] = useState<ModelMarker[]>([])
-  const [places, setPlaces] = useState<ModelPlace[]>([])
   const [imagery, setImagery] = useState(false)
   const district = area?.level === 'district'
   const areaId = area?.id
+  const selectArea = useRef(onSelectArea)
+  useEffect(() => { selectArea.current = onSelectArea }, [onSelectArea])
+  const town = area?.breadcrumbs[1]
+  const towns = useQuery({
+    queryKey: ['local-model-boundaries'],
+    queryFn: standaloneTwin ? skipToken : ({ signal }) => readBoundaries(signal),
+    staleTime: Infinity,
+    gcTime: Infinity,
+  })
+  const townBoundary = town && boundaryFor(town, towns.data)
+  const villages = useQuery({
+    queryKey: ['local-model-boundaries', townBoundary?.code],
+    queryFn: townBoundary ? ({ signal }) => readBoundaries(signal, townBoundary.code) : skipToken,
+    staleTime: Infinity,
+  })
+  const village = area?.level === 'village'
+  const villageBoundary = village ? boundaryFor(area, villages.data) : undefined
+  const boundary = villageBoundary ?? townBoundary
+  const boundaryLoading = !district && !standaloneTwin && (towns.isPending || (village && townBoundary && villages.isPending))
+  const childGeography = district ? towns.data : villages.data
+  const children = area?.children
+  const places = useMemo(() => {
+    if (!children || !childGeography) return []
+    return children.flatMap(item => {
+      const place = boundaryFor(item, childGeography)
+      return place ? [{ id: item.id, name: item.name, boundary: place }] : []
+    })
+  }, [children, childGeography])
 
   useEffect(() => {
     const element = mount.current
@@ -150,12 +177,14 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
     let unbindPicking: (() => void) | undefined
     let frame = 0
     let imageryTexture: Texture | undefined
+    let boundaryTexture: Texture | undefined
 
     setPhase('loading')
-    setView('3d')
+    setLocalView('3d')
     setPicked(undefined)
     setMarkers([])
     setImagery(false)
+    setAppliedScope(undefined)
 
     async function initialize(host: HTMLDivElement) {
       const twin = standaloneTwin ? twinSites[standaloneTwin] : undefined
@@ -173,6 +202,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         child.material = new MeshStandardMaterial({ color: '#92b6c9', roughness: .69 })
       })
       const bounds = new Box3().setFromObject(localModel)
+      const geographyBounds = terrain ? new Box3().setFromObject(terrain) : bounds
       const rawSize = bounds.getSize(new Vector3())
       const scale = twin ? 52 / Math.max(rawSize.x, rawSize.z) : .001
       const size = rawSize.multiplyScalar(scale)
@@ -205,7 +235,13 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       const pointer = new Vector2()
       let currentView: View = '3d'
       let positions: Array<{ id: string; point: Vector3 }> = []
-      let focusArea = 'mentougou'
+      let activeBoundary: GeoBoundary | undefined
+      let scopeInitialized = false
+      const districtTerrainIndex = terrain?.geometry.index ?? null
+      let regionTerrainIndex: BufferAttribute | null | undefined
+      let childPlaces: ModelPlace[] = []
+      let viewSize = size
+      let viewTarget = new Vector3()
       const towardGround = new Vector3(0, -1, 0)
       const pointAt = (x: number, z: number) => {
         const world = localModel.localToWorld(new Vector3(x, bounds.max.y, z))
@@ -217,10 +253,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         }
         return world
       }
-      const pointFor = ([lon, lat]: ModelPlace['coordinates']) => pointAt(
-        bounds.min.x + (lon - districtBounds.west) / (districtBounds.east - districtBounds.west) * size.x / scale,
-        bounds.min.z + (districtBounds.north - lat) / (districtBounds.north - districtBounds.south) * size.z / scale,
-      )
+      const pointFor = (coordinates: [number, number]) => pointAt(...modelCoordinates(coordinates, geographyBounds))
       let down: { x: number; y: number } | undefined
       const startPick = (event: PointerEvent) => { down = { x: event.clientX, y: event.clientY } }
       const endPick = (event: PointerEvent) => {
@@ -230,7 +263,15 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         const rect = surface.domElement.getBoundingClientRect()
         pointer.set((event.clientX - rect.left) * 2 / rect.width - 1, 1 - (event.clientY - rect.top) * 2 / rect.height)
         ray.setFromCamera(pointer, camera)
-        const hit = ray.intersectObjects(localModel.children, true)[0]
+        const hits = ray.intersectObjects(localModel.children, true)
+        const geographicPoint = (point: Vector3) => {
+          const local = localModel.worldToLocal(point.clone())
+          return geoCoordinates(local.x, local.z, geographyBounds)
+        }
+        const scope = activeBoundary
+        const hit = scope
+          ? hits.find(item => boundaryContains(scope, geographicPoint(item.point)))
+          : hits[0]
         if (!hit) return
         if (twin) {
           setPicked({ label: twin.name, source: '项目本地三维模型' })
@@ -238,6 +279,14 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         }
         const name = hit.object.name as Surface
         if (!Object.hasOwn(surfaceLabels, name)) return
+        if (name === 'terrain' && childPlaces.length) {
+          const coordinates = geographicPoint(hit.point)
+          const child = childPlaces.find(place => boundaryContains(place.boundary, coordinates))
+          if (child && selectArea.current) {
+            selectArea.current(child.id)
+            return
+          }
+        }
         const offset = name === 'roads' ? 18 : name === 'water' ? 12 : 0
         setPicked({ ...surfaceDetail(name), height: Math.round(localModel.worldToLocal(hit.point).y - offset) })
       }
@@ -252,13 +301,11 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         frame = requestAnimationFrame(() => {
           frame = 0
           surface.render(scene, camera)
-          if (positions.length > 0) {
-            const point = new Vector3()
-            setMarkers(positions.map(({ id, point: world }) => {
-              point.copy(world).project(camera)
-              return { id, x: (point.x + 1) * 50, y: (1 - point.y) * 50, visible: Math.abs(point.x) < .94 && Math.abs(point.y) < .90 }
-            }))
-          }
+          const point = new Vector3()
+          setMarkers(positions.map(({ id, point: world }) => {
+            point.copy(world).project(camera)
+            return { id, x: (point.x + 1) * 50, y: (1 - point.y) * 50, visible: Math.abs(point.x) < .94 && Math.abs(point.y) < .90 }
+          }))
         })
       }
       const fit = () => {
@@ -266,7 +313,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         if (!width || !height) return
         const aspect = width / height
         const heightFactor = currentView === '2d' ? .58 : .39
-        const halfHeight = Math.max(size.z * heightFactor + size.y * .64, size.x * .565 / aspect)
+        const halfHeight = Math.max(viewSize.z * heightFactor + viewSize.y * .64, viewSize.x * .565 / aspect)
         camera.left = -halfHeight * aspect
         camera.right = halfHeight * aspect
         camera.top = halfHeight
@@ -285,11 +332,6 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         camera.updateProjectionMatrix()
         draw()
       }
-      const focus = (id: string) => {
-        focusArea = id
-        const town = positions.find(position => position.id === id)
-        positionCamera(town?.point ?? new Vector3(), town ? 2.4 : 1)
-      }
       tools.current = {
         zoom: amount => {
           camera.zoom = Math.max(.75, Math.min(10, camera.zoom * amount))
@@ -297,16 +339,66 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           draw()
         },
         reset: () => {
-          focus(focusArea)
+          positionCamera(viewTarget)
           setPicked(undefined)
         },
         view: mode => {
+          if (mode === currentView) return
           currentView = mode
           orbit.enabled = mode === '3d'
           positionCamera(orbit.target, camera.zoom)
           fit()
         },
-        focus,
+        scope: (nextBoundary, nextPlaces) => {
+          if (!terrain) return
+          childPlaces = nextPlaces
+          const refit = !scopeInitialized || nextBoundary !== activeBoundary
+          if (refit && nextBoundary) {
+            regionTerrainIndex ??= terrainSurfaceIndex(terrain)
+            terrain.geometry.setIndex(regionTerrainIndex)
+            const clipped = maskToBoundary(localModel, nextBoundary, geographyBounds)
+            boundaryTexture?.dispose()
+            boundaryTexture = clipped.texture
+            const { west, east, south, north: top } = nextBoundary.bounds
+            const [left, front] = modelCoordinates([west, south], geographyBounds)
+            const [right, back] = modelCoordinates([east, top], geographyBounds)
+            const sample = pointFor(boundaryCenter(nextBoundary))
+            viewTarget = localModel.localToWorld(new Vector3((left + right) / 2, 0, (front + back) / 2))
+            const hasRange = clipped.topY > clipped.bottomY
+            viewTarget.y = hasRange ? localModel.localToWorld(new Vector3(0, (clipped.bottomY + clipped.topY) / 2, 0)).y : sample.y
+            viewSize = new Vector3((right - left) * scale,
+              hasRange ? (clipped.topY - clipped.bottomY) * localModel.scale.y : Math.max(.03, Math.min(.5, (right - left) * scale / 4)),
+              (front - back) * scale)
+          } else if (refit) {
+            if (boundaryTexture) {
+              clearBoundaryMask(localModel)
+              boundaryTexture.dispose()
+              terrain.geometry.setIndex(districtTerrainIndex)
+            }
+            boundaryTexture = undefined
+            viewSize = size
+            viewTarget = new Vector3()
+          }
+          activeBoundary = nextBoundary
+          scopeInitialized = true
+          positions = []
+          if (!nextBoundary) {
+            const [tianjieX, tianjieZ] = twinSites.tianjie.modelPoint
+            const [jingxiX, jingxiZ] = twinSites.jingxi.modelPoint
+            positions = [
+              { id: 'population', point: pointFor([115.85, 40.025]) },
+              { id: 'twins', point: pointAt((tianjieX + jingxiX) / 2, (tianjieZ + jingxiZ) / 2) },
+            ]
+          }
+          positions.push(...nextPlaces.map(place => ({ id: place.id, point: pointFor(boundaryCenter(place.boundary)) })))
+          if (refit) {
+            setPicked(undefined)
+            positionCamera(viewTarget)
+            fit()
+          } else {
+            draw()
+          }
+        },
       }
       orbit.addEventListener('change', draw)
       observer = new ResizeObserver(fit)
@@ -314,16 +406,6 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       fit()
       setPhase('ready')
       if (!terrain) return
-      positions = [{ id: 'population', point: pointFor([115.85, 40.025]) }]
-      const [tianjieX, tianjieZ] = twinSites.tianjie.modelPoint
-      const [jingxiX, jingxiZ] = twinSites.jingxi.modelPoint
-      positions.push({ id: 'twins', point: pointAt((tianjieX + jingxiX) / 2, (tianjieZ + jingxiZ) / 2) })
-      void readPlaces(controller.signal).then(items => {
-        if (controller.signal.aborted) return
-        positions.push(...items.map(place => ({ id: place.id, point: pointFor(place.coordinates) })))
-        setPlaces(items)
-        focus(focusArea)
-      }).catch(() => undefined)
       new TextureLoader().load(mapRoot + 'mentougou-sentinel-2-20261008.webp', texture => {
         if (controller.signal.aborted) {
           texture.dispose()
@@ -346,6 +428,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       controls?.dispose()
       unbindPicking?.()
       imageryTexture?.dispose()
+      boundaryTexture?.dispose()
       if (model) releaseModel(model)
       renderer?.dispose()
       renderer?.forceContextLoss()
@@ -354,29 +437,48 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
     }
   }, [standaloneTwin])
 
-  const townScope = area?.breadcrumbs.find(crumb => crumb.id !== 'mentougou')?.id
   useEffect(() => {
-    if (phase === 'ready') tools.current?.focus(townScope ?? 'mentougou')
-  }, [phase, townScope])
+    if (phase !== 'ready' || !areaId || boundaryLoading || !(district || boundary)) return
+    try {
+      tools.current?.scope(boundary, places)
+      setAppliedScope({ id: areaId, boundary })
+      setScopeError(undefined)
+    } catch {
+      setScopeError(areaId)
+    }
+  }, [areaId, boundary, boundaryLoading, district, phase, places])
+
+  useEffect(() => {
+    if (phase === 'ready') tools.current?.view(view)
+  }, [phase, view])
 
   function changeView(mode: View) {
     if (mode === view) return
-    setView(mode)
-    tools.current?.view(mode)
+    if (onViewModeChange) onViewModeChange(mode)
+    else setLocalView(mode)
   }
 
   const population = markers.find(marker => marker.id === 'population' && marker.visible)
   const twinGroup = markers.find(marker => marker.id === 'twins' && marker.visible)
-  const currentTown = places.find(place => place.id === townScope)
-  const currentTownMarker = markers.find(marker => marker.id === townScope && marker.visible)
   const pins = markers.flatMap(marker => {
     const place = places.find(item => item.id === marker.id)
-    return marker.visible && place && displayedTowns.has(place.id) ? [{ ...marker, name: place.name }] : []
+    return marker.visible && place ? [{ ...marker, name: place.name }] : []
   })
+  const ready = phase === 'ready' && (standaloneTwin || (appliedScope?.id === areaId && appliedScope?.boundary === boundary))
+  const failed = phase === 'unavailable' || (areaId !== undefined && scopeError === areaId)
+    || (!district && !standaloneTwin && !boundaryLoading && !boundary)
+  const modelPhase = failed ? 'unavailable' : ready ? 'ready' : 'loading'
+  const scopeId = standaloneTwin ?? (village && !villageBoundary ? town?.id : areaId)
+  const modelName = standaloneTwin ? twinSites[standaloneTwin].name : area?.name ?? '门头沟区'
+
+  useEffect(() => {
+    mount.current?.querySelector('canvas')?.setAttribute('aria-label', modelName + '本地模型画布')
+  }, [modelName, phase])
 
   return (
-    <section className="district-local-model" data-model-ready={phase} data-view={view}
-      data-twin={Boolean(standaloneTwin)} aria-label={standaloneTwin ? twinSites[standaloneTwin].name + '模型' : '门头沟区本地模型'}>
+    <section className="district-local-model" data-model-ready={modelPhase} data-view={view}
+      data-model-scope={modelPhase === 'ready' ? scopeId : undefined}
+      data-twin={Boolean(standaloneTwin)} aria-label={modelName + '本地模型'}>
       <div className="district-local-model-canvas" ref={mount}>
         {district && population && (
           <div className="model-population" style={{ left: population.x + '%', top: population.y + '%' }}>
@@ -388,17 +490,13 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
             </Link>
           </div>
         )}
-        {district && onSelectArea && pins.map(pin => (
-          <button key={pin.id} type="button" className="model-place" data-place={pin.id} style={{ left: pin.x + '%', top: pin.y + '%' }}
+        {onSelectArea && pins.map(pin => (
+          <button key={pin.id} type="button" className="model-place" data-place={pin.id}
+            data-featured={!district || displayedTowns.has(pin.id)} style={{ left: pin.x + '%', top: pin.y + '%' }}
             aria-label={'查看' + pin.name} onClick={() => onSelectArea(pin.id)}>
             <span className="model-beacon" aria-hidden="true" /><span className="model-place-name">{pin.name}</span>
           </button>
         ))}
-        {areaId && !district && currentTownMarker && (
-          <div className="model-place model-place-current" style={{ left: currentTownMarker.x + '%', top: currentTownMarker.y + '%' }}>
-            <span className="model-beacon" aria-hidden="true" /><span className="model-place-name">{currentTown?.name ?? area?.name}</span>
-          </div>
-        )}
         {district && twinGroup && onOpenTwin && (
           <div className="model-twin-point" style={{ left: twinGroup.x + '%', top: twinGroup.y + '%' }}>
             <span className="model-beacon" aria-hidden="true" />
@@ -409,14 +507,15 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           </div>
         )}
       </div>
-      {phase === 'loading' && <p className="district-model-state" role="status">正在加载本地三维模型</p>}
-      {phase === 'unavailable' && <p className="district-model-state" role="status">本地三维模型暂不可用</p>}
-      {phase === 'ready' && (
+      {modelPhase === 'loading' && <p className="district-model-state" role="status">正在加载{modelName}模型</p>}
+      {modelPhase === 'unavailable' && <p className="district-model-state" role="status">{modelName}模型暂不可用</p>}
+      {modelPhase === 'ready' && (
         <>
-          {onOpenTwin && (!district || !twinGroup) && <nav className="district-local-landmarks" aria-label="重点地标">
+          {district && onOpenTwin && !twinGroup && <nav className="district-local-landmarks" aria-label="重点地标">
             <button type="button" onClick={() => onOpenTwin('tianjie')}>长安天街</button>
             <button type="button" onClick={() => onOpenTwin('jingxi')}>京西智谷</button>
           </nav>}
+          {village && !villageBoundary && <p className="model-region-note" role="status">本地村社边界暂不可用，当前显示{town?.name}模型。</p>}
           {picked && (
             <aside className="district-local-model-detail" aria-label="模型要素详情">
               <strong>{picked.label}</strong>
@@ -432,12 +531,12 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           </ul>}
           {imagery && <a href="https://ewds.climate.copernicus.eu/licences/ec-sentinel" target="_blank" rel="noreferrer"
             className="model-imagery-source">含经修改的 Copernicus Sentinel 2026 数据</a>}
-          <div className="navigation-map-tools" role="group" aria-label="本地模型操作">
-            <div className="navigation-map-mode" role="group" aria-label="模型视角">
+          <div className="local-model-tools" role="group" aria-label="本地模型操作">
+            <div className="local-model-tool-group" role="group" aria-label="模型视角">
               <button type="button" aria-pressed={view === '2d'} onClick={() => changeView('2d')}>2D</button>
               <button type="button" aria-pressed={view === '3d'} onClick={() => changeView('3d')}>3D</button>
             </div>
-            <div className="navigation-map-zoom">
+            <div className="local-model-tool-group">
               <button type="button" aria-label="缩小模型" onClick={() => tools.current?.zoom(.8)}>−</button>
               <button type="button" aria-label="放大模型" onClick={() => tools.current?.zoom(1.25)}>+</button>
               <button type="button" onClick={() => tools.current?.reset()}>复位视角</button>
