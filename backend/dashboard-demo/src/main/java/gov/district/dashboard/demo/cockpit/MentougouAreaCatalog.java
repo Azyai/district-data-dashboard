@@ -11,7 +11,7 @@ import java.util.stream.Stream;
  * Administrative names follow the Mentougou district government directory.
  * Coordinates are local schematic positions. Activity weights are synthetic.
  */
-final class MentougouAreaCatalog {
+public final class MentougouAreaCatalog {
 
     static final Area ROOT = new Area("mentougou", "门头沟区", "district", 0, 0, 0, List.of(
             town("dayu", "大峪街道", 0.72, 0.25,
@@ -59,7 +59,7 @@ final class MentougouAreaCatalog {
     private static final Map<String, List<Area>> PATHS = ALL_PATHS.stream()
             .collect(Collectors.toUnmodifiableMap(path -> path.getLast().id(), path -> path));
 
-    static List<List<Area>> allPaths() {
+    public static List<List<Area>> allPaths() {
         return ALL_PATHS;
     }
 
@@ -85,6 +85,6 @@ final class MentougouAreaCatalog {
         return new Area(id, name, "village", x, z, activity, List.of());
     }
 
-    record Area(String id, String name, String level, double x, double z, int activity, List<Area> children) {
+    public record Area(String id, String name, String level, double x, double z, int activity, List<Area> children) {
     }
 }
