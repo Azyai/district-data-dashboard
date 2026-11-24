@@ -53,7 +53,7 @@ class AdminMetricController {
         return ApiResult.ok(metrics.publish(id, revision(ifMatch)));
     }
 
-    private static long revision(String ifMatch) {
+    static long revision(String ifMatch) {
         if (ifMatch == null) {
             throw new ApiFailure(ApiCode.INVALID_REQUEST);
         }
