@@ -5,12 +5,19 @@ import { init, use as registerCharts } from 'echarts/core'
 import type { BarSeriesOption, LineSeriesOption } from 'echarts/charts'
 import type { GridComponentOption, TooltipComponentOption } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { isRadialStyle, radialChartModules, radialFallback, radialPreset, radarCeiling } from './chartPresets'
+import type { ChartPoint, RadialOption } from './chartPresets'
+import type { ChartStyle } from './chartStyles'
+import './data-chart.css'
 
-registerCharts([BarChart, LineChart, GridComponent, TooltipComponent, CanvasRenderer])
+registerCharts([BarChart, LineChart, GridComponent, TooltipComponent, CanvasRenderer, ...radialChartModules])
 
-type Point = { label: string; value: number }
-type Options = ComposeOption<GridComponentOption | TooltipComponentOption | BarSeriesOption | LineSeriesOption>
+export type ChartVariant = ChartStyle
+
+type Point = ChartPoint
+type CartesianOption = ComposeOption<GridComponentOption | TooltipComponentOption | BarSeriesOption | LineSeriesOption>
+type Options = CartesianOption | RadialOption
 
 type DataChartProps = {
   kind: 'trend' | 'ranking'
@@ -18,6 +25,9 @@ type DataChartProps = {
   points: Point[]
   unit: string
   compact?: boolean
+  variant?: ChartVariant
+  additive?: boolean
+  showData?: boolean
 }
 
 const fontFamily = 'system-ui, "Microsoft YaHei", sans-serif'
@@ -76,7 +86,7 @@ function chartDescription(label: string, points: Point[], unit: string, range: R
     tooltip(range.min, unit) + ' 至 ' + tooltip(range.max, unit) + '。'
 }
 
-function compactTrend(points: Point[], width: number, range: ReturnType<typeof pointRange>): Options {
+function compactTrend(points: Point[], width: number, range: ReturnType<typeof pointRange>, bar: boolean): CartesianOption {
   const mobile = width < 480
   const allZero = range.min === 0 && range.max === 0
   const labelWidth = Math.max(axisNumber.format(range.min).length, axisNumber.format(range.max).length)
@@ -87,7 +97,7 @@ function compactTrend(points: Point[], width: number, range: ReturnType<typeof p
     xAxis: {
       type: 'category',
       data: points.map(point => point.label),
-      boundaryGap: points.length === 1,
+      boundaryGap: bar || points.length === 1,
       axisLine: { onZero: false, lineStyle: { color: guide } },
       axisTick: { show: false },
       axisLabel: {
@@ -101,7 +111,7 @@ function compactTrend(points: Point[], width: number, range: ReturnType<typeof p
     },
     yAxis: {
       type: 'value',
-      scale: !allZero,
+      scale: !allZero && !bar,
       splitNumber: allZero ? 1 : 3,
       minInterval: points.every(point => Number.isInteger(point.value)) ? 1 : undefined,
       min: allZero ? 0 : undefined,
@@ -110,9 +120,9 @@ function compactTrend(points: Point[], width: number, range: ReturnType<typeof p
       splitLine: { lineStyle: { color: guide, type: 'dashed' } },
     },
     tooltip: {
-      axisPointer: { type: 'line', lineStyle: { color: '#8bcaed', type: 'dashed' } },
+      axisPointer: { type: bar ? 'shadow' : 'line', lineStyle: { color: '#8bcaed', type: 'dashed' } },
     },
-    series: {
+    series: bar ? barSeries(points, mobile, false, fontSize) : {
       type: 'line',
       sampling: 'minmax',
       symbol: 'circle',
@@ -126,7 +136,24 @@ function compactTrend(points: Point[], width: number, range: ReturnType<typeof p
   }
 }
 
-function standardChart(kind: DataChartProps['kind'], points: Point[], width: number): Options {
+function barSeries(points: Point[], narrow: boolean, showValues: boolean, labelSize: number): BarSeriesOption {
+  return {
+    type: 'bar',
+    barMaxWidth: narrow ? 14 : 22,
+    large: true,
+    largeThreshold: 500,
+    showBackground: points.length <= 20,
+    backgroundStyle: { color: '#1a2d44', borderRadius: 4 },
+    itemStyle: { color: lineGradient, borderRadius: 4 },
+    label: {
+      show: showValues, position: 'right', color: '#cceaf9', fontSize: labelSize,
+      formatter: ({ value }) => typeof value === 'number' ? observedNumber.format(value) : '',
+    },
+    data: points.map(point => point.value),
+  }
+}
+
+function standardChart(style: ChartVariant, kind: DataChartProps['kind'], points: Point[], width: number): CartesianOption {
   const narrow = width < 480
   const labelSize = narrow ? 12 : Math.min(26, Math.max(18, Math.round(width / 76)))
   const axisLabel = {
@@ -147,7 +174,8 @@ function standardChart(kind: DataChartProps['kind'], points: Point[], width: num
     axisLine: { lineStyle: { color: guide } },
     axisTick: { show: false },
   }
-  const ranking = kind === 'ranking'
+  const bar = style === 'bar'
+  const ranking = kind === 'ranking' && bar
   const showValues = ranking && points.length <= 8 && points.every(point => observedNumber.format(point.value).length <= 8)
   const labelWidth = ranking ? points.reduce((size, point) => Math.max(size, point.label.length), 0) : 0
   return {
@@ -162,22 +190,9 @@ function standardChart(kind: DataChartProps['kind'], points: Point[], width: num
       ...categoryAxis, inverse: true,
       axisLabel: { ...axisLabel, width: Math.round(width * .26), overflow: 'truncate' },
     } : valueAxis,
-    tooltip: { axisPointer: { type: ranking ? 'shadow' : 'line' } },
-    series: ranking
-      ? {
-        type: 'bar',
-        barMaxWidth: narrow ? 14 : 22,
-        large: true,
-        largeThreshold: 500,
-        showBackground: points.length <= 20,
-        backgroundStyle: { color: '#1a2d44', borderRadius: 4 },
-        itemStyle: { color: lineGradient, borderRadius: 4 },
-        label: {
-          show: showValues, position: 'right', color: '#cceaf9', fontSize: labelSize,
-          formatter: ({ value }) => typeof value === 'number' ? observedNumber.format(value) : '',
-        },
-        data: points.map(point => point.value),
-      }
+    tooltip: { axisPointer: { type: bar ? 'shadow' : 'line' } },
+    series: bar
+      ? barSeries(points, narrow, showValues, labelSize)
       : {
         type: 'line', sampling: 'minmax', showSymbol: points.length <= 48, symbolSize: narrow ? 6 : 8,
         lineStyle: { width: narrow ? 2.5 : 3.5, color: lineGradient },
@@ -188,10 +203,50 @@ function standardChart(kind: DataChartProps['kind'], points: Point[], width: num
   }
 }
 
-export default function DataChart({ kind, label, points, unit, compact = false }: DataChartProps) {
+function DatasetDetails({ points, label, unit }: { points: Point[]; label: string; unit: string }) {
+  const [open, setOpen] = useState(false)
+  const [page, setPage] = useState(0)
+  const pageSize = 40
+  const lastPage = Math.max(0, Math.ceil(points.length / pageSize) - 1)
+  const current = Math.min(page, lastPage)
+  const offset = current * pageSize
+  return (
+    <details className="data-chart-dataset" onToggle={event => setOpen(event.currentTarget.open)}
+      onKeyDown={event => {
+        if (event.key !== 'Escape') return
+        event.currentTarget.open = false
+        event.currentTarget.querySelector('summary')?.focus()
+      }}>
+      <summary aria-label={'查看' + label + '明细'}>数据</summary>
+      {open && (
+        <div className="data-chart-dataset-panel">
+          <table>
+            <caption>{label}明细</caption>
+            <thead><tr><th scope="col">观测项</th><th scope="col">{unit ? '数值（' + unit + '）' : '数值'}</th></tr></thead>
+            <tbody>{points.slice(offset, offset + pageSize).map((point, index) => (
+              <tr key={offset + index}><th scope="row">{point.label}</th><td>{observedNumber.format(point.value)}</td></tr>
+            ))}</tbody>
+          </table>
+          {lastPage > 0 && <nav className="data-chart-dataset-pages" aria-label="数据明细分页">
+            <button type="button" disabled={current === 0} onClick={() => setPage(current - 1)}>上一页</button>
+            <span aria-live="polite">{current + 1} / {lastPage + 1}</span>
+            <button type="button" disabled={current === lastPage} onClick={() => setPage(current + 1)}>下一页</button>
+          </nav>}
+        </div>
+      )}
+    </details>
+  )
+}
+
+export default function DataChart({ kind, label, points, unit, compact = false, variant, additive = false, showData = false }: DataChartProps) {
   const host = useRef<HTMLDivElement>(null)
   const observed = useMemo(() => points.filter(point => Number.isFinite(point.value)), [points])
   const range = useMemo(() => pointRange(observed), [observed])
+  const requested = variant ?? (kind === 'trend' ? 'line' : 'bar')
+  const fallback = radialFallback(requested, observed, range.min, unit)
+  const style = fallback ? 'bar' : requested
+  const radial = isRadialStyle(style)
+  const note = fallback ?? (style === 'radar' ? '统一刻度 0–' + tooltip(radarCeiling(range.max), unit) : null)
 
   useEffect(() => {
     const element = host.current
@@ -209,16 +264,18 @@ export default function DataChart({ kind, label, points, unit, compact = false }
       height = element.clientHeight
       chart ??= init(element, undefined, { devicePixelRatio: Math.min(window.devicePixelRatio, 2) })
       chart.resize({ width, height })
-      if (widthChanged) {
-        const options = compact && kind === 'trend' ? compactTrend(observed, width, range) : standardChart(kind, observed, width)
+      if (widthChanged || radial) {
+        const options: Options = isRadialStyle(style)
+          ? radialPreset(style, observed, unit, range.max, width, height, additive)
+          : compact && kind === 'trend' ? compactTrend(observed, width, range, style === 'bar')
+            : standardChart(style, kind, observed, width)
         chart.setOption({
           ...options,
           animation: false,
           textStyle: { color: axisInk, fontFamily },
           color: [marker],
           tooltip: {
-            ...options.tooltip,
-            trigger: 'axis',
+            trigger: radial ? 'item' : 'axis',
             triggerOn: 'mousemove|click',
             renderMode: 'richText',
             confine: true,
@@ -227,6 +284,7 @@ export default function DataChart({ kind, label, points, unit, compact = false }
             padding: [9, 13],
             textStyle: { color: '#edf7fd' },
             valueFormatter: (value: unknown) => tooltip(value, unit),
+            ...options.tooltip,
           },
         })
       }
@@ -238,19 +296,28 @@ export default function DataChart({ kind, label, points, unit, compact = false }
       observer.disconnect()
       chart?.dispose()
     }
-  }, [kind, observed, unit, compact, range])
+  }, [kind, observed, unit, compact, range, style, radial, additive])
 
   if (observed.length === 0) {
     return <p className="chart-fallback" role="status">{label}暂无数据</p>
   }
 
-  return (
+  const dataPlot = (
     <div
       ref={host}
       className={compact ? 'data-chart data-chart-compact' : 'data-chart'}
-      style={{ minWidth: 0 }}
+      data-chart-variant={style}
       role="img"
       aria-label={chartDescription(label, observed, unit, range)}
     />
+  )
+  return (
+    <div className="data-chart-frame">
+      {dataPlot}
+      {(note || showData) && <div className="data-chart-info">
+        {note && <p>{note}</p>}
+        {showData && <DatasetDetails label={label} points={observed} unit={unit} />}
+      </div>}
+    </div>
   )
 }
