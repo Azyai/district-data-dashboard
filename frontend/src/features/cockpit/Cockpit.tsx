@@ -1,11 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { lazy, Suspense, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useMatch, useNavigate, useSearchParams } from 'react-router'
 import { dashboardApi } from '../../api/client'
 import { DisplayHeader } from '../screens/DisplayHeader'
 import { displayPath } from '../screens/screenCatalog'
 import MonitoringPanels from './MonitoringPanels'
-import { monitoringSnapshot, readMonitoring, type MonitorPage } from './monitoringData'
+import { beijingHalfHour, monitoringSnapshot, readMonitoring, type MonitorPage } from './monitoringData'
 import './cockpit.css'
 
 const TiandituMap = lazy(() => import('./TiandituMap'))
@@ -17,7 +17,24 @@ export default function Cockpit({ page = 'roads' }: { page?: MonitorPage }) {
   const areaId = pathArea ?? (params.get('area') || district)
   const navigate = useNavigate()
   const [view, setView] = useState<'2d'|'3d'>('2d')
-  const [hour, setHour] = useState(10)
+  const [liveHour, setLiveHour] = useState(beijingHalfHour)
+  const [reviewHour, setReviewHour] = useState<number | null>(null)
+  const hour = reviewHour ?? liveHour
+  useEffect(() => {
+    const slotMs = 30 * 60_000
+    let timer: number
+    const sync = () => {
+      window.clearTimeout(timer)
+      setLiveHour(beijingHalfHour())
+      timer = window.setTimeout(sync, slotMs - Date.now() % slotMs + 50)
+    }
+    sync()
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', sync)
+    }
+  }, [])
   const [filter, setFilter] = useState('')
   const [focus, setFocus] = useState({ scope: '', name: '' })
   const zone = useQuery({queryKey: ['cockpit-area', areaId], queryFn: ({signal})=>dashboardApi.area(areaId,signal),
@@ -39,7 +56,7 @@ export default function Cockpit({ page = 'roads' }: { page?: MonitorPage }) {
             topic={page} data={data} selected={selected} status={filter} onSelectFeature={select}/>
         </Suspense>
         {data && catalog.data && <MonitoringPanels key={scope} page={page} area={area} directory={directory.data} catalog={catalog.data}
-          data={data} selected={selected} hour={hour} status={filter} onSelect={select} onArea={go} onHour={setHour} onStatus={status=>{
+          data={data} selected={selected} hour={hour} status={filter} onSelect={select} onArea={go} onHour={setReviewHour} onLive={() => setReviewHour(null)} onStatus={status=>{
             setFilter(status)
             const road=data.roads.find(item=>item.name===selected)
             if (road && status && road.status!==status) select('')

@@ -37,11 +37,23 @@ export const waterKind = (name: string) => name.includes('水库') ? '水库' : 
 const reservoirRates: Record<string, number> = { 斋堂水库: 86, 落坡岭水库: 72, 珠窝水库: 64, 三家店水库: 91, 苇子水库: 58, 龙口水库: 47 }
 export const reservoirRate = (name: string) => reservoirRates[name] ?? 45 + profileSeed(name) % 46
 
-export function monitoringSnapshot(catalog: MonitoringCatalog, page: MonitorPage, area: MonitorArea, hour = catalog.baseHour) {
+export function beijingHalfHour(timestamp = Date.now()) {
+  const minutes = (Math.floor(timestamp / 60_000) + 8 * 60) % 1440
+  return Math.floor(minutes / 30) / 2
+}
+
+export function slotLabel(hour: number) {
+  return String(Math.floor(hour)).padStart(2, '0') + (Number.isInteger(hour) ? ':00' : ':30')
+}
+
+export function monitoringSnapshot(catalog: MonitoringCatalog, page: MonitorPage, area: MonitorArea, hour = beijingHalfHour()) {
   const name = modelAreaName(area)
   const scoped = (row: { town: string; village?: string | null }) => area.level === 'district'
     || (area.level === 'town' ? row.town === name : row.village === name && (!area.breadcrumbs?.[1] || row.town === area.breadcrumbs[1].name))
-  const factor = catalog.hourly[hour] ?? 1
+  const start = Math.floor(hour)
+  const current = catalog.hourly[start] ?? 1
+  const next = catalog.hourly[(start + 1) % 24] ?? current
+  const factor = current + (next - current) * (hour - start)
   const roads = page === 'roads' ? catalog.roads.filter(scoped).map(base => {
     const congestion = Math.round(base.congestion * factor * 100) / 100
     return { ...base, congestion, status: roadStatus(congestion), speed: Math.round(Math.min(120, Math.max(8, base.speed / factor ** .55))),

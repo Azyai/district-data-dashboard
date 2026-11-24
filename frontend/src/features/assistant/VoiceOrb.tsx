@@ -100,7 +100,7 @@ export default function VoiceOrb() {
       })
       if (!unchanged()) return '页面已切换，请在当前区域重新提问。'
       const period = document.querySelector<HTMLElement>('.monitoring-stage')?.dataset.hour
-      const hour = period && /^\d{1,2}$/.test(period) ? Number(period) : undefined
+      const hour = period && /^\d{1,2}(?:\.5)?$/.test(period) ? Number(period) : undefined
       const monitor = monitoringSnapshot(catalog, screen === 'overview' ? 'roads' : screen, area, hour)
       const keys = Object.entries(monitorTerms[screen]).filter(([label, pattern]) => question.includes(label) || pattern.test(question))
         .map(([label]) => label)
@@ -108,7 +108,9 @@ export default function VoiceOrb() {
       const general = /概况|情况|概览|态势|分析|有哪些指标/.test(question)
       if (keys.length || general) {
         if (!monitor.kpis.length) return area.name + '当前缺少这个主题的监测样本。'
-        const periodName = screen === 'overview' ? (hour ?? catalog.baseHour) + '时的' : '的'
+        const halfHour = hour ?? catalog.baseHour
+        const periodName = screen === 'overview'
+          ? Math.floor(halfHour) + '点' + (halfHour % 1 ? '半的' : '的') : '的'
         return area.name + periodName + '模拟监测数据，' + (matched.length ? matched : monitor.kpis)
           .map(item => item.label + '为' + item.value + (spokenUnits[item.unit] ?? item.unit)).join('，') + '。'
       }
