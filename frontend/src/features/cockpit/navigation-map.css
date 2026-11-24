@@ -13,7 +13,7 @@
 }
 
 .navigation-map[data-map-ready="fallback"] { background: #101f30; }
-.navigation-map-fallback, .navigation-map-surface { position: absolute; inset: 0; }
+.navigation-map-fallback, .navigation-map > .navigation-map-surface { position: absolute; inset: 0; }
 .district-viewport-mask {
   position: absolute;
   inset: 0;

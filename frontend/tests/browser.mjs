@@ -11,7 +11,7 @@ const verifyLiveBasemap = process.env.VERIFY_LIVE_BASEMAP === '1'
 const basemapOrigin = 'https://tiles.openfreemap.org'
 const elevationOrigin = 'https://elevation-tiles-prod.s3.amazonaws.com'
 const imageryPath = '/maps/mentougou-sentinel-2-20261008.webp'
-const mapLayoutAnchors = ['.map-panel', '.cockpit-primary', '.cockpit-brief', '.cockpit-trend']
+const mapLayoutAnchors = ['.map-panel']
 const browser = await chromium.launch({
   executablePath: browserPath,
   args: process.env.E2E_FORCE_WEBGL === '1' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
@@ -33,19 +33,26 @@ async function mapLayout(page) {
   return { height, anchors }
 }
 
-async function waitForArea(page, name, mapReady = 'fallback') {
+async function waitForArea(page, name) {
   const area = page.getByRole('navigation', { name: '区域层级' })
   await area.locator('[aria-current="page"]').filter({ hasText: name }).waitFor()
-  await page.getByRole('heading', { name: '空间态势' }).waitFor()
-  if (name !== '门头沟区') {
-    await page.locator('.terrain-surface canvas').waitFor()
-    return
-  }
-  const map = page.locator(`.navigation-map[data-map-ready="${mapReady}"]`)
-  await map.locator(mapReady === 'true' ? '.maplibregl-canvas' : '.district-map > canvas').waitFor()
+  await page.getByRole('heading', { name: name + '模型' }).waitFor()
+  await page.locator('.district-local-model[data-model-ready="ready"] canvas').waitFor()
 }
 
-async function verifyDistrictMap(page, stacked = false) {
+async function verifyLocalModel(page) {
+  const model = page.locator('.district-local-model[data-model-ready="ready"]')
+  const initialLayout = await mapLayout(page)
+  await model.getByRole('link', { name: '查看全区人口专题' }).waitFor()
+  await model.getByRole('button', { name: '2D', exact: true }).click()
+  assert.equal(await model.getAttribute('data-view'), '2d')
+  await model.getByRole('button', { name: '3D', exact: true }).click()
+  assert.equal(await model.getAttribute('data-view'), '3d')
+  assert.deepEqual(await mapLayout(page), initialLayout)
+}
+
+async function verifyDistrictMap(page) {
+  await page.getByRole('button', { name: '行政地图' }).click()
   const map = page.locator('.district-map')
   const attribution = map.getByRole('link', { name: '© OpenStreetMap contributors' })
   assert.equal(await attribution.getAttribute('href'), 'https://www.openstreetmap.org/copyright')
@@ -55,31 +62,24 @@ async function verifyDistrictMap(page, stacked = false) {
   await map.getByRole('button', { name: '全域', exact: true }).click()
   assert.equal(await map.getAttribute('data-zoomed'), 'false')
   assert.deepEqual(await mapLayout(page), layoutBeforeZoom, 'Offline map zoom should preserve cockpit layout')
-  await verifyPanelLayout(page, { stacked })
+  await verifyPanelLayout(page)
+  await page.getByRole('button', { name: '返回模型' }).click()
+  await waitForArea(page, '门头沟区')
 }
 
-async function verifyPanelLayout(page, { stacked = false, online = false } = {}) {
+async function verifyPanelLayout(page, { online = false } = {}) {
   const layout = await page.evaluate(({ credits, controls }) => {
     const bounds = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON()
     return {
       stage: bounds('.map-panel'), map: bounds('.district-map-extent'),
-      left: bounds('.cockpit-primary'), right: bounds('.cockpit-brief'),
       credits: bounds(credits), controls: bounds(controls),
     }
   }, {
     credits: online ? '.maplibregl-ctrl-attrib' : '.district-map-credit',
     controls: online ? '.navigation-map-tools' : '.district-map-tools',
   })
-  if (stacked) {
-    assert.ok(layout.stage.bottom <= layout.left.top && layout.left.bottom <= layout.right.top, 'The map leads the mobile layout')
-  } else {
-    assert.ok(layout.map.left <= layout.left.left && layout.right.right <= layout.map.right, 'The map continues behind the desktop panels')
-    assert.ok(layout.left.right <= layout.credits.left && layout.controls.right <= layout.right.left,
-      'Attribution and map controls clear the desktop panels')
-    for (const rail of [layout.left, layout.right]) {
-      assert.ok(rail.top >= layout.stage.top && rail.bottom <= layout.stage.bottom, 'Panels float within the stage')
-    }
-  }
+  assert.ok(layout.stage.left <= layout.map.left && layout.stage.right >= layout.map.right,
+    'The map fits the stage')
   const { credits, controls } = layout
   assert.ok(credits.right <= controls.left || controls.right <= credits.left ||
     credits.bottom <= controls.top || controls.bottom <= credits.top, 'Attribution and map controls do not cover each other')
@@ -164,10 +164,14 @@ async function verifyOnlineDistrictMap(page) {
     return origin === appOrigin && pathname.endsWith(imageryPath)
   }
   page.on('request', request => { imageryRequested ||= matchesImagery(request.url()) })
+  await page.goto(baseUrl)
+  await waitForArea(page, '门头沟区')
+  await page.locator('.model-imagery-source').waitFor()
+  imageryRequested = false
   const [styleResponse, tileResponse] = await Promise.all([
     mapResponse(page, basemapOrigin, /^\/styles\//),
     mapResponse(page, basemapOrigin, /\/\d+\/\d+\/\d+\.(pbf|mvt)$/),
-    page.goto(baseUrl),
+    page.getByRole('button', { name: '行政地图' }).click(),
   ])
   const style = await styleResponse.json()
   assert.equal(style.version, 8)
@@ -175,7 +179,6 @@ async function verifyOnlineDistrictMap(page) {
     'The online style supplies building extrusion data')
   assert.ok((await tileResponse.body()).byteLength > 0, 'The online vector tile has data')
 
-  await waitForArea(page, '门头沟区', 'true')
   const map = page.locator('.navigation-map[data-map-ready="true"]')
   const mode2D = map.getByRole('button', { name: '2D', exact: true })
   const mode3D = map.getByRole('button', { name: '3D', exact: true })
@@ -263,14 +266,14 @@ async function verifyOnlineDistrictMap(page) {
   assert.deepEqual(await mapLayout(page), layout, '2D/3D switching should preserve cockpit layout')
   await assertNoHorizontalOverflow(page)
   await page.setViewportSize({ width: 390, height: 844 })
-  await verifyPanelLayout(page, { stacked: true, online: true })
+  await verifyPanelLayout(page, { online: true })
   await assertNoHorizontalOverflow(page)
   const mobileMask = await verifyDistrictViewportMask(map)
   assert.ok(mobileMask.width < flatMask.width / 2, 'The mask backing canvas resizes with the viewport')
   await capture(page, 'cockpit-online-mobile.png')
   await imagery.click()
   await imageryCredit.waitFor()
-  await verifyPanelLayout(page, { stacked: true, online: true })
+  await verifyPanelLayout(page, { online: true })
   await assertNoHorizontalOverflow(page)
   await imagery.click()
   await imageryCredit.waitFor({ state: 'hidden' })
@@ -303,11 +306,13 @@ try {
   await page.goto(baseUrl)
   await page.getByRole('heading', { name: '门头沟区数字驾驶舱' }).waitFor()
   await waitForArea(page, '门头沟区')
-  assert.ok(blockedBasemapRequests > 0, 'Offline coverage should exercise an unavailable tile service')
+  assert.equal(blockedBasemapRequests, 0, 'The homepage model does not contact the tile service')
   await page.getByRole('button', { name: '身份核验' }).waitFor()
   await assertNoHorizontalOverflow(page)
   await page.setViewportSize({ width: 1072, height: 893 })
+  await verifyLocalModel(page)
   await verifyDistrictMap(page)
+  assert.ok(blockedBasemapRequests > 0, 'Offline coverage should exercise an unavailable tile service')
   await verifyRegionMenuLayout(page)
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, 'cockpit-1440.png')
@@ -384,7 +389,8 @@ try {
   await page.getByRole('link', { name: '返回门头沟区全域' }).click()
   await waitForArea(page, '门头沟区')
   await assertNoHorizontalOverflow(page)
-  await verifyDistrictMap(page, true)
+  await verifyLocalModel(page)
+  await verifyDistrictMap(page)
   await verifyRegionMenuLayout(page)
   console.log('PASS offline district map, zoom/reset and stable panel layout at 1072px and 390px')
   await capture(page, 'cockpit-mobile.png')
