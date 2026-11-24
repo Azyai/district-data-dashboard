@@ -15,7 +15,7 @@ interface DashboardDraftMapper {
 
     @Select("""
             SELECT d.revision, c.component_id, c.title, c.component_type, c.metric_id, c.unit,
-                c.position_x, c.position_y, c.component_width, c.component_height, c.layer_z
+                c.position_x, c.position_y, c.component_width, c.component_height, c.layer_z, c.chart_style
             FROM demo_dashboard_draft d
             LEFT JOIN demo_dashboard_draft_component c ON c.project_id = d.project_id
             WHERE d.project_id = #{projectId}
@@ -42,12 +42,12 @@ interface DashboardDraftMapper {
             <script>
             INSERT INTO demo_dashboard_draft_component (
                 project_id, component_id, ordinal_no, title, component_type, metric_id, unit,
-                position_x, position_y, component_width, component_height, layer_z
+                position_x, position_y, component_width, component_height, layer_z, chart_style
             ) VALUES
             <foreach collection="components" item="component" index="ordinal" separator=",">
                 (#{projectId}, #{component.id}, #{ordinal}, #{component.title}, #{component.type},
                  #{component.metricId}, #{component.unit}, #{component.geometry.x}, #{component.geometry.y},
-                 #{component.geometry.width}, #{component.geometry.height}, #{component.geometry.z})
+                 #{component.geometry.width}, #{component.geometry.height}, #{component.geometry.z}, #{component.chartStyle,jdbcType=VARCHAR})
             </foreach>
             </script>
             """)
@@ -55,10 +55,10 @@ interface DashboardDraftMapper {
 
     record DraftRow(int revision, String componentId, String title, String componentType, String metricId,
                     String unit, Integer positionX, Integer positionY, Integer componentWidth,
-                    Integer componentHeight, Integer layerZ) {
+                    Integer componentHeight, Integer layerZ, String chartStyle) {
         Component component() {
             return new Component(componentId, title, componentType, metricId, unit,
-                    new Geometry(positionX, positionY, componentWidth, componentHeight, layerZ));
+                    new Geometry(positionX, positionY, componentWidth, componentHeight, layerZ), chartStyle);
         }
     }
 }

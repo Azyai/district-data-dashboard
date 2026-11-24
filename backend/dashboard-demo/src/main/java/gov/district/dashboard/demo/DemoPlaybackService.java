@@ -30,7 +30,7 @@ public final class DemoPlaybackService {
                             kpi("completion-rate", "办结率", "%", 664),
                             kpi("active-alerts", "待处置预警", "条", 1280),
                             trend("event-trend", "近 7 日事件受理量", "件"),
-                            ranking("category-volume", "事件类型分布", "件"))),
+                            ranking("category-volume", "事件类型分布", "件", "network"))),
             "city-snapshot-1", "DISTRICT_VIEWER");
 
     private static final Project SERVICES = new Project(
@@ -41,7 +41,7 @@ public final class DemoPlaybackService {
                             kpi("online-rate", "网办率", "%", 664),
                             kpi("satisfaction-rate", "满意度", "%", 1280),
                             trend("service-trend", "近 7 日接件量", "件"),
-                            ranking("service-category-volume", "热门事项类型", "件"))),
+                            ranking("service-category-volume", "热门事项类型", "件", "ring"))),
             "services-snapshot-1", "SERVICE_VIEWER");
 
     private static final List<Project> PROJECTS = List.of(CITY, SERVICES);
@@ -163,8 +163,8 @@ public final class DemoPlaybackService {
         return component(metricId, title, "trend", unit, new Geometry(48, 220, 1112, 740, 1));
     }
 
-    private static Component ranking(String metricId, String title, String unit) {
-        return component(metricId, title, "ranking", unit, new Geometry(1184, 220, 688, 740, 1));
+    private static Component ranking(String metricId, String title, String unit, String chartStyle) {
+        return new Component(metricId, title, "ranking", metricId, unit, new Geometry(1184, 220, 688, 740, 1), chartStyle);
     }
 
     private static Component component(String metricId, String title, String type, String unit, Geometry geometry) {
@@ -184,7 +184,11 @@ public final class DemoPlaybackService {
     public record Canvas(int width, int height) {
     }
 
-    public record Component(String id, String title, String type, String metricId, String unit, Geometry geometry) {
+    public record Component(String id, String title, String type, String metricId, String unit, Geometry geometry,
+                            @JsonInclude(JsonInclude.Include.NON_NULL) String chartStyle) {
+        public Component(String id, String title, String type, String metricId, String unit, Geometry geometry) {
+            this(id, title, type, metricId, unit, geometry, null);
+        }
     }
 
     public record Geometry(int x, int y, int width, int height, int z) {
