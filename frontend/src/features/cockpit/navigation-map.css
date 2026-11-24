@@ -5,17 +5,32 @@
   min-width: 0;
   min-height: 280px;
   overflow: hidden;
-  background: #d9e5dc;
-  --map-control-ink: #18334d;
-  --map-control-line: #55799255;
-  --map-control-background: #f6fbff;
-  --map-control-shadow: 0 3px 12px #17385232;
+  background: #0e1d30;
+  --map-control-ink: #d5e9f9;
+  --map-control-line: #456689;
+  --map-control-background: #132940;
+  --map-control-shadow: 0 3px 12px #03091754;
 }
 
 .navigation-map[data-map-ready="fallback"] { background: #101f30; }
 .navigation-map-fallback, .navigation-map-surface { position: absolute; inset: 0; }
+.district-viewport-mask {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
 .navigation-map > .district-map-frame { bottom: 96px; }
-.navigation-map-surface .maplibregl-canvas:focus-visible { outline: 3px solid #1566be; outline-offset: -4px; }
+.navigation-map-surface:has(.maplibregl-canvas:focus-visible)::after {
+  position: absolute;
+  z-index: 2;
+  inset: 2px;
+  border: 2px solid #72c8f2;
+  pointer-events: none;
+  content: "";
+}
 
 .navigation-map-pin {
   display: grid;
@@ -29,16 +44,16 @@
 .navigation-map-pin::before {
   width: 10px;
   height: 10px;
-  border: 2px solid #e6f6ff;
+  border: 2px solid #d8f8ff;
   border-radius: 50%;
-  background: #225ba4;
+  background: #3196c5;
   box-shadow: 0 0 0 1px #183b6c, 0 2px 5px #15324f47;
   content: "";
 }
 
 .navigation-map-pin[data-visible="false"] { visibility: hidden; }
 .navigation-map-pin:hover, .navigation-map-pin:focus-visible { z-index: 2; }
-.navigation-map-pin:focus-visible { outline: 2px solid #193c69; outline-offset: 2px; }
+.navigation-map-pin:focus-visible { outline: 2px solid #a2edff; outline-offset: 2px; }
 
 .navigation-map-pin-label {
   position: absolute;
@@ -46,6 +61,7 @@
   left: calc(50% + 8px);
   translate: 0 -50%;
   padding: 3px 5px;
+  border: 1px solid #3b789b;
   border-radius: 4px;
   color: #f2f8ff;
   background: #163757;
@@ -99,10 +115,10 @@
 }
 
 .navigation-map-tools button + button { border-left: 1px solid var(--map-control-line); }
-.navigation-map-tools button:hover { background: #e4f2fe; }
-.navigation-map-tools button[aria-pressed="true"] { color: #fff; background: #155da4; }
+.navigation-map-tools button:hover { background: #244c70; }
+.navigation-map-tools button[aria-pressed="true"] { color: #eaf8ff; background: #20679a; }
 .navigation-map-tools button:disabled { opacity: .54; cursor: default; }
-.navigation-map-tools button:focus-visible { outline: 2px solid #296fc1; outline-offset: -3px; }
+.navigation-map-tools button:focus-visible { outline: 2px solid #9ee7f9; outline-offset: -3px; }
 .navigation-map-zoom button { font-size: 1rem; }
 
 .navigation-map .maplibregl-ctrl-bottom-left {
@@ -114,13 +130,13 @@
 .navigation-map .maplibregl-ctrl-bottom-left .maplibregl-ctrl { margin: 4px 0 0; }
 .navigation-map .maplibregl-ctrl-attrib, .navigation-map .maplibregl-ctrl-scale {
   border-color: #486785;
-  color: #234363;
-  background: #f6fbfff2;
+  color: #acc6df;
+  background: #12263b;
   font: 550 11px/1.42 system-ui, "Microsoft YaHei", sans-serif;
 }
 
 .navigation-map .maplibregl-ctrl-attrib { max-width: 100%; padding: 2px 6px; border-radius: 3px; }
-.navigation-map .maplibregl-ctrl-attrib a { color: #294e70; text-underline-offset: 2px; }
+.navigation-map .maplibregl-ctrl-attrib a { color: #c2dbf1; text-underline-offset: 2px; }
 .navigation-map .maplibregl-ctrl-scale { padding: 1px 4px; }
 
 .navigation-map-status {
@@ -142,8 +158,6 @@
   font-size: .75rem;
 }
 
-.navigation-map-status button { padding: .12rem .18rem; color: #165692; text-decoration: underline; cursor: pointer; }
-
 @media (pointer: coarse) {
   .navigation-map-tools button { min-width: 44px; min-height: 44px; }
 }
@@ -156,4 +170,9 @@
   .navigation-map > .district-map-frame { bottom: 113px; }
   .navigation-map-tools { right: 10px; bottom: 9px; }
   .navigation-map .maplibregl-ctrl-bottom-left { left: 10px; right: 10px; }
+}
+
+@container (max-width: 320px) {
+  .navigation-map-tools { right: 8px; gap: 3px; }
+  .navigation-map-tools button:last-child { padding-inline: .3rem; }
 }

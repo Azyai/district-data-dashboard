@@ -3,7 +3,9 @@ import type { ReactNode } from 'react'
 import { AttributionControl, LngLatBounds, Map as MapLibreMap, Marker, ScaleControl } from 'maplibre-gl'
 import type { PaddingOptions, RasterDEMSourceSpecification, StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import { styleCockpitBasemap } from './cockpit-map-style'
 import DistrictMap from './DistrictMap'
+import { attachDistrictViewportMask } from './district-viewport-mask'
 import './navigation-map.css'
 
 type Position = [number, number]
@@ -35,6 +37,9 @@ const elevationSource = 'mentougou-elevation'
 const reliefSource = 'mentougou-relief'
 const reliefLayer = 'mentougou-hillshade'
 const buildingLayer = 'building-3d'
+const imageryLayer = 'mentougou-sentinel-2'
+const imageryUrl = import.meta.env.BASE_URL + 'maps/mentougou-sentinel-2-20261008.webp'
+const imageryAttribution = '<a href="https://ewds.climate.copernicus.eu/licences/ec-sentinel" target="_blank" rel="noreferrer">Contains modified Copernicus Sentinel data 2026</a>'
 const elevationTiles: RasterDEMSourceSpecification = {
   type: 'raster-dem',
   tiles: ['https://elevation-tiles-prod.s3.amazonaws.com/terrarium/{z}/{x}/{y}.png'],
@@ -59,15 +64,7 @@ async function readStyle(signal: AbortSignal) {
     throw new Error('Unexpected online map style')
   }
   style.sources[baseSource] = { ...style.sources[baseSource], attribution: vectorAttribution }
-  for (const layer of style.layers) {
-    if (layer.id === buildingLayer) layer.layout = { ...layer.layout, visibility: 'none' }
-    if (layer.type === 'symbol' && JSON.stringify(layer.layout?.['text-field'] ?? '').includes('name:nonlatin')) {
-      layer.layout = { ...layer.layout, 'text-field': [
-        'coalesce', ['get', 'name:zh'], ['get', 'name:nonlatin'], ['get', 'name'], ['get', 'name:latin'], '',
-      ] }
-    }
-  }
-  return style
+  return styleCockpitBasemap(style)
 }
 
 async function readDistrict(signal: AbortSignal): Promise<District> {
@@ -102,31 +99,41 @@ function framePadding(container: HTMLElement, frame: HTMLElement): PaddingOption
   }
 }
 
+function tileArea(bounds: LngLatBounds): [number, number, number, number] {
+  return [bounds.getWest() - .04, bounds.getSouth() - .03, bounds.getEast() + .04, bounds.getNorth() + .03]
+}
+
 function addOutline(map: MapLibreMap, outline: Outline) {
   map.addSource(districtSource, { type: 'geojson', data: outline })
   const firstLabel = map.getStyle().layers.find(layer => layer.type === 'symbol')?.id
   map.addLayer({
     id: 'mentougou-context', source: districtSource, type: 'fill',
-    paint: { 'fill-color': '#467de1', 'fill-opacity': .075 },
+    paint: { 'fill-color': '#4788b5', 'fill-opacity': .085 },
+  }, firstLabel)
+  map.addLayer({
+    id: 'mentougou-boundary-halo', source: districtSource, type: 'line',
+    layout: { 'line-join': 'round' },
+    paint: { 'line-color': '#3c9eca', 'line-width': 5, 'line-opacity': .3, 'line-blur': 1.2 },
   }, firstLabel)
   map.addLayer({
     id: 'mentougou-boundary', source: districtSource, type: 'line',
     layout: { 'line-join': 'round' },
-    paint: { 'line-color': '#2349a9', 'line-width': 2.3, 'line-opacity': .86 },
+    paint: { 'line-color': '#88d6eb', 'line-width': 1.5, 'line-opacity': .93 },
   }, firstLabel)
 }
 
-function showRelief(map: MapLibreMap) {
-  map.addSource(elevationSource, { ...elevationTiles, attribution: elevationAttribution })
-  map.addSource(reliefSource, elevationTiles)
+function showRelief(map: MapLibreMap, bounds: LngLatBounds) {
+  const tiles = { ...elevationTiles, bounds: tileArea(bounds) }
+  map.addSource(elevationSource, { ...tiles, attribution: elevationAttribution })
+  map.addSource(reliefSource, tiles)
   const waterway = map.getStyle().layers.find(layer => layer.type === 'line' && layer['source-layer'] === 'waterway')?.id
   map.addLayer({
     id: reliefLayer, source: reliefSource, type: 'hillshade',
     paint: {
-      'hillshade-shadow-color': '#344b62',
-      'hillshade-highlight-color': '#f3f6e6',
-      'hillshade-accent-color': '#46655a',
-      'hillshade-exaggeration': .42,
+      'hillshade-shadow-color': '#0b1829',
+      'hillshade-highlight-color': '#81bad3',
+      'hillshade-accent-color': '#203e53',
+      'hillshade-exaggeration': .49,
       'hillshade-illumination-anchor': 'map',
     },
   }, waterway)
@@ -140,6 +147,24 @@ function hideRelief(map: MapLibreMap) {
   map.removeSource(elevationSource)
 }
 
+function setImageryLayer(map: MapLibreMap, visible: boolean) {
+  if (map.getLayer(imageryLayer)) {
+    map.setLayoutProperty(imageryLayer, 'visibility', visible ? 'visible' : 'none')
+    return
+  }
+  if (!visible) return
+  map.addSource(imageryLayer, {
+    type: 'image', url: imageryUrl,
+    coordinates: [[115.405, 40.19], [116.181, 40.19], [116.181, 39.798], [115.405, 39.798]],
+  })
+  const before = map.getLayer(reliefLayer) ? reliefLayer
+    : map.getStyle().layers.find(layer => layer.type === 'line' && layer['source-layer'] === 'waterway')?.id
+  map.addLayer({
+    id: imageryLayer, source: imageryLayer, type: 'raster',
+    paint: { 'raster-brightness-min': .06, 'raster-fade-duration': 0 },
+  }, before)
+}
+
 export default function NavigationMap({ areas, onSelectArea, fallback }: Props) {
   const root = useRef<HTMLDivElement>(null)
   const mount = useRef<HTMLDivElement>(null)
@@ -151,6 +176,7 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
   const [district, setDistrict] = useState<District>()
   const [phase, setPhase] = useState<MapPhase>('loading')
   const [mode, setMode] = useState<MapMode>('2d')
+  const [imagery, setImagery] = useState(false)
   const [camera, setCamera] = useState<Camera>({ pitch: 0, zoom: 0 })
   const [terrainNotice, setTerrainNotice] = useState(false)
 
@@ -165,8 +191,11 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
     let failed = false
     let map: MapLibreMap | null = null
     let observer: ResizeObserver | undefined
+    let detachMask: (() => void) | undefined
     const release = () => {
       observer?.disconnect()
+      detachMask?.()
+      detachMask = undefined
       if (map) map.remove()
       map = null
       mapRef.current = null
@@ -187,6 +216,8 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
     const timer = window.setTimeout(fail, 12000)
     void Promise.all([readStyle(controller.signal), readDistrict(controller.signal)]).then(([style, local]) => {
       if (cancelled || controller.signal.aborted) return
+      const source = style.sources[baseSource]
+      if (source.type === 'vector') source.bounds = tileArea(local.bounds)
       const instance = new MapLibreMap({
         container: host,
         style,
@@ -214,11 +245,11 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
       map = instance
       mapRef.current = instance
       bounds.current = local.bounds
+      detachMask = attachDistrictViewportMask(instance, local.outline)
       instance.keyboard.disableRotation()
       instance.touchZoomRotate.disableRotation()
       instance.getCanvas().setAttribute('aria-label', '北京市门头沟区导航地图')
       instance.addControl(new ScaleControl({ unit: 'metric', maxWidth: 92 }), 'bottom-left')
-      instance.addControl(new AttributionControl({ compact: false }), 'bottom-left')
       instance.on('error', () => {
         // Tile and glyph failures can be transient. The basemap deadline handles a failed initial view.
       })
@@ -262,6 +293,16 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
       release()
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || phase !== 'ready') return
+    const control = new AttributionControl({ compact: false, customAttribution: imagery ? imageryAttribution : undefined })
+    map.addControl(control, 'bottom-left')
+    return () => {
+      if (map.hasControl(control)) map.removeControl(control)
+    }
+  }, [imagery, phase])
 
   useEffect(() => {
     const map = mapRef.current
@@ -335,11 +376,12 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
 
   function changeMode(next: MapMode) {
     const map = mapRef.current
-    if (!map || next === mode) return
+    const districtBounds = bounds.current
+    if (!map || !districtBounds || next === mode) return
     window.clearTimeout(elevationTimer.current)
     setTerrainNotice(false)
     if (next === '3d') {
-      showRelief(map)
+      showRelief(map, districtBounds)
       elevationTimer.current = window.setTimeout(() => {
         if (mapRef.current !== map || !map.getSource(elevationSource)) return
         hideRelief(map)
@@ -351,6 +393,13 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
     if (map.getLayer(buildingLayer)) map.setLayoutProperty(buildingLayer, 'visibility', next === '3d' ? 'visible' : 'none')
     map.jumpTo({ pitch: next === '3d' ? 52 : 0, bearing: 0 })
     setMode(next)
+  }
+
+  function toggleImagery() {
+    const map = mapRef.current
+    if (!map) return
+    setImageryLayer(map, !imagery)
+    setImagery(!imagery)
   }
 
   return (
@@ -368,6 +417,7 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
       {phase === 'ready' && (
         <>
           <div className="navigation-map-tools" aria-label="地图操作">
+            <button type="button" aria-label="卫星影像" aria-pressed={imagery} onClick={toggleImagery}>影像</button>
             <div className="navigation-map-mode" aria-label="地图模式">
               <button type="button" aria-pressed={mode === '2d'} onClick={() => changeMode('2d')}>2D</button>
               <button type="button" aria-pressed={mode === '3d'} onClick={() => changeMode('3d')}>3D</button>
