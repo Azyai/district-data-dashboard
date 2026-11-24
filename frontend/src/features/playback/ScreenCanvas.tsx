@@ -2,17 +2,22 @@ import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react'
 import type { ComponentData, Manifest } from '../../api/client'
 import { chartStyleFor, chartStyleLabel } from './chartStyles'
 import './playback.css'
+import { TopicNetwork, topicFocusId, topicModeFor } from './TopicNetwork'
 
 const DataChart = lazy(() => import('./DataChart'))
 const numberFormat = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
 
-export function ScreenComponentContent({ component, data }: {
+export function ScreenComponentContent({ component, data, prominent = false }: {
   component: Manifest['components'][number]
   data?: ComponentData['results'][number]
+  prominent?: boolean
 }) {
   const unit = data?.unit ?? component.unit
   const plot = data?.points
   const chartStyle = chartStyleFor(component)
+  const additive = component.type === 'ranking' &&
+    (unit === '件' || (unit === '人' && component.metricId === 'age-structure') ||
+      (unit === '户' && component.metricId === 'household-structure'))
   return (
     <div className="screen-component-body" data-chart-style={chartStyle ?? 'kpi'}>
       <header className="screen-component-heading">
@@ -29,7 +34,7 @@ export function ScreenComponentContent({ component, data }: {
       ) : plot?.length ? (
         <Suspense fallback={<p className="chart-fallback" aria-busy="true">正在加载图表</p>}>
           <DataChart kind={component.type} variant={chartStyle} label={component.title} points={plot} unit={unit}
-            additive={component.type === 'ranking' && unit === '件'} />
+            additive={additive} prominent={prominent} />
         </Suspense>
       ) : <p className="chart-fallback">暂无数据</p>}
     </div>
@@ -40,6 +45,9 @@ export function ScreenCanvas({ manifest, snapshot }: { manifest: Manifest; snaps
   const area = useRef<HTMLDivElement>(null)
   const [areaSize, setAreaSize] = useState({ width: 0, height: 0 })
   const { width, height } = manifest.canvas
+  const topicMode = topicModeFor(manifest.theme)
+  const topicCompact = !!topicMode && areaSize.width > 0 && areaSize.width < 650
+  const focusId = topicMode ? topicFocusId(manifest.components) : undefined
   const scale = areaSize.width > 0 && areaSize.height > 0
     ? Math.min(areaSize.width / width, areaSize.height / height)
     : 1
@@ -56,15 +64,18 @@ export function ScreenCanvas({ manifest, snapshot }: { manifest: Manifest; snaps
   }, [])
 
   return (
-    <div ref={area} className="screen-area" data-theme={manifest.theme}>
+    <div ref={area} className="screen-area" data-theme={manifest.theme}
+      data-topic-mode={topicMode} data-topic-compact={topicCompact || undefined}>
       <div className="screen-size" style={{ width: width * scale, height: height * scale }}>
         <div className="screen-canvas" style={{ width, height, transform: 'scale(' + scale + ')' }}>
+          {topicMode && !topicCompact && <TopicNetwork theme={manifest.theme} size={manifest.canvas} components={manifest.components} />}
           {manifest.components.map(component => {
             const geometry = component.geometry
+            const focus = component.id === focusId
             return (
-              <article key={component.id} className="screen-component" data-kind={component.type}
+              <article key={component.id} className="screen-component" data-kind={component.type} data-topic-focus={focus || undefined}
                 style={{ left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height, zIndex: geometry.z }}>
-                <ScreenComponentContent component={component} data={byComponent.get(component.id)} />
+                <ScreenComponentContent component={component} data={byComponent.get(component.id)} prominent={focus} />
               </article>
             )
           })}
