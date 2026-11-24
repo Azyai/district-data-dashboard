@@ -20,7 +20,7 @@ export async function readMonitoring(signal?: AbortSignal): Promise<MonitoringCa
   return response.json()
 }
 
-export const roadColors: Record<string, string> = { 畅通: '#39e2a4', 缓行: '#f1ce69', 拥堵: '#ff924e', 严重拥堵: '#ff5371' }
+export const roadColors: Record<string, string> = { 畅通: '#2ee6a6', 缓行: '#f0c14a', 拥堵: '#ff7a32', 严重拥堵: '#ff3b5c' }
 export const number = (value: number, digits = 0) => value.toLocaleString('zh-CN', {
   minimumFractionDigits: digits, maximumFractionDigits: digits,
 })

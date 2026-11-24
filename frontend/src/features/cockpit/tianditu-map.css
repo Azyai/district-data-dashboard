@@ -1,4 +1,4 @@
-.tianditu-map { position: absolute; inset: 0; overflow: hidden; background: #1b2b3b; color: #edf7ff; }
+.tianditu-map { position: absolute; inset: 0; overflow: hidden; background: #07101c; color: #edf7ff; }
 .atlas-render { position:absolute; inset:0; isolation:isolate; z-index:0; }
 .atlas-render .maplibregl-canvas[data-area-hover] { cursor: pointer; }
 .atlas-render .maplibregl-canvas[data-orbiting] { cursor: grabbing; }

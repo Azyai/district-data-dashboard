@@ -74,7 +74,7 @@ export default function MonitoringLayers({ map, topic, area, data, selected, sta
       })
       map.addLayer({
         id: 'monitor-water-surface', type: 'fill', source: waterways, filter: false,
-        paint: { 'fill-color': '#197be9', 'fill-opacity': .82 },
+        paint: { 'fill-color': '#1a78e8', 'fill-opacity': .82 },
       }, 'towns')
       map.addLayer({
         id: 'monitor-river-line', type: 'line', source: waterways, filter: false,
