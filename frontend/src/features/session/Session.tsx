@@ -25,7 +25,7 @@ function PersonaOption({ title, description, persona, active, submit }: {
 
 function clearPrivateQueries(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.removeQueries({
-    predicate: query => query.queryKey[0] !== 'identity' && query.queryKey[0] !== 'cockpit-area',
+    predicate: query => !['identity', 'cockpit-area', 'cockpit-side-metrics'].includes(String(query.queryKey[0])),
   })
 }
 
