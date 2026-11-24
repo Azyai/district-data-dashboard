@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Alert, Button, Empty, Input, List, Modal, Select, Space, Spin, Tag } from 'antd'
+import { Alert, Button, Empty, Input, List, Modal, Space, Spin, Tag } from 'antd'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link } from 'react-router'
@@ -96,9 +96,15 @@ export function DashboardReviewPage({ identityControl }: { identityControl: Reac
     <section className="playback-heading">
       <h1 id="review-title">大屏发布审核</h1>
       <Space wrap>
-        <Select aria-label="选择审核专题" value={projectId} options={projects} disabled={decision.isPending} onChange={next => {
-          setProjectId(next); setRevision(undefined); setNote(''); decision.reset()
-        }} />
+        <select className="playback-select" aria-label="选择审核专题" value={projectId} disabled={decision.isPending}
+          onChange={event => {
+            setProjectId(event.currentTarget.value)
+            setRevision(undefined)
+            setNote('')
+            decision.reset()
+          }}>
+          {projects.map(project => <option key={project.value} value={project.value}>{project.label}</option>)}
+        </select>
         {state.data?.activeRevision && <Button onClick={() => choose(0)}>恢复系统默认版</Button>}
       </Space>
     </section>

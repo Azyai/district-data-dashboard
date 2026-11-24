@@ -1,5 +1,6 @@
 import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react'
 import type { ComponentData, Manifest } from '../../api/client'
+import { chartStyleFor, chartStyleLabel } from './chartStyles'
 import './playback.css'
 
 const DataChart = lazy(() => import('./DataChart'))
@@ -11,11 +12,15 @@ export function ScreenComponentContent({ component, data }: {
 }) {
   const unit = data?.unit ?? component.unit
   const plot = data?.points
+  const chartStyle = chartStyleFor(component)
   return (
-    <div className="screen-component-body">
+    <div className="screen-component-body" data-chart-style={chartStyle ?? 'kpi'}>
       <header className="screen-component-heading">
         <h2>{component.title}</h2>
-        {component.type !== 'kpi' && <span>单位 {unit}</span>}
+        <div className="screen-chart-meta">
+          <span className="screen-chart-type">{chartStyleLabel(component)}</span>
+          {component.type !== 'kpi' && unit && <span>{unit}</span>}
+        </div>
       </header>
       {component.type === 'kpi' ? (
         <p className="screen-metric" data-empty={typeof data?.value !== 'number'}>
@@ -23,7 +28,8 @@ export function ScreenComponentContent({ component, data }: {
         </p>
       ) : plot?.length ? (
         <Suspense fallback={<p className="chart-fallback" aria-busy="true">正在加载图表</p>}>
-          <DataChart kind={component.type} label={component.title} points={plot} unit={unit} />
+          <DataChart kind={component.type} variant={chartStyle} label={component.title} points={plot} unit={unit}
+            additive={component.type === 'ranking' && unit === '件'} />
         </Suspense>
       ) : <p className="chart-fallback">暂无数据</p>}
     </div>
