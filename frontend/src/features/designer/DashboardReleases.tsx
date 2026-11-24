@@ -6,6 +6,7 @@ import { Link } from 'react-router'
 import { request, writeRequest } from '../../api/client'
 import type { components } from '../../api/generated/openapi'
 import { ScreenCanvas } from '../playback/ScreenCanvas'
+import { dashboardProjects } from './dashboardProjects'
 import { previewDraft } from './draftLayout'
 import type { DraftWorkspace } from './designerApi'
 
@@ -14,7 +15,6 @@ type Review = components['schemas']['DashboardReleaseReview']
 
 const date = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Asia/Shanghai' })
 const statuses = { PENDING: '待审核', APPROVED: '已通过', RETURNED: '已退回' }
-const projects = [{ value: 'city-operations', label: '城市运行' }, { value: 'public-services', label: '政务服务' }]
 
 function releasePath(projectId: string, reviewer: boolean) {
   const project = encodeURIComponent(projectId)
@@ -63,7 +63,7 @@ export default function DashboardReleases({ projectId, revision, disabled }: {
 }
 
 export function DashboardReviewPage({ identityControl }: { identityControl: ReactNode }) {
-  const [projectId, setProjectId] = useState(projects[0].value)
+  const [projectId, setProjectId] = useState<string>(dashboardProjects[0].id)
   const [revision, setRevision] = useState<number>()
   const [note, setNote] = useState('')
   const path = releasePath(projectId, true)
@@ -103,7 +103,7 @@ export function DashboardReviewPage({ identityControl }: { identityControl: Reac
             setNote('')
             decision.reset()
           }}>
-          {projects.map(project => <option key={project.value} value={project.value}>{project.label}</option>)}
+          {dashboardProjects.map(project => <option key={project.id} value={project.id}>{project.name}</option>)}
         </select>
         {state.data?.activeRevision && <Button onClick={() => choose(0)}>恢复系统默认版</Button>}
       </Space>
