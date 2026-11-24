@@ -4,6 +4,7 @@ import { Link } from 'react-router'
 import { ApiError, type CockpitArea } from '../../api/client'
 import { type SnapshotAnswer } from './answer'
 import { demoTranscription, type TranscriptionState } from './transcription'
+import { useMicrophone } from './useMicrophone'
 import './assistant.css'
 
 export type AssistantReply = {
@@ -20,9 +21,10 @@ type AssistantContentProps = {
 type Turn = AssistantReply & { id: number; question: string }
 
 const examples = [
+  '打开人口专题',
+  '哪类诉求最多？',
+  '看水务数据',
   '看大台街道的数据',
-  '这里有哪些问题？',
-  '治理事件受理量是多少？',
 ]
 
 const dateTime = new Intl.DateTimeFormat('zh-CN', {
@@ -54,6 +56,7 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
   const [speaking, setSpeaking] = useState(false)
   const [working, setWorking] = useState(false)
   const [error, setError] = useState('')
+  const microphone = useMicrophone()
   const nextTurn = useRef(0)
   const pendingTranscript = useRef<AbortController>(null)
   const pendingQuestion = useRef<AbortController>(null)
@@ -105,6 +108,7 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
     if (!normalized || pendingQuestion.current) return
     stopReading()
     stopTranscription()
+    if (microphone.active) microphone.cancel()
     setError('')
     setQuestion(normalized)
     setWorking(true)
@@ -178,7 +182,7 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
     <div className="voice-assistant-body">
       <div className="voice-assistant-context">
         <p className="voice-assistant-scope">{area.name}</p>
-        <p>查询指标、查看问题或切换区域。</p>
+        <p>打开专题、查询指标或切换区域。</p>
       </div>
       <ol ref={transcriptLog} className="voice-assistant-log" role="log" aria-label="问数记录">
         {turns.map(turn => (
@@ -212,11 +216,12 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
             <input
               id={inputId}
               value={question}
-              placeholder="例如：大台有哪些问题？"
+              placeholder="例如：哪个监测点达标率最低？"
               maxLength={160}
               disabled={working}
               onChange={event => {
                 if (transcribing) stopTranscription()
+                if (microphone.active) microphone.cancel()
                 setQuestion(event.target.value)
               }}
             />
@@ -224,14 +229,17 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
           </div>
         </form>
         <div className="voice-assistant-actions">
-          <button type="button" disabled={working} onClick={transcribing ? stopTranscription : simulateVoice}>
+          <button type="button" disabled={working || transcribing} onClick={() => microphone.listen(text => void ask(text))}>
+            {microphone.active ? '取消录音' : '语音提问'}
+          </button>
+          <button type="button" disabled={working || microphone.active} onClick={transcribing ? stopTranscription : simulateVoice}>
             {transcribing ? '取消模拟转写' : '模拟语音转写'}
           </button>
           {latest && systemVoice && (
             <button type="button" onClick={readAnswer}>{speaking ? '停止朗读' : '朗读回复'}</button>
           )}
         </div>
-        <p className="voice-assistant-status" role="status">{transcriptionStatus(transcription)}</p>
+        <p className="voice-assistant-status" role="status">{transcriptionStatus(transcription) || microphone.status}</p>
         {error && <p className="voice-assistant-error" role="alert">{error}</p>}
       </div>
     </div>
