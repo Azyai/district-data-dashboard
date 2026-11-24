@@ -1,6 +1,6 @@
 # 区政府数字大屏
 
-P2 演示打开即进入门头沟区全域驾驶舱，支持区、镇街、村社区下钻和合成数据问数。常规身份核验后保留驾驶舱，政务服务专项身份进入授权专题。页面、接口及数据库种数使用合成数据。
+本地演示打开即进入门头沟区全域驾驶舱，支持区、镇街和村社切换。区域指标、人口、接诉即办和水务均有独立数据页。常规身份核验后保留驾驶舱入口，政务服务专项身份进入授权专题。业务读数使用合成数据。
 
 ## 本地启动
 
@@ -21,7 +21,9 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-打开 [门头沟区演示驾驶舱](http://127.0.0.1:5173)，直接浏览全域数据。用地图节点或区域列表下钻，右上角可核验演示身份。Web 应用通过同源 `/api` 代理访问本机 8080。演示 profile 使用内存 H2 数据库，启动时由 Flyway 建表并载入合成数据。演示会话只在显式启用该 profile 时可用。
+打开驾驶舱后，用地图节点或区域目录切换区划。右上角显示实时北京时间。二维左键拖动平移，三维左键拖动旋转和俯仰，滚轮缩放范围为 50 米至 5 公里。身份核验在数据工作台。 [门头沟区演示驾驶舱](http://127.0.0.1:5173) · [地图资源准备](frontend/public/maps/README.md)
+
+Web 应用通过同源 `/api` 代理访问本机 8080。演示 profile 使用内存 H2 数据库，启动时由 Flyway 建表并载入合成数据。演示会话只在显式启用该 profile 时可用。
 
 | 入口 | 默认端口 | 配置 |
 | --- | --- | --- |
@@ -39,11 +41,11 @@ pnpm dev
 java -jar backend/bootstrap/target/district-dashboard.jar --spring.profiles.active=demo,mysql
 ```
 
-顶部“AI 问数”打开浮层，输入“看大台街道的数据”进入对应区域，输入“大台有哪些问题”打开问题弹窗。运行态势也可手动查看问题。AI4BI 读取当前区域快照，语音入口提供模拟转写。正式 ASR 预留豆包流式语音识别模型 2.0，服务端适配器在获批后配置。
+在数据工作台打开“AI 问数”。输入“看大台街道的数据”打开区域数据页，输入“打开水务专题”进入水务页。问数读取当前区域快照，语音入口提供模拟转写。正式 ASR 预留豆包流式语音识别模型 2.0，服务端适配器在获批后配置。 [数据工作台](http://127.0.0.1:5173/workbench)
 
 ## P2 数据接入
 
-从驾驶舱进入 [数据管理](http://127.0.0.1:5173/admin)，选择演示数据管理员。来源流程依次为配置、测试预览、同步。指标表单从成功数据集中选择度量，支持求和、分子分母汇总后计算比率。发布后可回到驾驶舱查看同一指标和来源批次，也可用 AI4BI 问当前区域的最新数值。现有草稿、来源版本和历史运行可追溯。
+在数据管理选择演示数据管理员。来源流程依次为配置、测试预览和同步。指标表单从成功数据集中选择度量，支持求和、分子分母汇总后计算比率。发布后可在区域数据页查看指标和来源批次，也可用 AI4BI 问当前区域的最新数值。来源、指标版本和历史运行可追溯。 [数据管理](http://127.0.0.1:5173/admin)
 
 - CSV 可直接上传 [空气观测样例](fixtures/p2/air-observations.csv)，字段映射为 `region/date/measure/value/denominator`。
 - HTTPS 夹具通过 JDK keytool 生成独立演示信任库。启动后有 `/data.json`、`/alternate.json` 和带错误行的 `/invalid.json`。应用按登记的准确地址访问，始终校验证书。
@@ -68,15 +70,20 @@ java "-Djavax.net.ssl.trustStore=$fixtureTrust" '-Djavax.net.ssl.trustStoreType=
 
 三种夹具同时可用时，可在独立空的演示目录执行 `node scripts/p2-smoke.mjs` 生成验收配置并验证发布结果。管理后台浏览器回归使用 `pnpm --dir frontend test:e2e:admin`，有三路已登记夹具时可设 `E2E_VERIFY_ALL_CONNECTORS=1`。
 
-## P3 大屏编排
+## P3 独立数据页
 
-使用新版后端启动后，进入 **数据管理 > 大屏编排** 并选择演示数据管理员。在城市运行和政务服务两个专题中，可添加指标组件、拖动和调整大小、修改标题与绑定、调整图层、撤销或重做。预览使用专题的模拟快照及与播放页相同的组件渲染。
+| 入口 | 路径 |
+| --- | --- |
+| 大台街道区域数据 | [/data/areas/datai](http://127.0.0.1:5173/data/areas/datai) |
+| 人口专题 | [/topics/population](http://127.0.0.1:5173/topics/population) |
+| 接诉即办 | [/topics/hotline](http://127.0.0.1:5173/topics/hotline) |
+| 水务专题 | [/topics/water](http://127.0.0.1:5173/topics/water) |
 
-保存草稿会按版本写入数据库。版本冲突时，工作台保留当前编辑，由管理员决定是否加载服务器草稿。Flyway V6 创建草稿表，演示内存库中的草稿可在同一服务实例内刷新恢复。使用持久数据库的演示实例可跨服务重启保留草稿。
+独立页可直接打开、刷新，也可由工作台智能体按已登记意图跳转。专题布局与指标对应关系随前端版本交付，已授权的数据版本从后端加载。政务服务专项入口仍由演示身份核验提供。
 
 ## 验证
 
-在前后端运行时从项目根目录执行接口冒烟，通过 Vite 代理校验会话、推荐和播放链路。
+在前后端运行时从项目根目录执行接口冒烟，通过 Vite 代理校验会话、推荐和授权展示链路。
 
 ```powershell
 node scripts/smoke.mjs http://127.0.0.1:5173
@@ -85,10 +92,9 @@ pnpm --dir frontend contracts:check
 pnpm --dir frontend lint
 pnpm --dir frontend typecheck
 pnpm --dir frontend test:intent
-pnpm --dir frontend test:layout
 pnpm --dir frontend build
 pnpm --dir frontend test:e2e
-pnpm --dir frontend test:e2e:designer
+pnpm --dir frontend test:e2e:topics
 ```
 
 端到端测试需要 Chromium。未安装时运行 `pnpm --dir frontend exec playwright install chromium`。后台健康探针位于 [本机 8081](http://127.0.0.1:8081/actuator/health)，演示接口契约位于 [contracts/openapi.json](contracts/openapi.json)。
