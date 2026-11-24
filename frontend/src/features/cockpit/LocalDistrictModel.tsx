@@ -1,15 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   AmbientLight, Box3, BufferAttribute, Color, DirectionalLight, Mesh, MeshBasicMaterial,
-  MeshStandardMaterial, OrthographicCamera, Scene, Vector3, WebGLRenderer,
+  MeshStandardMaterial, OrthographicCamera, Raycaster, Scene, Vector2, Vector3, WebGLRenderer,
 } from 'three'
 import type { Object3D } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import './local-model.css'
 
-const assetUrl = import.meta.env.BASE_URL + 'maps/local-model/mentougou.glb'
-const maximumAssetBytes = 4_500_000
+const assetRoot = import.meta.env.BASE_URL + 'maps/local-model/'
+const landmarkFiles = { tianjie: { label: '天街', file: 'tianjie.glb' }, jingxi: { label: '京西智谷', file: 'jingxi.glb' } }
+const surfaceLabels = { terrain: '地形', roads: '路网', water: '水系' }
+type Surface = keyof typeof surfaceLabels
+type Landmark = keyof typeof landmarkFiles
+type Pick = { label: string; source: string; height?: number }
+
+async function readModel(file: string, limit: number, signal: AbortSignal) {
+  const response = await fetch(assetRoot + file, { signal })
+  if (!response.ok || Number(response.headers.get('Content-Length')) > limit) throw new Error('Local model unavailable')
+  const bytes = await response.arrayBuffer()
+  if (bytes.byteLength < 20 || bytes.byteLength > limit || new DataView(bytes).getUint32(0) !== 0x676c5446) {
+    throw new Error('Invalid local model payload')
+  }
+  return (await new GLTFLoader().parseAsync(bytes, '')).scene
+}
 
 function releaseModel(object: Object3D) {
   object.traverse(child => {
@@ -53,13 +67,16 @@ function applyModelStyle(object: Object3D) {
   water.position.y += 12
 }
 
-type ModelTools = { zoom: (amount: number) => void; reset: () => void }
+type ModelTools = { zoom: (amount: number) => void; reset: () => void; landmark: (id: Landmark) => Promise<void> }
 type ModelPhase = 'loading' | 'ready' | 'unavailable'
 
 export default function LocalDistrictModel() {
   const mount = useRef<HTMLDivElement>(null)
   const tools = useRef<ModelTools | undefined>(undefined)
   const [phase, setPhase] = useState<ModelPhase>('loading')
+  const [picked, setPicked] = useState<Pick>()
+  const [landmarkPending, setLandmarkPending] = useState<Landmark>()
+  const [landmarkError, setLandmarkError] = useState(false)
 
   useEffect(() => {
     const element = mount.current
@@ -69,18 +86,11 @@ export default function LocalDistrictModel() {
     let renderer: WebGLRenderer | undefined
     let controls: OrbitControls | undefined
     let observer: ResizeObserver | undefined
+    let unbindPicking: (() => void) | undefined
     let frame = 0
 
     async function initialize(host: HTMLDivElement) {
-      const response = await fetch(assetUrl, { signal: controller.signal })
-      if (!response.ok || Number(response.headers.get('Content-Length')) > maximumAssetBytes) {
-        throw new Error('Local district model unavailable')
-      }
-      const bytes = await response.arrayBuffer()
-      if (bytes.byteLength < 20 || bytes.byteLength > maximumAssetBytes || new DataView(bytes).getUint32(0) !== 0x676c5446) {
-        throw new Error('Invalid local district model payload')
-      }
-      const { scene: localModel } = await new GLTFLoader().parseAsync(bytes, '')
+      const localModel = await readModel('mentougou.glb', 4_500_000, controller.signal)
       if (controller.signal.aborted) {
         releaseModel(localModel)
         return
@@ -113,6 +123,35 @@ export default function LocalDistrictModel() {
       orbit.update()
       orbit.saveState()
       surface.domElement.style.touchAction = 'pan-y'
+      const ray = new Raycaster()
+      const pointer = new Vector2()
+      let down: { x: number; y: number } | undefined
+      const startPick = (event: PointerEvent) => { down = { x: event.clientX, y: event.clientY } }
+      const endPick = (event: PointerEvent) => {
+        const start = down
+        down = undefined
+        if (!start || event.button !== 0 || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 5) return
+        const rect = surface.domElement.getBoundingClientRect()
+        pointer.set((event.clientX - rect.left) * 2 / rect.width - 1, 1 - (event.clientY - rect.top) * 2 / rect.height)
+        ray.setFromCamera(pointer, camera)
+        const hit = ray.intersectObjects(localModel.children, true)[0]
+        if (!hit) return
+        const { landmarkLabel } = hit.object.userData
+        if (typeof landmarkLabel === 'string') {
+          setPicked({ label: landmarkLabel, source: '天街和京西智谷模型' })
+          return
+        }
+        const name = hit.object.name as Surface
+        if (!Object.hasOwn(surfaceLabels, name)) return
+        const offset = name === 'roads' ? 18 : name === 'water' ? 12 : 0
+        setPicked({ ...surfaceDetail(name), height: Math.round(localModel.worldToLocal(hit.point).y - offset) })
+      }
+      surface.domElement.addEventListener('pointerdown', startPick)
+      surface.domElement.addEventListener('pointerup', endPick)
+      unbindPicking = () => {
+        surface.domElement.removeEventListener('pointerdown', startPick)
+        surface.domElement.removeEventListener('pointerup', endPick)
+      }
       const draw = () => {
         if (frame) return
         frame = requestAnimationFrame(() => {
@@ -133,15 +172,47 @@ export default function LocalDistrictModel() {
         surface.setSize(width, height, false)
         draw()
       }
+      const loadedLandmarks = new Map<Landmark, Object3D>()
       tools.current = {
         zoom: amount => {
-          camera.zoom = Math.max(.75, Math.min(5, camera.zoom * amount))
+          camera.zoom = Math.max(.75, Math.min(200, camera.zoom * amount))
           camera.updateProjectionMatrix()
           draw()
         },
         reset: () => {
           orbit.reset()
+          setPicked(undefined)
           draw()
+        },
+        landmark: async id => {
+          const config = landmarkFiles[id]
+          let object = loadedLandmarks.get(id)
+          if (!object) {
+            object = await readModel(config.file, 8_000_000, controller.signal)
+            if (controller.signal.aborted) {
+              releaseModel(object)
+              return
+            }
+            object.traverse(child => {
+              if (!(child instanceof Mesh)) return
+              child.geometry.computeVertexNormals()
+              child.material.dispose()
+              child.material = new MeshStandardMaterial({ color: '#bfd8e5', roughness: .73 })
+              child.userData.landmarkLabel = config.label
+            })
+            localModel.add(object)
+            loadedLandmarks.set(id, object)
+          }
+          const detail = new Box3().setFromObject(object)
+          const dimensions = detail.getSize(new Vector3())
+          const offset = camera.position.clone().sub(orbit.target)
+          orbit.target.copy(detail.getCenter(new Vector3()))
+          camera.position.copy(orbit.target).add(offset)
+          camera.zoom = Math.min(160, size.x * .58 / Math.max(.25, dimensions.x, dimensions.z))
+          camera.updateProjectionMatrix()
+          orbit.update()
+          draw()
+          setPicked({ label: config.label, source: '天街和京西智谷模型' })
         },
       }
       orbit.addEventListener('change', draw)
@@ -159,6 +230,7 @@ export default function LocalDistrictModel() {
       cancelAnimationFrame(frame)
       observer?.disconnect()
       controls?.dispose()
+      unbindPicking?.()
       if (model) releaseModel(model)
       renderer?.dispose()
       renderer?.forceContextLoss()
@@ -167,6 +239,20 @@ export default function LocalDistrictModel() {
     }
   }, [])
 
+  async function showLandmark(id: Landmark) {
+    const current = tools.current
+    if (!current || landmarkPending) return
+    setLandmarkPending(id)
+    setLandmarkError(false)
+    try {
+      await current.landmark(id)
+    } catch {
+      setLandmarkError(true)
+    } finally {
+      setLandmarkPending(undefined)
+    }
+  }
+
   return (
     <section className="district-local-model" data-model-ready={phase} aria-label="门头沟区本地三维模型">
       <div className="district-local-model-canvas" ref={mount} />
@@ -174,10 +260,26 @@ export default function LocalDistrictModel() {
       {phase === 'unavailable' && <p className="district-model-state" role="status">本地三维模型暂不可用</p>}
       {phase === 'ready' && (
         <>
+          <div className="district-local-landmarks" aria-label="重点地标">
+            {(Object.keys(landmarkFiles) as Landmark[]).map(id => (
+              <button key={id} type="button" disabled={Boolean(landmarkPending)} onClick={() => void showLandmark(id)}>
+                {landmarkPending === id ? `加载${landmarkFiles[id].label}` : landmarkFiles[id].label}
+              </button>
+            ))}
+            {landmarkError && <span role="status">地标模型暂不可用</span>}
+          </div>
+          {picked && (
+            <aside className="district-local-model-detail" aria-label="模型要素详情">
+              <strong>{picked.label}</strong>
+              <span>{picked.source}</span>
+              {typeof picked.height === 'number' && <span>模型高程 {picked.height} 米</span>}
+              <button type="button" onClick={() => setPicked(undefined)}>关闭详情</button>
+            </aside>
+          )}
           <ul className="district-local-model-key" aria-label="模型图例">
-            <li data-surface="terrain">地形</li>
-            <li data-surface="roads">路网</li>
-            <li data-surface="water">水系</li>
+            {(Object.keys(surfaceLabels) as Surface[]).map(key => (
+              <li key={key} data-surface={key}><button type="button" onClick={() => setPicked(surfaceDetail(key))}>{surfaceLabels[key]}</button></li>
+            ))}
           </ul>
           <div className="navigation-map-tools" role="group" aria-label="本地模型操作">
             <div className="navigation-map-zoom">
@@ -190,4 +292,9 @@ export default function LocalDistrictModel() {
       )}
     </section>
   )
+}
+
+function surfaceDetail(key: Surface): Pick {
+  const source = key === 'terrain' ? '门头沟地形' : key === 'roads' ? '路网' : '水域'
+  return { label: surfaceLabels[key], source: `${source}模型` }
 }

@@ -34,9 +34,55 @@
 }
 
 .district-local-model-key li { display: flex; align-items: center; gap: 5px; }
+.district-local-model-key button { padding: .2rem .05rem; cursor: pointer; }
+.district-local-model-key button:hover { color: #f0f9ff; }
 .district-local-model-key li::before { width: 7px; height: 7px; border-radius: 2px; background: #709cae; content: ''; }
 .district-local-model-key [data-surface='roads']::before { background: #d9b376; }
 .district-local-model-key [data-surface='water']::before { background: #46bef4; }
+
+.district-local-landmarks, .district-local-model-detail {
+  position: absolute;
+  z-index: 2;
+  left: calc(var(--district-map-inset-left, 0px) + 14px);
+  display: flex;
+  gap: .45rem;
+  color: #c8e1f3;
+  font-size: .75rem;
+}
+
+.district-local-landmarks {
+  top: 13px;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: calc(100% - 100px);
+}
+
+.district-local-landmarks button, .district-local-model-detail button {
+  min-height: 36px;
+  padding: .2rem .55rem;
+  border: 1px solid #426c8a;
+  border-radius: 6px;
+  color: #e0f0ff;
+  background: #143650;
+  cursor: pointer;
+}
+
+.district-local-landmarks button:hover, .district-local-model-detail button:hover { background: #24597d; }
+.district-local-landmarks button:disabled { opacity: .67; cursor: wait; }
+.district-local-model :is(button, select):focus-visible { outline: 2px solid #9ee7f9; outline-offset: 1px; }
+
+.district-local-model-detail {
+  bottom: 58px;
+  max-width: min(14rem, calc(100% - 24px));
+  align-items: flex-start;
+  flex-direction: column;
+  padding: .55rem .7rem;
+  border: 1px solid #426c8a;
+  border-radius: 7px;
+  background: #0c2237ef;
+}
+
+.district-local-model-detail strong { color: #edf8ff; }
 
 .district-model-state {
   position: absolute;
@@ -52,4 +98,6 @@
 @container (max-width: 450px) {
   .district-local-model-canvas { bottom: 85px; }
   .district-local-model-key { left: 12px; bottom: 64px; }
+  .district-local-landmarks { top: 10px; left: 10px; }
+  .district-local-model-detail { left: 10px; bottom: 96px; }
 }
