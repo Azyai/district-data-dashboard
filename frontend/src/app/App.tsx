@@ -142,8 +142,7 @@ export function App() {
                         : <Navigate to="/" replace />
                     } />
                     <Route path="/admin/*" element={<Administration session={session} />} />
-                    <Route path="/review" element={session.checking ? <Loading /> : session.identity?.roles.includes('DASHBOARD_REVIEWER')
-                      ? <DashboardReviewPage identityControl={session.control} /> : <Navigate to="/" replace />} />
+                    <Route path="/review" element={<DashboardReviewPage session={session} />} />
                     <Route path="/workbench" element={<Navigate to="/" replace />} />
                     <Route path="*" element={<main className="center-state"><h1>页面不存在</h1><Link to="/" className="action-link">返回驾驶舱</Link></main>} />
                   </Routes>

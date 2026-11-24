@@ -6,6 +6,7 @@ import { Link } from 'react-router'
 import { request, writeRequest } from '../../api/client'
 import type { components } from '../../api/generated/openapi'
 import { ScreenCanvas } from '../playback/ScreenCanvas'
+import type { SessionState } from '../session/Session'
 import { dashboardProjects } from './dashboardProjects'
 import { previewDraft } from './draftLayout'
 import type { DraftWorkspace } from './designerApi'
@@ -62,7 +63,35 @@ export default function DashboardReleases({ projectId, revision, disabled }: {
   </>
 }
 
-export function DashboardReviewPage({ identityControl }: { identityControl: ReactNode }) {
+function ReviewNavigation({ children }: { children?: ReactNode }) {
+  return (
+    <header className="playback-bar">
+      <Link to="/admin" className="playback-back"><i aria-hidden="true" />返回数据管理</Link>
+      {children}
+    </header>
+  )
+}
+
+export function DashboardReviewPage({ session }: { session: SessionState }) {
+  if (session.identity?.roles.includes('DASHBOARD_REVIEWER')) {
+    return <ReviewWorkspace busy={session.busy} onSignOut={session.signOut} />
+  }
+  return (
+    <main className="playback-shell" data-theme="city" aria-labelledby="review-access">
+      <ReviewNavigation />
+      <section className="review-access">
+        {session.checking ? <><Spin /><p role="status">正在检查审核会话</p></> : <>
+          <h1 id="review-access">发布审核员核验</h1>
+          <p>核验后可检查送审画布并决定是否发布。</p>
+          <Button type="primary" onClick={session.signInForReview} loading={session.busy}>使用演示审核员</Button>
+          {session.error && <Alert type="error" title={session.error.message} />}
+        </>}
+      </section>
+    </main>
+  )
+}
+
+function ReviewWorkspace({ busy, onSignOut }: { busy: boolean; onSignOut: () => void }) {
   const [projectId, setProjectId] = useState<string>(dashboardProjects[0].id)
   const [revision, setRevision] = useState<number>()
   const [note, setNote] = useState('')
@@ -89,10 +118,7 @@ export function DashboardReviewPage({ identityControl }: { identityControl: Reac
   }
 
   return <main className="playback-shell" data-theme="city" aria-labelledby="review-title">
-    <header className="playback-bar">
-      <Link to="/" className="playback-back"><i aria-hidden="true" />返回驾驶舱</Link>
-      {identityControl}
-    </header>
+    <ReviewNavigation><Button onClick={onSignOut} loading={busy}>退出审核</Button></ReviewNavigation>
     <section className="playback-heading">
       <h1 id="review-title">大屏发布审核</h1>
       <Space wrap>
