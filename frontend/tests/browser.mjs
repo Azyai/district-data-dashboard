@@ -42,11 +42,46 @@ async function verifyLocalModel(page) {
   const model = page.locator('.district-local-model[data-model-ready="ready"]')
   const initialLayout = await mapLayout(page)
   await model.getByRole('link', { name: '查看全区人口专题' }).waitFor()
-  await model.getByRole('button', { name: '2D', exact: true }).click()
-  assert.equal(await model.getAttribute('data-view'), '2d')
-  await model.getByRole('button', { name: '3D', exact: true }).click()
-  assert.equal(await model.getAttribute('data-view'), '3d')
-  await model.getByRole('button', { name: '放大模型', exact: true }).click()
+
+  const markerGeometry = () => {
+    const read = selector => {
+      const rect = document.querySelector(selector)?.getBoundingClientRect()
+      return rect ? { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 } : null
+    }
+    const population = read('.model-population')
+    const town = read('.model-place[data-place="datai"]')
+    return population && town && {
+      ...population, separation: Math.hypot(population.x - town.x, population.y - town.y),
+    }
+  }
+  for (const view of ['2D', '3D']) {
+    await model.getByRole('button', { name: view, exact: true }).click()
+    assert.equal(await model.getAttribute('data-view'), view.toLowerCase())
+    await model.getByRole('button', { name: '复位视角', exact: true }).click()
+    await mapLayout(page)
+    const start = await page.evaluate(markerGeometry)
+    assert(start?.separation > 1)
+    await page.mouse.move(start.x, start.y)
+    await page.mouse.wheel(0, -100)
+    await mapLayout(page)
+    const larger = await page.evaluate(markerGeometry)
+    assert(larger?.separation > start.separation * 1.12, view + ' wheel up should magnify the scene')
+    assert(Math.hypot(larger.x - start.x, larger.y - start.y) < 2, view + ' keeps the cursor anchor')
+    await page.mouse.wheel(0, 100)
+    await mapLayout(page)
+    const restored = await page.evaluate(markerGeometry)
+    assert(Math.abs(restored.separation - start.separation) < 2, view + ' wheel down should shrink the scene')
+  }
+  assert.equal(await model.getByRole('button', { name: /放大模型|缩小模型/ }).count(), 0)
+  const canvas = model.locator('canvas')
+  await canvas.focus()
+  const previous = await page.evaluate(markerGeometry)
+  await canvas.press('+')
+  await page.waitForFunction(({ x, y }) => {
+    const marker = document.querySelector('.model-population')?.getBoundingClientRect()
+    return marker && Math.hypot(marker.x + marker.width / 2 - x, marker.y + marker.height / 2 - y) > 1
+  }, previous)
+  assert((await page.evaluate(markerGeometry))?.separation > previous.separation, 'Keyboard zoom should remain available')
   await model.getByRole('button', { name: '复位视角', exact: true }).click()
   assert.deepEqual(await mapLayout(page), initialLayout)
   assert.equal(await page.getByRole('button', { name: /行政地图|区域地图|行政区划/ }).count(), 0)
@@ -105,12 +140,15 @@ try {
     await page.setViewportSize({ width: 1440, height: 900 })
   }
 
+  const districtCanvas = await page.locator('.district-local-model canvas').elementHandle()
   await page.locator('.region-picker > summary').click()
   const town = page.getByRole('navigation', { name: '下辖区域' }).getByRole('link', { name: '大峪街道' })
   await town.focus()
   await town.press('Enter')
   await page.waitForURL('**/areas/dayu')
   await waitForArea(page, '大峪街道')
+  assert.equal(await page.locator('.district-local-model canvas').evaluate((canvas, before) => canvas === before, districtCanvas), true,
+    'Town drill-down should reuse the loaded district model')
   await capture(page, 'cockpit-town.png')
 
   await page.locator('.region-picker > summary').click()
@@ -170,7 +208,7 @@ try {
   await verifyLocalModel(page)
   await verifyRegionMenuLayout(page)
   assert.deepEqual(externalMapRequests, [], 'District and regional models use local assets')
-  console.log('PASS local district model, 2D/3D, zoom/reset and stable panel layout at 1072px and 390px')
+  console.log('PASS local model, pointer-anchored 2D/3D wheel zoom, keyboard zoom and stable layout at 1072px and 390px')
   await capture(page, 'cockpit-mobile.png')
   await verifyAs(page, /政务服务专项/)
   await page.waitForURL('**/play/public-services')

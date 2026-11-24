@@ -29,6 +29,7 @@
 .district-local-model:not([data-model-ready="ready"]) .district-local-model-canvas { visibility: hidden; }
 .district-local-model-canvas canvas:active { cursor: grabbing; }
 .district-local-model[data-view="2d"] canvas { cursor: crosshair; }
+.district-local-model-canvas canvas:focus-visible { outline: 1px solid #9ee7f9; outline-offset: -3px; }
 
 .model-population, .model-place, .model-twin-point {
   position: absolute;
@@ -238,6 +239,11 @@
 .local-model-tools button:hover { background: #244c70; }
 .local-model-tools button[aria-pressed="true"] { color: #eaf8ff; background: #20679a; }
 .local-model-tools button:focus-visible { outline-offset: -3px; }
+.local-model-zoom-hint { margin-inline-end: .25rem; color: #b3cbd9; }
+
+@media (hover: none) {
+  .local-model-zoom-hint { display: none; }
+}
 .model-region-note {
   position: absolute;
   left: 15px;

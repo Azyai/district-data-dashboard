@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { skipToken, useQuery } from '@tanstack/react-query'
 import {
   AmbientLight, Box3, BufferAttribute, Color, DirectionalLight, Mesh, MeshBasicMaterial,
-  MeshStandardMaterial, OrthographicCamera, Raycaster, Scene, SRGBColorSpace, TextureLoader, Vector2, Vector3, WebGLRenderer,
+  MeshStandardMaterial, OrthographicCamera, Raycaster, Scene, SRGBColorSpace, Texture, TextureLoader, Vector2, Vector3, WebGLRenderer,
 } from 'three'
-import type { Object3D, Texture } from 'three'
+import type { BufferGeometry, Material, Object3D } from 'three'
 import { Link } from 'react-router'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
@@ -20,6 +20,9 @@ import './local-model.css'
 const assetRoot = import.meta.env.BASE_URL + 'maps/local-model/'
 const mapRoot = import.meta.env.BASE_URL + 'maps/'
 const imageryBounds = { west: 115.405, east: 116.181, south: 39.798, north: 40.19 }
+const districtModelLimit = 26_000_000
+const twinModelLimit = 26_000_000
+const renderPixelLimit = 8_300_000
 const surfaceLabels = { terrain: '地形', roads: '路网', water: '水系' }
 type Surface = keyof typeof surfaceLabels
 type Pick = { label: string; source: string; height?: number }
@@ -49,16 +52,46 @@ async function readModel(file: string, limit: number, signal: AbortSignal) {
   if (bytes.byteLength < 20 || bytes.byteLength > limit || new DataView(bytes).getUint32(0) !== 0x676c5446) {
     throw new Error('Invalid local model payload')
   }
-  return (await new GLTFLoader().parseAsync(bytes, '')).scene
+  return (await new GLTFLoader().parseAsync(bytes, assetRoot)).scene
+}
+
+async function readDetailedModel(file: string, twin: boolean, signal: AbortSignal) {
+  try {
+    return await readModel(file.replace(/\.glb$/, '-hd.glb'), twin ? twinModelLimit : districtModelLimit, signal)
+  } catch {
+    signal.throwIfAborted()
+    return readModel(file, twin ? 8_000_000 : 4_500_000, signal)
+  }
+}
+
+function modelResources(object: Object3D) {
+  const geometries = new Set<BufferGeometry>()
+  const materials = new Set<Material>()
+  const textures = new Set<Texture>()
+  object.traverse(child => {
+    if (!(child instanceof Mesh)) return
+    geometries.add(child.geometry)
+    for (const material of Array.isArray(child.material) ? child.material : [child.material]) {
+      if (materials.has(material)) continue
+      materials.add(material)
+      for (const value of Object.values(material)) {
+        if (value instanceof Texture) textures.add(value)
+      }
+    }
+  })
+  return { geometries, materials, textures }
 }
 
 function releaseModel(object: Object3D) {
-  object.traverse(child => {
-    if (!(child instanceof Mesh)) return
-    child.geometry.dispose()
-    const materials = Array.isArray(child.material) ? child.material : [child.material]
-    for (const material of materials) material.dispose()
-  })
+  const { geometries, materials, textures } = modelResources(object)
+  const bitmaps = new Set<ImageBitmap>()
+  for (const texture of textures) {
+    if (typeof ImageBitmap !== 'undefined' && texture.image instanceof ImageBitmap) bitmaps.add(texture.image)
+    texture.dispose()
+  }
+  for (const bitmap of bitmaps) bitmap.close()
+  for (const geometry of geometries) geometry.dispose()
+  for (const material of materials) material.dispose()
 }
 
 function applyModelStyle(object: Object3D) {
@@ -70,29 +103,34 @@ function applyModelStyle(object: Object3D) {
   }
   const geometry = terrain.geometry
   geometry.computeBoundingBox()
-  geometry.computeVertexNormals()
+  if (!geometry.hasAttribute('normal')) geometry.computeVertexNormals()
   const positions = geometry.getAttribute('position')
   const elevations = geometry.boundingBox
   if (!elevations) throw new Error('Local terrain has no elevation range')
-  const lower = new Color('#476561')
-  const higher = new Color('#90a087')
-  const shade = new Color()
-  const colors = new Float32Array(positions.count * 3)
-  const min = elevations.min.y
-  const relief = Math.max(1, elevations.max.y - min)
-  for (let index = 0; index < positions.count; index++) {
-    const height = (positions.getY(index) - min) / relief
-    shade.copy(lower).lerp(higher, Math.pow(height, .72)).toArray(colors, index * 3)
+  const nativeTexture = terrain.material instanceof MeshStandardMaterial && Boolean(terrain.material.map)
+  if (!nativeTexture) {
+    const lower = new Color('#476561')
+    const higher = new Color('#90a087')
+    const shade = new Color()
+    const colors = new Float32Array(positions.count * 3)
+    const min = elevations.min.y
+    const relief = Math.max(1, elevations.max.y - min)
+    for (let index = 0; index < positions.count; index++) {
+      const height = (positions.getY(index) - min) / relief
+      shade.copy(lower).lerp(higher, Math.pow(height, .72)).toArray(colors, index * 3)
+    }
+    geometry.setAttribute('color', new BufferAttribute(colors, 3))
+    terrain.material.dispose()
+    terrain.material = new MeshStandardMaterial({ vertexColors: true, roughness: .93 })
   }
-  geometry.setAttribute('color', new BufferAttribute(colors, 3))
-  for (const mesh of [terrain, roads, water]) mesh.material.dispose()
-  terrain.material = new MeshStandardMaterial({ vertexColors: true, roughness: .93 })
+  roads.material.dispose()
+  water.material.dispose()
   roads.material = new MeshBasicMaterial({ color: '#bcc3a1', transparent: true, opacity: .65, depthWrite: false })
   water.material = new MeshBasicMaterial({ color: '#3ea8de' })
   // The thin overlays need a small display offset to stay above the simplified terrain surface.
   roads.position.y += 18
   water.position.y += 12
-  return terrain
+  return { terrain, nativeTexture }
 }
 
 function applyImagery(terrain: Mesh, texture: Texture) {
@@ -117,7 +155,6 @@ function applyImagery(terrain: Mesh, texture: Texture) {
 }
 
 type ModelTools = {
-  zoom: (amount: number) => void
   reset: () => void
   view: (mode: View) => void
   scope: (boundary: GeoBoundary | undefined, places: ModelPlace[]) => void
@@ -174,9 +211,8 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
     let renderer: WebGLRenderer | undefined
     let controls: OrbitControls | undefined
     let observer: ResizeObserver | undefined
-    let unbindPicking: (() => void) | undefined
+    let unbindInput: (() => void) | undefined
     let frame = 0
-    let imageryTexture: Texture | undefined
     let boundaryTexture: Texture | undefined
 
     setPhase('loading')
@@ -188,18 +224,17 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
 
     async function initialize(host: HTMLDivElement) {
       const twin = standaloneTwin ? twinSites[standaloneTwin] : undefined
-      const localModel = await readModel(twin?.file ?? 'mentougou.glb', twin ? 8_000_000 : 4_500_000, controller.signal)
+      const localModel = await readDetailedModel(twin?.file ?? 'mentougou.glb', Boolean(twin), controller.signal)
       if (controller.signal.aborted) {
         releaseModel(localModel)
         return
       }
       model = localModel
-      const terrain = twin ? undefined : applyModelStyle(localModel)
+      const districtStyle = twin ? undefined : applyModelStyle(localModel)
+      const terrain = districtStyle?.terrain
       if (twin) localModel.traverse(child => {
         if (!(child instanceof Mesh)) return
-        child.geometry.computeVertexNormals()
-        child.material.dispose()
-        child.material = new MeshStandardMaterial({ color: '#92b6c9', roughness: .69 })
+        if (!child.geometry.hasAttribute('normal')) child.geometry.computeVertexNormals()
       })
       const bounds = new Box3().setFromObject(localModel)
       const geographyBounds = terrain ? new Box3().setFromObject(terrain) : bounds
@@ -218,9 +253,12 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       camera.position.copy(initialPosition)
       const surface = new WebGLRenderer({ alpha: true, antialias: true })
       renderer = surface
-      surface.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
+      const anisotropy = Math.min(8, surface.capabilities.getMaxAnisotropy())
+      for (const texture of modelResources(localModel).textures) texture.anisotropy = anisotropy
       surface.domElement.setAttribute('role', 'img')
       surface.domElement.setAttribute('aria-label', twin ? twin.name + '建筑模型' : '门头沟区地形、路网和水系模型')
+      surface.domElement.setAttribute('aria-description', '使用滚轮或加减键缩放')
+      surface.domElement.tabIndex = 0
       host.append(surface.domElement)
       const orbit = new OrbitControls(camera, surface.domElement)
       controls = orbit
@@ -290,12 +328,6 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         const offset = name === 'roads' ? 18 : name === 'water' ? 12 : 0
         setPicked({ ...surfaceDetail(name), height: Math.round(localModel.worldToLocal(hit.point).y - offset) })
       }
-      surface.domElement.addEventListener('pointerdown', startPick)
-      surface.domElement.addEventListener('pointerup', endPick)
-      unbindPicking = () => {
-        surface.domElement.removeEventListener('pointerdown', startPick)
-        surface.domElement.removeEventListener('pointerup', endPick)
-      }
       const draw = () => {
         if (frame) return
         frame = requestAnimationFrame(() => {
@@ -308,6 +340,48 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           }))
         })
       }
+      const anchor = new Vector3()
+      const movement = new Vector3()
+      const zoomAt = (factor: number, x = 0, y = 0) => {
+        const next = Math.max(.6, Math.min(12, camera.zoom * factor))
+        if (next === camera.zoom) return
+        anchor.set(x, y, 0).unproject(camera)
+        camera.zoom = next
+        camera.updateProjectionMatrix()
+        movement.set(x, y, 0).unproject(camera)
+        movement.subVectors(anchor, movement)
+        camera.position.add(movement)
+        orbit.target.add(movement)
+        camera.updateMatrixWorld()
+        draw()
+      }
+      const wheelZoom = (event: WheelEvent) => {
+        if (event.ctrlKey || event.metaKey || !event.deltaY) return
+        const rect = surface.domElement.getBoundingClientRect()
+        if (!(rect.width && rect.height)) return
+        event.preventDefault()
+        const units = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? 16
+          : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? rect.height : 1
+        const delta = Math.max(-300, Math.min(300, event.deltaY * units))
+        zoomAt(Math.exp(-delta * .002),
+          (event.clientX - rect.left) * 2 / rect.width - 1,
+          1 - (event.clientY - rect.top) * 2 / rect.height)
+      }
+      const keyZoom = (event: KeyboardEvent) => {
+        if (event.ctrlKey || event.metaKey || event.altKey || !['+', '=', '-'].includes(event.key)) return
+        event.preventDefault()
+        zoomAt(event.key === '-' ? .8 : 1.25)
+      }
+      surface.domElement.addEventListener('pointerdown', startPick)
+      surface.domElement.addEventListener('pointerup', endPick)
+      surface.domElement.addEventListener('keydown', keyZoom)
+      host.addEventListener('wheel', wheelZoom, { passive: false })
+      unbindInput = () => {
+        surface.domElement.removeEventListener('pointerdown', startPick)
+        surface.domElement.removeEventListener('pointerup', endPick)
+        surface.domElement.removeEventListener('keydown', keyZoom)
+        host.removeEventListener('wheel', wheelZoom)
+      }
       const fit = () => {
         const { clientWidth: width, clientHeight: height } = host
         if (!width || !height) return
@@ -319,6 +393,8 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         camera.top = halfHeight
         camera.bottom = -halfHeight
         camera.updateProjectionMatrix()
+        const ratio = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(renderPixelLimit / (width * height)))
+        if (ratio !== surface.getPixelRatio()) surface.setPixelRatio(ratio)
         surface.setSize(width, height, false)
         draw()
       }
@@ -333,11 +409,6 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         draw()
       }
       tools.current = {
-        zoom: amount => {
-          camera.zoom = Math.max(.75, Math.min(10, camera.zoom * amount))
-          camera.updateProjectionMatrix()
-          draw()
-        },
         reset: () => {
           positionCamera(viewTarget)
           setPicked(undefined)
@@ -405,13 +476,13 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       observer.observe(host)
       fit()
       setPhase('ready')
-      if (!terrain) return
+      if (!terrain || districtStyle?.nativeTexture) return
       new TextureLoader().load(mapRoot + 'mentougou-sentinel-2-20261008.webp', texture => {
         if (controller.signal.aborted) {
           texture.dispose()
           return
         }
-        imageryTexture = texture
+        texture.anisotropy = anisotropy
         applyImagery(terrain, texture)
         setImagery(true)
         draw()
@@ -426,9 +497,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       cancelAnimationFrame(frame)
       observer?.disconnect()
       controls?.dispose()
-      unbindPicking?.()
-      imageryTexture?.dispose()
-      boundaryTexture?.dispose()
+      unbindInput?.()
       if (model) releaseModel(model)
       renderer?.dispose()
       renderer?.forceContextLoss()
@@ -532,13 +601,12 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           {imagery && <a href="https://ewds.climate.copernicus.eu/licences/ec-sentinel" target="_blank" rel="noreferrer"
             className="model-imagery-source">含经修改的 Copernicus Sentinel 2026 数据</a>}
           <div className="local-model-tools" role="group" aria-label="本地模型操作">
+            <span className="local-model-zoom-hint">滚轮缩放</span>
             <div className="local-model-tool-group" role="group" aria-label="模型视角">
               <button type="button" aria-pressed={view === '2d'} onClick={() => changeView('2d')}>2D</button>
               <button type="button" aria-pressed={view === '3d'} onClick={() => changeView('3d')}>3D</button>
             </div>
             <div className="local-model-tool-group">
-              <button type="button" aria-label="缩小模型" onClick={() => tools.current?.zoom(.8)}>−</button>
-              <button type="button" aria-label="放大模型" onClick={() => tools.current?.zoom(1.25)}>+</button>
               <button type="button" onClick={() => tools.current?.reset()}>复位视角</button>
             </div>
           </div>
