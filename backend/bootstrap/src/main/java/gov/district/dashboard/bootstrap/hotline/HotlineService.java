@@ -60,7 +60,7 @@ class HotlineService {
         Area area = area(areaId);
         Snapshot snapshot = snapshot(month);
         Scope scope = Scope.forArea(area);
-        return new Overview(area, month, snapshot.quality(), snapshot.snapshotOn(), snapshot.thresholds(),
+        return new Overview(area, YearMonth.from(snapshot.monthStart()).toString(), snapshot.quality(), snapshot.snapshotOn(), snapshot.thresholds(),
                 totals(scope, snapshot.monthStart()), trend(scope), categories(scope, snapshot.monthStart()),
                 subdivisions(area, snapshot.monthStart()));
     }
@@ -93,7 +93,7 @@ class HotlineService {
             items = jdbc.query(TICKET_FIELDS + filter + " ORDER BY t.opened_on DESC, t.ticket_id DESC LIMIT ? OFFSET ?",
                     (row, number) -> ticket(row), arguments.toArray());
         }
-        return new TicketPage(area, month, page, size, total, items);
+        return new TicketPage(area, YearMonth.from(snapshot.monthStart()).toString(), page, size, total, items);
     }
 
     TicketDetails ticketDetails(String id, String areaId, String month) {
@@ -142,7 +142,7 @@ class HotlineService {
                 .formatted(totals.late(), totals.due()), "late", totals.late(), "件"));
         findings.add(new Finding("dispatch-watch", "工单派发", "当前有 %d 件待派单。"
                 .formatted(totals.unassigned()), "unassigned", totals.unassigned(), "件"));
-        return new Analysis(area, month, snapshot.quality(), snapshot.snapshotOn(), totals, List.copyOf(findings));
+        return new Analysis(area, YearMonth.from(snapshot.monthStart()).toString(), snapshot.quality(), snapshot.snapshotOn(), totals, List.copyOf(findings));
     }
 
     Semantics semantics() {
@@ -178,15 +178,21 @@ class HotlineService {
     }
 
     private Snapshot snapshot(String month) {
-        if (!MONTH.matcher(month).matches()) {
+        LocalDate today = LocalDate.now(HotlineDemoCalendar.BEIJING);
+        boolean latest = month == null || month.isEmpty();
+        if (!latest && (!MONTH.matcher(month).matches() || YearMonth.parse(month).isAfter(YearMonth.from(today)))) {
             throw new ApiFailure(ApiCode.INVALID_REQUEST);
         }
+        String predicate = latest ? """
+                s.snapshot_on <= ? AND EXISTS (SELECT 1 FROM hotline_ticket t WHERE t.month_start = s.month_start)
+                ORDER BY s.month_start DESC LIMIT 1
+                """ : "s.month_start = ?";
         return jdbc.query("""
                         SELECT month_start, snapshot_on, quality, due_days, late_days
-                        FROM hotline_snapshot WHERE month_start = ?
-                        """, (row, number) -> new Snapshot(row.getObject(1, LocalDate.class),
+                        FROM hotline_snapshot s WHERE
+                        """ + predicate, (row, number) -> new Snapshot(row.getObject(1, LocalDate.class),
                         row.getObject(2, LocalDate.class), row.getString(3),
-                        new Thresholds(row.getInt(4), row.getInt(5))), YearMonth.parse(month).atDay(1))
+                        new Thresholds(row.getInt(4), row.getInt(5))), latest ? today : YearMonth.parse(month).atDay(1))
                 .stream().findFirst().orElseThrow(() -> new ApiFailure(ApiCode.INVALID_REQUEST));
     }
 
@@ -196,13 +202,15 @@ class HotlineService {
     }
 
     private List<TrendPoint> trend(Scope scope) {
+        List<Object> arguments = new ArrayList<>(scope.bind());
+        arguments.add(LocalDate.now(HotlineDemoCalendar.BEIJING));
         return jdbc.query("""
                 SELECT s.month_start, COUNT(t.ticket_id) AS received
                 FROM hotline_snapshot s
                 LEFT JOIN hotline_ticket t ON t.month_start = s.month_start
-                """ + scope.condition() + " GROUP BY s.month_start ORDER BY s.month_start",
+                """ + scope.condition() + " WHERE s.snapshot_on <= ? GROUP BY s.month_start ORDER BY s.month_start",
                 (row, number) -> new TrendPoint(YearMonth.from(row.getObject(1, LocalDate.class)).toString(),
-                        row.getLong(2)), scope.bind().toArray());
+                        row.getLong(2)), arguments.toArray());
     }
 
     private List<Category> categories(Scope scope, LocalDate month) {

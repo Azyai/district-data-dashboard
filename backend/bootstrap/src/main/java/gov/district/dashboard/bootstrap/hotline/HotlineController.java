@@ -20,13 +20,13 @@ class HotlineController {
 
     @GetMapping("/overview")
     ApiResult<HotlineService.Overview> overview(@RequestParam(defaultValue = "mentougou") String areaId,
-                                               @RequestParam(defaultValue = "2026-10") String month) {
+                                               @RequestParam(required = false) String month) {
         return ApiResult.ok(service.overview(areaId, month));
     }
 
     @GetMapping("/tickets")
     ApiResult<HotlineService.TicketPage> tickets(@RequestParam(defaultValue = "mentougou") String areaId,
-                                                @RequestParam(defaultValue = "2026-10") String month,
+                                                @RequestParam(required = false) String month,
                                                 @RequestParam(defaultValue = "all") String lane,
                                                 @RequestParam(defaultValue = "all") String category,
                                                 @RequestParam(defaultValue = "0") String page,
@@ -43,7 +43,7 @@ class HotlineController {
 
     @GetMapping("/analysis")
     ApiResult<HotlineService.Analysis> analysis(@RequestParam(defaultValue = "mentougou") String areaId,
-                                               @RequestParam(defaultValue = "2026-10") String month) {
+                                               @RequestParam(required = false) String month) {
         return ApiResult.ok(service.analysis(areaId, month));
     }
 
