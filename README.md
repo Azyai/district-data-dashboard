@@ -1,6 +1,6 @@
 # 区政府数字大屏
 
-本地演示打开即进入门头沟区全域驾驶舱，支持区、镇街和村社切换。区域指标、人口、接诉即办和水务均有独立数据页。常规身份核验后保留驾驶舱入口，政务服务专项身份进入授权专题。业务读数使用合成数据。
+本地演示打开即进入门头沟全域数字中心的路网监测页，可按区、镇街和村社查看数据。左侧选择区域和专题，居中标题显示当前范围和主题。常规身份核验后保留驾驶舱入口，政务服务专项身份进入授权专题。业务读数使用演示数据。
 
 ## 本地启动
 
@@ -41,7 +41,7 @@ Web 应用通过同源 `/api` 代理访问本机 8080。演示 profile 使用内
 java -jar backend/bootstrap/target/district-dashboard.jar --spring.profiles.active=demo,mysql
 ```
 
-在数据工作台打开“AI 问数”。输入“看大台街道的数据”打开区域数据页，输入“打开水务专题”进入水务页。问数读取当前区域快照，语音入口提供模拟转写。正式 ASR 预留豆包流式语音识别模型 2.0，服务端适配器在获批后配置。 [数据工作台](http://127.0.0.1:5173/workbench)
+点击展示页的悬浮语音圆钮并允许使用麦克风，说“小门小门，看大台街道的网格治理”。播报结束后可继续说“小门小门，这里的微网格有多少”。再次点击可关闭监听。圆钮可拖动，切换专题后仍保持位置和监听状态。本机识别需要支持中文本地识别的浏览器与语言包，朗读使用设备的中文语音。豆包流式语音识别 2.0 留待后续服务端接入。
 
 ## P2 数据接入
 
@@ -74,12 +74,15 @@ java "-Djavax.net.ssl.trustStore=$fixtureTrust" '-Djavax.net.ssl.trustStoreType=
 
 | 入口 | 路径 |
 | --- | --- |
-| 大台街道区域数据 | [/data/areas/datai](http://127.0.0.1:5173/data/areas/datai) |
-| 人口专题 | [/topics/population](http://127.0.0.1:5173/topics/population) |
-| 接诉即办 | [/topics/hotline](http://127.0.0.1:5173/topics/hotline) |
-| 水务专题 | [/topics/water](http://127.0.0.1:5173/topics/water) |
+| 路网监测 | [首页](http://127.0.0.1:5173/) |
+| 网格治理 | [网格地图](http://127.0.0.1:5173/screens/grid) |
+| 水域态势 | [水域地图](http://127.0.0.1:5173/screens/waters) |
+| 区域诊断 | [大台街道指标与事项](http://127.0.0.1:5173/screens/diagnosis?area=datai) |
+| 城镇人口 | [人口星图](http://127.0.0.1:5173/screens/population) |
+| 基层治理 | [接诉即办工单](http://127.0.0.1:5173/screens/governance) |
+| 经济发展 | [经济专题](http://127.0.0.1:5173/screens/economy) |
 
-独立页可直接打开、刷新，也可由工作台智能体按已登记意图跳转。专题布局与指标对应关系随前端版本交付，已授权的数据版本从后端加载。政务服务专项入口仍由演示身份核验提供。
+独立页支持直接打开、刷新、前进与后退。使用选择器或语音导航时，React Router 更新地址，区域数据按区域 ID 查询并复用缓存。接诉即办查询还依赖所选月份。地图的路网、村居和水域来自业主演示素材，监测数值采用演示口径。
 
 ## 验证
 
@@ -95,6 +98,8 @@ pnpm --dir frontend test:intent
 pnpm --dir frontend build
 pnpm --dir frontend test:e2e
 pnpm --dir frontend test:e2e:topics
+pnpm --dir frontend test:e2e:areas
+pnpm --dir frontend test:e2e:voice
 ```
 
 端到端测试需要 Chromium。未安装时运行 `pnpm --dir frontend exec playwright install chromium`。后台健康探针位于 [本机 8081](http://127.0.0.1:8081/actuator/health)，演示接口契约位于 [contracts/openapi.json](contracts/openapi.json)。
