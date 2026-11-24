@@ -119,7 +119,7 @@ function TicketDetail({ ticket, scope, month, data, analyze }: { ticket?: Hotlin
 function GovernanceMonth({ data, changeMonth, onAreaChange }: { data: HotlineOverview; changeMonth: (month: string) => void; onAreaChange: (id: string) => void }) {
   const [lane, setLane] = useState<Lane>('closed')
   const [branch, setBranch] = useState('')
-  const [page, setPage] = useState(0)
+  const [cursor, setCursor] = useState({ key: '', page: 0 })
   const [category, setCategory] = useState('')
   const [record, setRecord] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
@@ -128,6 +128,9 @@ function GovernanceMonth({ data, changeMonth, onAreaChange }: { data: HotlineOve
   const rows = [...data.areas].sort((a, b) => b[lane] - a[lane] || a.name.localeCompare(b.name, 'zh-CN'))
   const selected = rows.find(row => row.id === branch) ?? rows.find(row => row[lane] > 0) ?? rows[0]
   const scope = selected?.id ?? area.id
+  const listKey = [scope, month, lane, category].join('/')
+  const page = cursor.key === listKey ? cursor.page : 0
+  const setPage = (value: number) => setCursor({ key: listKey, page: value })
   const list = useQuery(hotlineTickets(scope, month, lane, category, page))
   const items = list.data?.items ?? []
   const ticket = items.find(item => item.id === record) ?? items[0]
@@ -185,11 +188,22 @@ export default function GovernanceScreen({ area, onAreaChange }: Pick<CoreScreen
   const [params, setParams] = useSearchParams()
   const month = normalizeHotlineMonth(params.get('month'))
   const overview = useQuery(hotlineOverview(area.id, month))
+  const [lastSnapshot, setLastSnapshot] = useState<HotlineOverview>()
+  const current = overview.data?.area.id === area.id && overview.data.month === month ? overview.data : undefined
+  useLayoutEffect(() => { if (current) setLastSnapshot(current) }, [current])
+  const data = current ?? lastSnapshot
   function changeMonth(value: string) {
     const next = new URLSearchParams(params)
     next.set('month', value)
     setParams(next, { preventScrollReset: true })
   }
-  return overview.data ? <GovernanceMonth key={area.id + ':' + month} data={overview.data} changeMonth={changeMonth} onAreaChange={onAreaChange}/>
-    : <Feedback error={overview.error} retry={() => void overview.refetch()}/>
+  return <div className="hotline-scoped-view">
+    {data && <div className="hotline-snapshot" data-visible-area={data.area.id} data-visible-month={data.month} inert={!current} aria-hidden={!current || undefined}>
+      <GovernanceMonth data={data} changeMonth={changeMonth} onAreaChange={onAreaChange} />
+    </div>}
+    {!current && <div className="hotline-loading" aria-live="polite">
+      <Feedback error={overview.error} retry={() => void overview.refetch()} />
+      {data && <small>当前画面 · {data.area.name} · {data.month}</small>}
+    </div>}
+  </div>
 }
