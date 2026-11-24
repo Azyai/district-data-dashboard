@@ -141,7 +141,7 @@ function MetricEvidence({ metric, sources, onClose }: { metric: Metric; sources:
           <h2>{definition.label}</h2>
           <p>{published ? '生效口径 · v' + published.version : '草稿口径'}</p>
         </div>
-        {published && <Link to="/" className="admin-text-link">到驾驶舱核对</Link>}
+        {published && <a href="/#area-issues" className="admin-text-link" target="_blank" rel="noopener noreferrer">到驾驶舱核对</a>}
       </header>
       <div className="admin-detail-body">
         <dl className="admin-kv">

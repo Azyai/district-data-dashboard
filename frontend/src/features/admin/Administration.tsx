@@ -20,7 +20,7 @@ export default function Administration({ session }: { session: SessionState }) {
           <span>数据管理</span>
         </NavLink>
         <div className="admin-top-actions">
-          <Link className="admin-return" to="/"><AdminIcon name="home" />返回驾驶舱</Link>
+          <Link className="admin-return" to="/review"><AdminIcon name="shield" />发布审核</Link>
           {authorized && <Button onClick={session.signOut} loading={session.busy}>退出管理</Button>}
         </div>
       </header>
