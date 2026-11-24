@@ -69,6 +69,28 @@ class DemoApiIntegrationTests {
     }
 
     @Test
+    void publicTopicsExposeOnlyActiveAggregateTemplatesAndMatchingSnapshots() throws Exception {
+        try (var browser = new Browser()) {
+            for (String topic : List.of("population", "hotline", "water")) {
+                String path = "/cockpit/topics/" + topic;
+                JsonNode manifest = browser.get(path + "/manifest", ApiCode.OK);
+                String release = manifest.path("releaseId").asString();
+                JsonNode snapshot = browser.get(path + "/snapshot?releaseId=" + release, ApiCode.OK);
+                assertThat(manifest.path("theme").asString()).isEqualTo(topic);
+                assertThat(snapshot.path("quality").asString()).isEqualTo("SIMULATED");
+                assertThat(snapshot.path("releaseId").asString()).isEqualTo(release);
+                assertThat(snapshot.path("results").size()).isEqualTo(manifest.path("components").size());
+                browser.get(path + "/snapshot?releaseId=previous-release", ApiCode.RELEASE_CONFLICT);
+                browser.get(path + "/snapshot?releaseId=INVALID", ApiCode.INVALID_REQUEST);
+                browser.get(draftPath(topic), ApiCode.AUTH_REQUIRED);
+            }
+            browser.get("/cockpit/topics/" + CITY + "/manifest", ApiCode.PROJECT_NOT_FOUND);
+            browser.get("/cockpit/topics/" + SERVICES + "/snapshot?releaseId=services-release-1", ApiCode.PROJECT_NOT_FOUND);
+            browser.get(manifestPath(CITY), ApiCode.AUTH_REQUIRED);
+        }
+    }
+
+    @Test
     void requiresCsrfHeaderAndDataAdminBeforeAcceptingCsv() throws Exception {
         try (var browser = new Browser()) {
             browser.uploadCsv(null, ApiCode.CSRF_INVALID);
@@ -158,7 +180,8 @@ class DemoApiIntegrationTests {
             JsonNode identity = browser.login("district");
             assertIdentity(identity, CITY, "/");
             assertThat(browser.get("/me", ApiCode.OK)).isEqualTo(identity);
-            assertThat(ids(browser.get("/projects/recommendations", ApiCode.OK))).containsExactly(CITY, SERVICES);
+            assertThat(ids(browser.get("/projects/recommendations", ApiCode.OK)))
+                    .containsExactly(CITY, SERVICES, "population", "hotline", "water");
 
             JsonNode manifest = browser.get(manifestPath(CITY), ApiCode.OK);
             assertThat(manifest.path("schemaVersion").asInt()).isEqualTo(1);
