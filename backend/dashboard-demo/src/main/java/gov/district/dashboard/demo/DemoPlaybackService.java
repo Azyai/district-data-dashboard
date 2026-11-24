@@ -70,11 +70,8 @@ public final class DemoPlaybackService {
             java.util.stream.Stream.of(CITY, SERVICES), PUBLIC_TOPICS.stream()).toList();
 
     private final DemoObservationMapper observations;
-    private final DashboardReleaseService releases;
-
-    DemoPlaybackService(DemoObservationMapper observations, DashboardReleaseService releases) {
+    DemoPlaybackService(DemoObservationMapper observations) {
         this.observations = observations;
-        this.releases = releases;
     }
 
     public List<ProjectSummary> recommendations(CurrentIdentity viewer) {
@@ -88,21 +85,21 @@ public final class DemoPlaybackService {
     }
 
     public Manifest manifest(CurrentIdentity viewer, String projectId) {
-        return liveProject(visibleProject(viewer, projectId)).manifest();
+        return visibleProject(viewer, projectId).manifest();
     }
 
     public Manifest publicManifest(String projectId) {
-        return liveProject(publicTopic(projectId)).manifest();
+        return publicTopic(projectId).manifest();
     }
 
     public BatchQueryResult publicSnapshot(String projectId, String releaseId) {
-        Project active = liveProject(publicTopic(projectId));
-        return queryRelease(active, releaseId, active.manifest().components().stream().map(Component::id).toList());
+        Project project = publicTopic(projectId);
+        return queryRelease(project, releaseId, project.manifest().components().stream().map(Component::id).toList());
     }
 
     public BatchQueryResult query(CurrentIdentity viewer, String projectId, String releaseId,
                                   List<String> componentIds) {
-        return queryRelease(liveProject(visibleProject(viewer, projectId)), releaseId, componentIds);
+        return queryRelease(visibleProject(viewer, projectId), releaseId, componentIds);
     }
 
     private BatchQueryResult queryRelease(Project project, String releaseId, List<String> componentIds) {
@@ -110,27 +107,6 @@ public final class DemoPlaybackService {
             throw new ApiFailure(ApiCode.RELEASE_CONFLICT);
         }
         return query(project, componentIds);
-    }
-
-    public static Manifest draftTemplate(String projectId) {
-        return project(projectId).manifest();
-    }
-
-    public BatchQueryResult draftSnapshot(String projectId) {
-        Project project = project(projectId);
-        return query(project, project.manifest().components().stream().map(Component::id).toList());
-    }
-
-    private Project liveProject(Project original) {
-        Manifest template = original.manifest();
-        var active = releases.active(template.projectId());
-        if (active.serial() == 0) {
-            return original;
-        }
-        var manifest = new Manifest(template.schemaVersion(), template.projectId(),
-                template.projectId() + "-live-" + active.serial(), template.title(), template.description(),
-                template.theme(), template.canvas(), active.components() == null ? template.components() : active.components());
-        return new Project(manifest, original.snapshotId(), original.requiredRole());
     }
 
     private BatchQueryResult query(Project project, List<String> componentIds) {
