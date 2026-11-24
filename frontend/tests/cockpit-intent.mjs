@@ -117,6 +117,20 @@ test('hotline analysis follows selected area and gives precise area override', (
   assert.deepEqual(interpretScreenIntent('工单表有哪些字段？', 'datai', locations, 'governance').kind, 'hotline')
 })
 
+test('routes monitoring and diagnostic commands without confusing grid and hotline governance', () => {
+  for (const [spoken, screen, areaId] of [
+    ['看路网监测', 'overview', 'datai'],
+    ['打开网格治理', 'grid', 'datai'],
+    ['我想看看妙峰山镇的水域态势', 'waters', 'miaofengshan'],
+    ['打开大台街道的问题诊断', 'diagnosis', 'datai'],
+  ]) {
+    assert.deepEqual(interpretScreenIntent(spoken, 'datai', locations, 'governance'), { kind: 'screen', screen, areaId })
+  }
+  assert.deepEqual(interpretScreenIntent('切换到军庄镇', 'datai', locations, 'grid'),
+    { kind: 'screen', screen: 'grid', areaId: 'junzhuang' })
+  assert.equal(interpretScreenIntent('我想看基层治理', 'datai', locations).screen, 'governance')
+})
+
 test('all navigation methods share district and town screen URLs', () => {
   assert.equal(screenPath('overview'), '/')
   assert.equal(screenPath('overview', 'datai'), '/areas/datai')
