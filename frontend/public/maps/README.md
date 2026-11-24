@@ -8,7 +8,7 @@
 
 ## 本地资源
 
-随应用提供的 `district-atlas.geojson`、`district-relief.webp`、`district-elevation.png` 分别用于区镇边界、备用晕渲和展示地形。地形根据本地模型外包范围与地理范围对齐。镇街下的村社范围及地标精细 GLB 由项目提供的原始模型生成，运行资源位于 `local-model/`。
+构建前从项目素材生成 `district-atlas.geojson`、`district-relief.webp`、`district-elevation.png`，分别用于区镇边界、备用晕渲和展示地形。它们与本地模型资源均被 Git 忽略，Vite 将已生成的资源复制到部署目录。地形根据本地模型外包范围与地理范围对齐。镇街下的村社范围及地标精细 GLB 同样由原始模型生成，运行资源位于 `local-model/`。
 
 从仓库根目录执行以下命令重新生成资源。先安装前端开发依赖，纹理转换需要 FFmpeg，可通过 `DASHBOARD_FFMPEG` 设置可执行文件路径。地图生成脚本需要 Python、NumPy、Pillow、Shapely 2。
 

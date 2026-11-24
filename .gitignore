@@ -5,6 +5,9 @@
 /frontend/node_modules/
 /frontend/dist/
 /frontend/public/maps/local-model/
+/frontend/public/maps/district-atlas.geojson
+/frontend/public/maps/district-elevation.png
+/frontend/public/maps/district-relief.webp
 /frontend/test-results/
 /frontend/playwright-report/
 *.log
