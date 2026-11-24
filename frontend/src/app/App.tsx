@@ -9,6 +9,7 @@ import { Session } from '../features/session/Session'
 const Cockpit = lazy(() => import('../features/cockpit/Cockpit'))
 const Playback = lazy(() => import('../features/playback/Playback'))
 const Administration = lazy(() => import('../features/admin/Administration'))
+const DashboardReviewPage = lazy(() => import('../features/designer/DashboardReleases').then(module => ({ default: module.DashboardReviewPage })))
 
 const client = new QueryClient({
   defaultOptions: {
@@ -79,6 +80,8 @@ export function App() {
                         : <Navigate to="/" replace />
                     } />
                     <Route path="/admin/*" element={<Administration session={session} />} />
+                    <Route path="/review" element={session.checking ? <Loading /> : session.identity?.roles.includes('DASHBOARD_REVIEWER')
+                      ? <DashboardReviewPage identityControl={session.control} /> : <Navigate to="/" replace />} />
                     <Route path="/workbench" element={<Navigate to="/" replace />} />
                     <Route path="*" element={<main className="center-state"><h1>页面不存在</h1><Link to="/" className="action-link">返回驾驶舱</Link></main>} />
                   </Routes>

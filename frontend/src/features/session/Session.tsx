@@ -64,7 +64,7 @@ export function Session({ children }: { children: (state: SessionState) => React
       clearPrivateQueries(queryClient)
       queryClient.setQueryData(identityKey, data)
       setOpen(false)
-      if (data.landingPath.startsWith('/play/')) navigate(data.landingPath)
+      if (data.landingPath.startsWith('/play/') || data.landingPath === '/review') navigate(data.landingPath)
     },
   })
   const logout = useMutation({
@@ -118,6 +118,7 @@ export function Session({ children }: { children: (state: SessionState) => React
         <div className="identity-options">
           <PersonaOption title="常规身份" description="继续查看当前区域" persona="district" active={active} submit={login.mutate} />
           <PersonaOption title="政务服务专项" description="进入已授权的政务服务专题" persona="service" active={active} submit={login.mutate} />
+          <PersonaOption title="大屏审核员" description="审核待发布的专题版本" persona="reviewer" active={active} submit={login.mutate} />
         </div>
         {current && <Button className="session-logout" loading={logout.isPending} disabled={login.isPending}
           onClick={() => logout.mutate()}>退出核验</Button>}
