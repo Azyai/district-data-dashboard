@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Button, ConfigProvider, Modal, Spin, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { lazy, Suspense, useState, type ReactNode } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
 import type { CockpitArea } from '../api/client'
 import { Session } from '../features/session/Session'
 import { asksForInsight, matchTopics, topicFor, topics, type TopicId } from '../features/topics/topicCatalog'
@@ -12,6 +12,7 @@ const Cockpit = lazy(() => import('../features/cockpit/Cockpit'))
 const TwinScene = lazy(() => import('../features/cockpit/TwinScene'))
 const TopicDialog = lazy(() => import('../features/topics/TopicDialog'))
 const Playback = lazy(() => import('../features/playback/Playback'))
+const AreaWorkbench = lazy(() => import('../features/workbench/AreaWorkbench'))
 const Administration = lazy(() => import('../features/admin/Administration'))
 const DashboardReviewPage = lazy(() => import('../features/designer/DashboardReleases').then(module => ({ default: module.DashboardReviewPage })))
 
@@ -64,7 +65,7 @@ function Loading() {
   return <main className="center-state" aria-busy="true"><Spin /><span>正在加载页面</span></main>
 }
 
-function CockpitWithTopics({ identityControl }: { identityControl: ReactNode }) {
+function WorkbenchWithTopics({ identityControl }: { identityControl: ReactNode }) {
   const [picking, setPicking] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
@@ -75,13 +76,13 @@ function CockpitWithTopics({ identityControl }: { identityControl: ReactNode }) 
   function select(id: TopicId, question?: string) {
     setPicking(false)
     params.set('topic', id)
-    void navigate({ pathname: location.pathname, search: params.toString() },
+    void navigate({ pathname: '/workbench', search: params.toString() },
       { replace: Boolean(selected), state: { topicQuestion: question }, preventScrollReset: true })
   }
 
   function close() {
     params.delete('topic')
-    void navigate({ pathname: location.pathname, search: params.toString() }, { replace: true, preventScrollReset: true })
+    void navigate({ pathname: '/workbench', search: params.toString() }, { replace: true, preventScrollReset: true })
   }
 
   async function topicQuestion(question: string, area: CockpitArea, signal: AbortSignal) {
@@ -96,17 +97,18 @@ function CockpitWithTopics({ identityControl }: { identityControl: ReactNode }) 
     if (area.id !== 'mentougou') return undefined
     setPicking(false)
     params.set('topic', matched[0].id)
-    void navigate({ pathname: '/', search: params.toString() },
+    params.delete('area')
+    void navigate({ pathname: '/workbench', search: params.toString() },
       { state: { topicQuestion: asksForInsight(question) ? question : undefined }, preventScrollReset: true })
     return null
   }
 
-  const topicControl = <button type="button" className="cockpit-topic-link" aria-haspopup="dialog"
-    onClick={() => setPicking(true)}>专题</button>
+  const topicControl = <Button className="workbench-topic" aria-haspopup="dialog" autoInsertSpace={false}
+    onClick={() => setPicking(true)}>专题</Button>
 
   return (
     <>
-      <Cockpit identityControl={identityControl} topicControl={topicControl} onTopicQuestion={topicQuestion} />
+      <AreaWorkbench identityControl={identityControl} topicControl={topicControl} onTopicQuestion={topicQuestion} />
       <Modal title="全区专题" open={picking} onCancel={() => setPicking(false)}
         centered width="min(26rem, calc(100vw - 1.5rem))" footer={null} destroyOnHidden>
         <div className="topic-picker-choices">{topics.map(topic => (
@@ -121,6 +123,19 @@ function CockpitWithTopics({ identityControl }: { identityControl: ReactNode }) 
   )
 }
 
+function DisplayCockpit() {
+  const { search, hash } = useLocation()
+  const area = useMatch('/areas/:areaId')?.params.areaId
+  const params = new URLSearchParams(search)
+  const linkedTopic = topicFor(params.get('topic'))
+  const linkedPanel = hash === '#voice-assistant' || hash === '#area-issues'
+  if (linkedTopic || linkedPanel) {
+    if (area) params.set('area', area)
+    return <Navigate to={{ pathname: '/workbench', search: params.toString(), hash }} replace />
+  }
+  return <Cockpit />
+}
+
 export function App() {
   return (
     <StyleProvider layer>
@@ -131,11 +146,11 @@ export function App() {
               {(session) => (
                 <Suspense fallback={<Loading />}>
                   <Routes>
-                    <Route element={<CockpitWithTopics identityControl={session.control} />}>
+                    <Route element={<DisplayCockpit />}>
                       <Route index />
                       <Route path="/areas/:areaId" />
                     </Route>
-                    <Route path="/twins/:twinId" element={<TwinScene identityControl={session.control} />} />
+                    <Route path="/twins/:twinId" element={<TwinScene />} />
                     <Route path="/play/:projectId" element={
                       session.checking ? <Loading /> : session.identity
                         ? <Playback identity={session.identity} identityControl={session.control} />
@@ -143,7 +158,7 @@ export function App() {
                     } />
                     <Route path="/admin/*" element={<Administration session={session} />} />
                     <Route path="/review" element={<DashboardReviewPage session={session} />} />
-                    <Route path="/workbench" element={<Navigate to="/" replace />} />
+                    <Route path="/workbench" element={<WorkbenchWithTopics identityControl={session.control} />} />
                     <Route path="*" element={<main className="center-state"><h1>页面不存在</h1><Link to="/" className="action-link">返回驾驶舱</Link></main>} />
                   </Routes>
                 </Suspense>

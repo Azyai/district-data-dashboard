@@ -1,12 +1,11 @@
 import { useEffect, useRef } from 'react'
-import type { ReactNode } from 'react'
 import { Link, useLocation, useParams } from 'react-router'
 import LocalDistrictModel from './LocalDistrictModel'
 import { isTwinId, twinPath, twinSites } from './twinSites'
 import './cockpit.css'
 import './twin-scene.css'
 
-export default function TwinScene({ identityControl }: { identityControl: ReactNode }) {
+export default function TwinScene() {
   const { twinId } = useParams()
   const location = useLocation()
   const heading = useRef<HTMLHeadingElement>(null)
@@ -32,7 +31,6 @@ export default function TwinScene({ identityControl }: { identityControl: ReactN
           <Link to={backPath} className="twin-back"><span aria-hidden="true">←</span> 返回驾驶舱</Link>
           <span className="twin-header-title">数字孪生</span>
         </nav>
-        <div className="cockpit-actions">{identityControl}</div>
       </header>
       <main className="twin-body">
         <div className="twin-title">

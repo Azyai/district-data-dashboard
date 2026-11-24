@@ -1,21 +1,13 @@
-import { keepPreviousData, queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
-import { Link, useLocation, useMatch, useNavigate } from 'react-router'
-import { ApiError, dashboardApi, type CockpitArea, type CockpitDirectory } from '../../api/client'
-import { answerFromSnapshot } from '../assistant/answer'
-import { interpretCockpitIntent } from '../assistant/intent'
-import type { AssistantReply } from '../assistant/VoiceAssistant'
-import { matchTopics } from '../topics/topicCatalog'
+import { Link, useMatch, useNavigate } from 'react-router'
+import { dashboardApi, type CockpitArea } from '../../api/client'
 import { twinPath, type TwinId } from './twinSites'
 import './cockpit.css'
 
-const AreaIssuesDialog = lazy(() => import('./AreaIssuesDialog'))
 const LocalDistrictModel = lazy(() => import('./LocalDistrictModel'))
-const VoiceAssistant = lazy(() => import('../assistant/VoiceAssistant').then(module => ({ default: module.VoiceAssistant })))
 const district = 'mentougou'
 const areaRefreshMs = 60_000
-const legacyDirectoryBatchSize = 4
 const time = new Intl.DateTimeFormat('zh-CN', {
   dateStyle: 'medium',
   timeStyle: 'short',
@@ -32,36 +24,12 @@ const areaQuery = (areaId: string) => queryOptions({
   staleTime: areaRefreshMs,
 })
 
-async function readLocationDirectory(signal: AbortSignal, rootSnapshot?: CockpitArea): Promise<CockpitDirectory> {
-  try {
-    return await dashboardApi.locations(signal)
-  } catch (error) {
-    if (!(error instanceof ApiError) || ![401, 404].includes(error.status)) throw error
-    const root = rootSnapshot ?? await dashboardApi.area(district, signal)
-    const entry = (area: Pick<CockpitArea, 'id' | 'name' | 'level'>, parentId: string | null) =>
-      ({ id: area.id, name: area.name, level: area.level, parentId })
-    const locations: CockpitDirectory = [entry(root, null)]
-    for (let start = 0; start < root.children.length; start += legacyDirectoryBatchSize) {
-      signal.throwIfAborted()
-      const children = root.children.slice(start, start + legacyDirectoryBatchSize)
-      const branches = await Promise.all(children.map(child => dashboardApi.area(child.id, signal)))
-      for (const branch of branches) {
-        locations.push(entry(branch, root.id))
-        for (const child of branch.children) locations.push(entry(child, branch.id))
-      }
-    }
-    return locations
-  }
-}
-
 function formatTime(updatedAt: string) {
   const date = new Date(updatedAt)
   return Number.isNaN(date.getTime()) ? '暂未发布' : time.format(date)
 }
 
 const iconPaths = {
-  grid: 'M3.5 3.5h6v6h-6zm11 0h6v6h-6zm-11 11h6v6h-6zm11 0h6v6h-6z',
-  spark: 'M12 3c0 4.97 4.03 9 9 9-4.97 0-9 4.03-9 9 0-4.97-4.03-9-9-9 4.97 0 9-4.03 9-9z',
   pin: 'M20 10c0 5-8 10-8 10S4 15 4 10a8 8 0 1 1 16 0zM14.5 10a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0z',
   pulse: 'M3 12h4l3-6 4 12 3-6h4',
   layers: 'm12 3 9 5-9 5-9-5 9-5zm-9 9 9 5 9-5m-18 4 9 5 9-5',
@@ -78,9 +46,7 @@ function CockpitIcon({ name }: { name: IconName }) {
   )
 }
 
-function Masthead({ identityControl, topicControl, onAsk }: {
-  identityControl: ReactNode; topicControl?: ReactNode; onAsk?: () => void
-}) {
+function Masthead() {
   return (
     <header className="cockpit-masthead">
       <div className="masthead-name">
@@ -89,16 +55,6 @@ function Masthead({ identityControl, topicControl, onAsk }: {
         </Link>
         <h1>门头沟区数字驾驶舱</h1>
       </div>
-      <nav className="cockpit-actions" aria-label="驾驶舱工具">
-        <a href="/admin" target="_blank" rel="noopener noreferrer" title="在新标签页打开数据管理" className="cockpit-admin-link">
-          <CockpitIcon name="grid" />数据管理
-        </a>
-        {identityControl}
-        {topicControl}
-        {onAsk && <button type="button" className="cockpit-ai-link" aria-haspopup="dialog" onClick={onAsk}>
-          <CockpitIcon name="spark" />AI 问数
-        </button>}
-      </nav>
     </header>
   )
 }
@@ -126,18 +82,16 @@ function AreaBar({ area }: { area: CockpitArea }) {
   )
 }
 
-function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwin, onInspect }: {
+function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwin }: {
   area: CockpitArea
   viewMode: '2d' | '3d'
   onViewModeChange: (mode: '2d' | '3d') => void
   onSelectArea: (areaId: string) => void
   onOpenTwin: (id: TwinId) => void
-  onInspect: () => void
 }) {
-  const parent = area.breadcrumbs.at(-2)
   const isDistrict = area.level === 'district'
   return (
-    <section className="map-panel" aria-labelledby="area-model">
+    <section className="map-panel" data-level={area.level} aria-labelledby="area-model">
       <div className="map-toolbar">
         <div className="map-heading">
           <h2 id="area-model"><CockpitIcon name="layers" />{area.name}模型</h2>
@@ -146,9 +100,8 @@ function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwi
           </span>}
         </div>
         <div className="map-actions">
-          {parent && <button type="button" className="level-up" aria-haspopup="dialog" onClick={onInspect}>
-            <CockpitIcon name="pulse" />查看问题
-          </button>}
+          {!isDistrict && <a className="level-up" href={'/workbench?area=' + encodeURIComponent(area.id) + '#area-issues'}
+            target="_blank" rel="noopener noreferrer"><CockpitIcon name="pulse" />区域数据</a>}
           {area.children.length > 0 && (
             <details className="region-picker" key={area.id}
               onKeyDown={event => {
@@ -176,35 +129,15 @@ function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwi
   )
 }
 
-type CockpitProps = {
-  identityControl: ReactNode
-  topicControl?: ReactNode
-  onTopicQuestion?: (question: string, area: CockpitArea, signal: AbortSignal) => Promise<AssistantReply | null | undefined>
-}
-
-export default function Cockpit({ identityControl, topicControl, onTopicQuestion }: CockpitProps) {
+export default function Cockpit() {
   const areaId = useMatch('/areas/:areaId')?.params.areaId ?? district
-  const location = useLocation()
   const navigate = useNavigate()
-  const client = useQueryClient()
-  const [overlay, setOverlay] = useState<'assistant' | 'issues' | null>(
-    () => location.hash === '#voice-assistant' ? 'assistant' : location.hash === '#area-issues' ? 'issues' : null,
-  )
-  const [assistantOpened, setAssistantOpened] = useState(() => location.hash === '#voice-assistant')
-  const [issuesOpened, setIssuesOpened] = useState(() => location.hash === '#area-issues')
-  const [highlightedSignal, setHighlightedSignal] = useState<string>()
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
   const heading = useRef<HTMLDivElement>(null)
   const lastArea = useRef(areaId)
   const zone = useQuery({ ...areaQuery(areaId), placeholderData: keepPreviousData, refetchInterval: areaRefreshMs })
   const area = zone.isPlaceholderData ? undefined : zone.data
   const displayedArea = zone.data
-
-  useEffect(() => {
-    if (location.hash === '#voice-assistant' || location.hash === '#area-issues') {
-      void navigate({ pathname: location.pathname, search: location.search }, { replace: true })
-    }
-  }, [location.hash, location.pathname, location.search, navigate])
 
   useEffect(() => {
     if (area && lastArea.current !== area.id) {
@@ -214,76 +147,9 @@ export default function Cockpit({ identityControl, topicControl, onTopicQuestion
     }
   }, [area])
 
-  function openAssistant() {
-    setAssistantOpened(true)
-    setOverlay('assistant')
-  }
-
-  function openIssues(signalId?: string) {
-    setHighlightedSignal(signalId)
-    setIssuesOpened(true)
-    setOverlay('issues')
-  }
-
-  async function handleQuestion(question: string, previousMetricId: string | undefined, signal: AbortSignal): Promise<AssistantReply | null> {
-    if (!area) return null
-    const origin = location.pathname
-    const ensureCurrentView = () => {
-      signal.throwIfAborted()
-      if (window.location.pathname !== origin) throw new DOMException('已切换区域', 'AbortError')
-    }
-    const locations = await client.fetchQuery({
-      queryKey: ['cockpit-locations'],
-      queryFn: ({ signal: directorySignal }) =>
-        readLocationDirectory(directorySignal, client.getQueryData(areaQuery(district).queryKey)),
-      staleTime: 300_000,
-    })
-    ensureCurrentView()
-    const intent = interpretCockpitIntent(question, area.id, locations, text => matchTopics(text).length > 0)
-    if (intent.kind === 'clarify') {
-      if (intent.reason === 'missing-navigation-target' && onTopicQuestion) {
-        const reply = await onTopicQuestion(question, area, signal)
-        if (reply !== undefined) {
-          signal.throwIfAborted()
-          if (reply === null) setOverlay(null)
-          return reply
-        }
-      }
-      return { answer: { text: intent.message, evidence: '' } }
-    }
-
-    const destination = intent.areaId === area.id ? area : await client.fetchQuery(areaQuery(intent.areaId))
-    ensureCurrentView()
-    if (intent.kind === 'ask' && onTopicQuestion) {
-      const reply = await onTopicQuestion(intent.question, destination, signal)
-      signal.throwIfAborted()
-      if (reply !== undefined) {
-        if (reply === null) setOverlay(null)
-        return reply
-      }
-      ensureCurrentView()
-    }
-    if (destination.id !== area.id) void navigate(areaPath(destination.id))
-    if (intent.kind === 'navigate') {
-      setOverlay(null)
-      return null
-    }
-    if (intent.kind === 'problems') {
-      openIssues()
-      return null
-    }
-
-    const isSameArea = destination.id === area.id
-    return {
-      answer: answerFromSnapshot(intent.question, destination, isSameArea ? previousMetricId : undefined),
-      scope: destination,
-      returnTo: isSameArea ? undefined : { name: area.name, path: areaPath(area.id) },
-    }
-  }
-
   return (
     <div className="cockpit">
-      <Masthead identityControl={identityControl} topicControl={topicControl} onAsk={area ? openAssistant : undefined} />
+      <Masthead />
       <main className="cockpit-body" aria-label="区域驾驶舱">
         {displayedArea ? (
           <div className="cockpit-area" inert={zone.isPlaceholderData} aria-busy={zone.isPlaceholderData}>
@@ -291,7 +157,7 @@ export default function Cockpit({ identityControl, topicControl, onTopicQuestion
 
             <div className="cockpit-main">
               <RegionModel area={displayedArea} viewMode={viewMode} onViewModeChange={setViewMode}
-                onInspect={openIssues} onSelectArea={id => { void navigate(areaPath(id)) }}
+                onSelectArea={id => { void navigate(areaPath(id)) }}
                 onOpenTwin={id => { void navigate(twinPath(id), { state: { backArea: displayedArea.id } }) }} />
             </div>
           </div>
@@ -308,18 +174,6 @@ export default function Cockpit({ identityControl, topicControl, onTopicQuestion
           </section>
         )}
       </main>
-      {area && (assistantOpened || issuesOpened) && (
-        <Suspense fallback={null}>
-          {assistantOpened && (
-            <VoiceAssistant area={area} open={overlay === 'assistant'}
-              onClose={() => setOverlay(null)} onQuestion={handleQuestion} />
-          )}
-          {issuesOpened && (
-            <AreaIssuesDialog area={area} open={overlay === 'issues'} signalId={highlightedSignal}
-              onClose={() => setOverlay(null)} />
-          )}
-        </Suspense>
-      )}
     </div>
   )
 }
