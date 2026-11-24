@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { cloneMaterial, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer } from '../src/features/designer/draftLayout.ts'
+import { alignComponents, cloneMaterial, componentBounds, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer } from '../src/features/designer/draftLayout.ts'
 
 const canvas = { width: 1920, height: 1080 }
 const geometry = { x: 48, y: 40, width: 592, height: 148, z: 1 }
@@ -26,6 +26,37 @@ test('clamps moves and sizes to the canvas and enforces the server minimum dimen
   assert.deepEqual(moveGeometry(geometry, -9999, 9999, canvas), { ...geometry, x: 0, y: 932 })
   assert.deepEqual(resizeGeometry(geometry, -9999, -9999, canvas), { ...geometry, width: 160, height: 120 })
   assert.deepEqual(resizeGeometry(geometry, 9999, 9999, canvas), { ...geometry, width: 1872, height: 1040 })
+})
+
+test('aligns all six sides and axes to a group while leaving sizes, layers and unselected components intact', () => {
+  const second = { ...material, id: 'second', geometry: { x: 500, y: 198, width: 300, height: 200, z: 4 } }
+  const unselected = { ...material, id: 'unselected', geometry: { ...geometry, x: 1100, y: 600, z: 6 } }
+  const input = [material, second, unselected]
+  const selection = new Set([material.id, second.id])
+  const cases = {
+    left: ['x', 48, 48], center: ['x', 128, 274], right: ['x', 208, 500],
+    top: ['y', 40, 40], middle: ['y', 145, 119], bottom: ['y', 250, 198],
+  }
+  assert.deepEqual(componentBounds([material, second]), { x: 48, y: 40, width: 752, height: 358 })
+  for (const [direction, [axis, firstTarget, secondTarget]] of Object.entries(cases)) {
+    const aligned = alignComponents(input, selection, direction, canvas)
+    assert.deepEqual(aligned[0].geometry, { ...material.geometry, [axis]: firstTarget }, direction)
+    assert.deepEqual(aligned[1].geometry, { ...second.geometry, [axis]: secondTarget }, direction)
+    assert.strictEqual(aligned[2], unselected)
+  }
+  assert.deepEqual(material.geometry, geometry)
+  assert.strictEqual(alignComponents(input, new Set([material.id, 'removed']), 'left', canvas), input)
+  const aligned = alignComponents(input, selection, 'left', canvas)
+  assert.strictEqual(alignComponents(aligned, selection, 'left', canvas), aligned)
+})
+
+test('centers mixed odd and even sizes on integer positions within canvas bounds', () => {
+  const wide = { ...material, geometry: { x: 0, y: 0, width: 1919, height: 151, z: 1 } }
+  const narrow = { ...material, id: 'narrow', geometry: { x: 1, y: 930, width: 180, height: 150, z: 2 } }
+  const input = [wide, narrow]
+  const selection = new Set([wide.id, narrow.id])
+  assert.deepEqual(alignComponents(input, selection, 'center', canvas).map(component => component.geometry.x), [0, 870])
+  assert.deepEqual(alignComponents(input, selection, 'middle', canvas).map(component => component.geometry.y), [465, 465])
 })
 
 test('clones a material with a bounded unique ID and a separate layer', () => {

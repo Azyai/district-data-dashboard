@@ -3,6 +3,7 @@ import type { ComponentData, Manifest } from '../../api/client'
 export type ScreenComponent = Manifest['components'][number]
 export type Geometry = ScreenComponent['geometry']
 export type CanvasSize = Manifest['canvas']
+export type Alignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
 
 export const maxComponents = 20
 
@@ -33,6 +34,45 @@ export function resizeGeometry(geometry: Geometry, deltaX: number, deltaY: numbe
     width: clamp(geometry.width + canvasDelta(deltaX, scale), minWidth, canvas.width - geometry.x),
     height: clamp(geometry.height + canvasDelta(deltaY, scale), minHeight, canvas.height - geometry.y),
   }
+}
+
+export function componentBounds(components: readonly ScreenComponent[]) {
+  if (!components.length) return null
+  const geometries = components.map(component => component.geometry)
+  const x = Math.min(...geometries.map(geometry => geometry.x))
+  const y = Math.min(...geometries.map(geometry => geometry.y))
+  const right = Math.max(...geometries.map(geometry => geometry.x + geometry.width))
+  const bottom = Math.max(...geometries.map(geometry => geometry.y + geometry.height))
+  return { x, y, width: right - x, height: bottom - y }
+}
+
+function alignmentLine(geometry: Omit<Geometry, 'z'>, alignment: Alignment) {
+  switch (alignment) {
+    case 'left': return geometry.x
+    case 'center': return geometry.x + geometry.width / 2
+    case 'right': return geometry.x + geometry.width
+    case 'top': return geometry.y
+    case 'middle': return geometry.y + geometry.height / 2
+    case 'bottom': return geometry.y + geometry.height
+  }
+}
+
+export function alignComponents(
+  components: ScreenComponent[], selection: ReadonlySet<string>, alignment: Alignment, canvas: CanvasSize,
+): ScreenComponent[] {
+  const selected = components.filter(component => selection.has(component.id))
+  if (selected.length < 2) return components
+  const bounds = componentBounds(selected)
+  if (!bounds) return components
+  const target = alignmentLine(bounds, alignment)
+  const horizontal = alignment === 'left' || alignment === 'center' || alignment === 'right'
+  const aligned = components.map(component => {
+    if (!selection.has(component.id)) return component
+    const offset = target - alignmentLine(component.geometry, alignment)
+    const geometry = moveGeometry(component.geometry, horizontal ? offset : 0, horizontal ? 0 : offset, canvas)
+    return geometry.x === component.geometry.x && geometry.y === component.geometry.y ? component : { ...component, geometry }
+  })
+  return aligned.every((component, index) => component === components[index]) ? components : aligned
 }
 
 export function cloneMaterial(material: ScreenComponent, components: ScreenComponent[], canvas: CanvasSize): ScreenComponent {
