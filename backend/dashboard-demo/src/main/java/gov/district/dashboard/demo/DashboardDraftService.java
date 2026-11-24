@@ -39,7 +39,7 @@ public class DashboardDraftService {
     }
 
     public Workspace read(String projectId) {
-        Manifest template = playback.draftTemplate(projectId);
+        Manifest template = DemoPlaybackService.draftTemplate(projectId);
         List<DraftRow> rows = mapper.find(projectId);
         int revision = rows.isEmpty() ? 0 : rows.getFirst().revision();
         List<Component> components = rows.isEmpty() ? template.components() : rows.stream()
@@ -51,7 +51,7 @@ public class DashboardDraftService {
 
     @Transactional
     public SavedDraft save(String projectId, int revision, List<Component> components) {
-        List<Component> layout = validatedLayout(playback.draftTemplate(projectId), components);
+        List<Component> layout = validatedLayout(DemoPlaybackService.draftTemplate(projectId), components);
         if (revision == 0) {
             try {
                 mapper.create(projectId);
@@ -70,7 +70,7 @@ public class DashboardDraftService {
         return new SavedDraft(revision + 1, layout);
     }
 
-    private static List<Component> validatedLayout(Manifest template, List<Component> components) {
+    static List<Component> validatedLayout(Manifest template, List<Component> components) {
         if (components.size() > MAX_COMPONENTS) {
             throw invalid();
         }

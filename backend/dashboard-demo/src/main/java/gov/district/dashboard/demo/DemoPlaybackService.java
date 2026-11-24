@@ -47,9 +47,11 @@ public final class DemoPlaybackService {
     private static final List<Project> PROJECTS = List.of(CITY, SERVICES);
 
     private final DemoObservationMapper observations;
+    private final DashboardReleaseService releases;
 
-    DemoPlaybackService(DemoObservationMapper observations) {
+    DemoPlaybackService(DemoObservationMapper observations, DashboardReleaseService releases) {
         this.observations = observations;
+        this.releases = releases;
     }
 
     public List<ProjectSummary> recommendations(CurrentIdentity viewer) {
@@ -63,25 +65,37 @@ public final class DemoPlaybackService {
     }
 
     public Manifest manifest(CurrentIdentity viewer, String projectId) {
-        return visibleProject(viewer, projectId).manifest();
+        return liveProject(visibleProject(viewer, projectId)).manifest();
     }
 
     public BatchQueryResult query(CurrentIdentity viewer, String projectId, String releaseId,
                                   List<String> componentIds) {
-        Project project = visibleProject(viewer, projectId);
+        Project project = liveProject(visibleProject(viewer, projectId));
         if (!project.manifest().releaseId().equals(releaseId)) {
             throw new ApiFailure(ApiCode.RELEASE_CONFLICT);
         }
         return query(project, componentIds);
     }
 
-    Manifest draftTemplate(String projectId) {
+    public static Manifest draftTemplate(String projectId) {
         return project(projectId).manifest();
     }
 
-    BatchQueryResult draftSnapshot(String projectId) {
+    public BatchQueryResult draftSnapshot(String projectId) {
         Project project = project(projectId);
         return query(project, project.manifest().components().stream().map(Component::id).toList());
+    }
+
+    private Project liveProject(Project original) {
+        Manifest template = original.manifest();
+        var active = releases.active(template.projectId());
+        if (active.serial() == 0) {
+            return original;
+        }
+        var manifest = new Manifest(template.schemaVersion(), template.projectId(),
+                template.projectId() + "-live-" + active.serial(), template.title(), template.description(),
+                template.theme(), template.canvas(), active.components() == null ? template.components() : active.components());
+        return new Project(manifest, original.snapshotId(), original.requiredRole());
     }
 
     private BatchQueryResult query(Project project, List<String> componentIds) {
@@ -118,7 +132,7 @@ public final class DemoPlaybackService {
         return project;
     }
 
-    private Project project(String projectId) {
+    private static Project project(String projectId) {
         return PROJECTS.stream()
                 .filter(project -> project.manifest().projectId().equals(projectId))
                 .findFirst()
