@@ -102,7 +102,8 @@ function network(
   const large = prominent && width >= 520
   const count = points.length
   const showValues = large || (prominent && width >= 300 && count <= 6)
-  const horizontalInset = large ? Math.max(142, width * .19) : Math.max(showValues ? 70 : narrow ? 50 : 58, width * .15)
+  const horizontalInset = large ? Math.max(142, width * .19) : Math.max(showValues ? 84 : narrow ? 50 : 58, width * .15)
+  const verticalInset = Math.max(large ? 76 : showValues ? 43 : 24, height * .17)
   const centerSize = large ? Math.min(116, width * .17) : Math.max(39, Math.min(60, width * .2))
   const rx = width * .35
   const ry = height * .34
@@ -122,8 +123,8 @@ function network(
       layout: 'none',
       left: horizontalInset,
       right: horizontalInset,
-      top: Math.max(24, height * .17),
-      bottom: Math.max(24, height * .17),
+      top: verticalInset,
+      bottom: verticalInset,
       roam: false,
       cursor: 'default',
       symbol: 'circle',
