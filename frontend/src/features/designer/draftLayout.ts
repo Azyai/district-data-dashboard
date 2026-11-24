@@ -4,6 +4,7 @@ export type ScreenComponent = Manifest['components'][number]
 export type Geometry = ScreenComponent['geometry']
 export type CanvasSize = Manifest['canvas']
 export type Alignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom'
+export type AlignmentReference = 'selection' | 'canvas'
 
 export const maxComponents = 20
 
@@ -59,20 +60,28 @@ function alignmentLine(geometry: Omit<Geometry, 'z'>, alignment: Alignment) {
 
 export function alignComponents(
   components: ScreenComponent[], selection: ReadonlySet<string>, alignment: Alignment, canvas: CanvasSize,
+  reference: AlignmentReference = 'selection',
 ): ScreenComponent[] {
   const selected = components.filter(component => selection.has(component.id))
-  if (selected.length < 2) return components
-  const bounds = componentBounds(selected)
-  if (!bounds) return components
-  const target = alignmentLine(bounds, alignment)
-  const horizontal = alignment === 'left' || alignment === 'center' || alignment === 'right'
+  const guide = alignmentGuide(selected, alignment, canvas, reference)
+  if (!guide) return components
   const aligned = components.map(component => {
     if (!selection.has(component.id)) return component
-    const offset = target - alignmentLine(component.geometry, alignment)
-    const geometry = moveGeometry(component.geometry, horizontal ? offset : 0, horizontal ? 0 : offset, canvas)
+    const offset = guide.offset - alignmentLine(component.geometry, alignment)
+    const geometry = moveGeometry(component.geometry, guide.axis === 'x' ? offset : 0, guide.axis === 'y' ? offset : 0, canvas)
     return geometry.x === component.geometry.x && geometry.y === component.geometry.y ? component : { ...component, geometry }
   })
   return aligned.every((component, index) => component === components[index]) ? components : aligned
+}
+
+export function alignmentGuide(
+  selected: readonly ScreenComponent[], alignment: Alignment, canvas: CanvasSize, reference: AlignmentReference,
+) {
+  if (!selected.length || (reference === 'selection' && selected.length < 2)) return null
+  const bounds = reference === 'canvas' ? { x: 0, y: 0, ...canvas } : componentBounds(selected)
+  if (!bounds) return null
+  const axis = alignment === 'left' || alignment === 'center' || alignment === 'right' ? 'x' : 'y'
+  return { axis, offset: alignmentLine(bounds, alignment) } as const
 }
 
 export function cloneMaterial(material: ScreenComponent, components: ScreenComponent[], canvas: CanvasSize): ScreenComponent {

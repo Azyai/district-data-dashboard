@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { alignComponents, cloneMaterial, componentBounds, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer } from '../src/features/designer/draftLayout.ts'
+import { alignComponents, alignmentGuide, cloneMaterial, componentBounds, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer } from '../src/features/designer/draftLayout.ts'
 
 const canvas = { width: 1920, height: 1080 }
 const geometry = { x: 48, y: 40, width: 592, height: 148, z: 1 }
@@ -57,6 +57,23 @@ test('centers mixed odd and even sizes on integer positions within canvas bounds
   const selection = new Set([wide.id, narrow.id])
   assert.deepEqual(alignComponents(input, selection, 'center', canvas).map(component => component.geometry.x), [0, 870])
   assert.deepEqual(alignComponents(input, selection, 'middle', canvas).map(component => component.geometry.y), [465, 465])
+})
+
+test('aligns one selected component to the canvas with a matching edge or center guide', () => {
+  const unchanged = { ...material, id: 'unchanged' }
+  const original = [material, unchanged]
+  const selection = new Set([material.id])
+  assert.equal(alignmentGuide([material], 'left', canvas, 'selection'), null)
+  assert.deepEqual(alignmentGuide([material], 'center', canvas, 'canvas'), { axis: 'x', offset: 960 })
+  const expected = {
+    left: ['x', 0], center: ['x', 664], right: ['x', 1328],
+    top: ['y', 0], middle: ['y', 466], bottom: ['y', 932],
+  }
+  for (const [direction, [axis, offset]] of Object.entries(expected)) {
+    const transformed = alignComponents(original, selection, direction, canvas, 'canvas')
+    assert.deepEqual(transformed[0].geometry, { ...geometry, [axis]: offset })
+    assert.strictEqual(transformed[1], unchanged)
+  }
 })
 
 test('clones a material with a bounded unique ID and a separate layer', () => {
