@@ -1,18 +1,59 @@
-import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
+import { useEffect, useId, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react'
 import './map-globe-control.css'
 
 type View = '2d' | '3d'
 type Position = { x: number; y: number }
 type Drag = { id: number; start: Position; origin: Position; moved: boolean }
-type Props = { view: View; onViewChange: (view: View) => void; onReset: () => void }
+type Orientation = { bearing: number; pitch: number }
+type Props = {
+  view: View
+  onViewChange: (view: View) => void
+  onReset: () => void
+  orientation?: Orientation & { onChange: (orientation: Orientation) => void }
+  attribution?: ReactNode
+}
 
 const clamp = (value: number) => Math.max(0, Math.min(1, value))
+const minPitch = 0
+const maxPitch = 65
 const directions: Record<string, Position> = {
   ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
 }
 
-export default function MapGlobeControl({ view, onViewChange, onReset }: Props) {
+function OrientationTools({ bearing, pitch, onChange }: NonNullable<Props['orientation']>) {
+  function tilt(delta: number) {
+    const next = Math.max(minPitch, Math.min(maxPitch, pitch + delta))
+    if (next !== pitch) onChange({ bearing, pitch: next })
+  }
+
+  const heading = (Math.round(bearing) % 360 + 360) % 360
+  return (
+    <fieldset className="map-globe-orient">
+      <legend>调整 3D 视角</legend>
+      <div className="map-globe-orient-row">
+        <span>方向 <b>{heading}°</b></span>
+        <button type="button" title="向左旋转" aria-label="向左旋转"
+          onClick={() => onChange({ bearing: bearing - 15, pitch })}><span aria-hidden="true">↶</span></button>
+        <button type="button" title="向右旋转" aria-label="向右旋转"
+          onClick={() => onChange({ bearing: bearing + 15, pitch })}><span aria-hidden="true">↷</span></button>
+      </div>
+      <div className="map-globe-orient-row">
+        <span>俯仰 <b>{Math.round(pitch)}°</b></span>
+        <button type="button" title="减小俯仰" aria-label="减小俯仰"
+          aria-disabled={pitch <= minPitch} onClick={() => tilt(-10)}><span aria-hidden="true">−</span></button>
+        <button type="button" title="增大俯仰" aria-label="增大俯仰"
+          aria-disabled={pitch >= maxPitch} onClick={() => tilt(10)}><span aria-hidden="true">＋</span></button>
+      </div>
+      <button className="map-globe-north" type="button" onClick={() => onChange({ bearing: 0, pitch })}>
+        <span aria-hidden="true">↑</span> 朝向正北
+      </button>
+      <p className="map-globe-gesture">右键拖动调整视角</p>
+    </fieldset>
+  )
+}
+
+export default function MapGlobeControl({ view, onViewChange, onReset, orientation, attribution }: Props) {
   const frame = useRef<HTMLDivElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const drag = useRef<Drag | undefined>(undefined)
@@ -98,19 +139,24 @@ export default function MapGlobeControl({ view, onViewChange, onReset }: Props) 
       <span className="map-globe-sr" id={id + '-help'}>点击打开工具，拖动或使用方向键移动按钮。</span>
       {open && (
         <div className="map-globe-panel" id={id} role="group" aria-label="地图视角"
-          data-below={position.y < .5} data-align-end={position.x >= .5}>
+          data-below={position.y < .5} data-align-end={position.x >= .5} data-orientation={Boolean(orientation)}>
           <div className="map-globe-modes">
             {(['2d', '3d'] as const).map(mode => (
               <button key={mode} type="button" aria-pressed={view === mode}
-                onClick={() => { onViewChange(mode); close() }}>{mode.toUpperCase()}</button>
+                onClick={() => {
+                  onViewChange(mode)
+                  if (!orientation || mode === '2d') close()
+                }}>{mode.toUpperCase()}</button>
             ))}
           </div>
+          {view === '3d' && orientation && <OrientationTools {...orientation} />}
           <button type="button" className="map-globe-reset" onClick={() => { onReset(); close() }}>
             <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.55" aria-hidden="true">
               <circle cx="10" cy="10" r="5.4" /><path d="M10 2v4m0 8v4M2 10h4m8 0h4" />
             </svg>
             复位视角
           </button>
+          {attribution && <div className="map-globe-attribution">{attribution}</div>}
         </div>
       )}
     </div>
