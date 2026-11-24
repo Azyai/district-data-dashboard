@@ -1,5 +1,6 @@
 package gov.district.dashboard.bootstrap;
 
+import gov.district.dashboard.bootstrap.security.WorkspaceSecurity;
 import gov.district.dashboard.platform.api.ApiCode;
 import java.net.CookieManager;
 import java.net.CookiePolicy;
@@ -240,6 +241,43 @@ class DemoApiIntegrationTests {
         }
     }
 
+    @Test
+    void keepsManagementAndDisplayIdentitiesAndCsrfTokensSeparateInOneBrowser() throws Exception {
+        String management = "management";
+        String admin = "/admin/sources";
+        try (var browser = new Browser()) {
+            JsonNode service = browser.login("service");
+            String initialSession = browser.sessionId();
+            Csrf displayToken = browser.csrf();
+            var manifest = browser.get(manifestPath(SERVICES), ApiCode.OK);
+            String batch = batchPayload(manifest.path("releaseId").asString(),
+                    manifest.path("components").get(0).path("id").asString());
+
+            browser.get("/me", management, ApiCode.AUTH_REQUIRED);
+            browser.post("/auth/demo-session", persona("data-admin"), displayToken, management, ApiCode.CSRF_INVALID);
+            JsonNode manager = browser.login("data-admin", management);
+            assertThat(browser.sessionId()).isNotEqualTo(initialSession);
+            assertOldSessionRejected(initialSession);
+            assertThat(browser.get("/me", management, ApiCode.OK)).isEqualTo(manager);
+            assertThat(browser.get("/me", ApiCode.OK)).isEqualTo(service);
+            browser.get(admin, management, ApiCode.OK);
+            browser.get(admin, ApiCode.ACCESS_DENIED);
+            browser.get(manifestPath(SERVICES), management, ApiCode.PROJECT_NOT_FOUND);
+            browser.post(queryPath(SERVICES), batch, displayToken, ApiCode.OK);
+
+            Csrf managerToken = browser.csrf(management);
+            browser.post("/auth/logout", null, displayToken, management, ApiCode.CSRF_INVALID);
+            browser.post("/auth/logout", null, displayToken, ApiCode.OK);
+            browser.get("/me", ApiCode.AUTH_REQUIRED);
+            browser.get(admin, management, ApiCode.OK);
+            assertThat(browser.login("service")).isEqualTo(service);
+            browser.post("/auth/logout", null, managerToken, management, ApiCode.OK);
+            browser.get("/me", management, ApiCode.AUTH_REQUIRED);
+            assertThat(browser.get("/me", ApiCode.OK)).isEqualTo(service);
+            browser.get(manifestPath(SERVICES), ApiCode.OK);
+            browser.post("/auth/demo-session", persona("data-admin"), managerToken, management, ApiCode.CSRF_INVALID);
+        }
+    }
 
     @Test
     void servesAnonymousCockpitAcrossThreeLevels() throws Exception {
@@ -415,11 +453,19 @@ class DemoApiIntegrationTests {
                 .build();
 
         private JsonNode get(String path, ApiCode expected) throws Exception {
-            return exchange(client, request(path).GET().build(), expected);
+            return get(path, null, expected);
+        }
+
+        private JsonNode get(String path, String workspace, ApiCode expected) throws Exception {
+            return exchange(client, scopedRequest(path, workspace).GET().build(), expected);
         }
 
         private JsonNode post(String path, String payload, Csrf csrf, ApiCode expected) throws Exception {
-            var builder = request(path);
+            return post(path, payload, csrf, null, expected);
+        }
+
+        private JsonNode post(String path, String payload, Csrf csrf, String workspace, ApiCode expected) throws Exception {
+            var builder = scopedRequest(path, workspace);
             if (csrf != null) {
                 builder.header(csrf.headerName(), csrf.token());
             }
@@ -428,6 +474,11 @@ class DemoApiIntegrationTests {
                 return exchange(client, builder.POST(HttpRequest.BodyPublishers.ofString(payload)).build(), expected);
             }
             return exchange(client, builder.POST(HttpRequest.BodyPublishers.noBody()).build(), expected);
+        }
+
+        private HttpRequest.Builder scopedRequest(String path, String workspace) {
+            var builder = request(path);
+            return workspace == null ? builder : builder.header(WorkspaceSecurity.WORKSPACE_HEADER, workspace);
         }
 
         private JsonNode uploadCsv(Csrf csrf, ApiCode expected) throws Exception {
@@ -458,7 +509,11 @@ class DemoApiIntegrationTests {
         }
 
         private Csrf csrf() throws Exception {
-            JsonNode csrf = get("/auth/csrf", ApiCode.OK);
+            return csrf(null);
+        }
+
+        private Csrf csrf(String workspace) throws Exception {
+            JsonNode csrf = get("/auth/csrf", workspace, ApiCode.OK);
             String headerName = csrf.path("headerName").asString();
             String token = csrf.path("token").asString();
             assertThat(headerName).matches("X-[A-Za-z0-9-]+");
@@ -467,7 +522,11 @@ class DemoApiIntegrationTests {
         }
 
         private JsonNode login(String personaName) throws Exception {
-            return post("/auth/demo-session", persona(personaName), csrf(), ApiCode.OK);
+            return login(personaName, null);
+        }
+
+        private JsonNode login(String personaName, String workspace) throws Exception {
+            return post("/auth/demo-session", persona(personaName), csrf(workspace), workspace, ApiCode.OK);
         }
 
         private String sessionId() {

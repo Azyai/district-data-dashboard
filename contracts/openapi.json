@@ -3,7 +3,7 @@
   "info": {
     "title": "区政府数字大屏演示 API",
     "version": "0.1.0",
-    "description": "P1 平台底座演示契约，使用合成身份和合成业务数据。"
+    "description": "演示契约，使用合成身份和合成业务数据。同一浏览器可为数据管理和审核请求发送 X-Dashboard-Workspace: management，使用独立的身份和 CSRF 上下文。缺省为展示上下文。同一操作的 CSRF 获取与写请求应使用相同上下文。"
   },
   "servers": [
     {
