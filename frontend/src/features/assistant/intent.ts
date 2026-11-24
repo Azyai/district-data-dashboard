@@ -9,7 +9,7 @@ export type CockpitIntent =
   | { kind: 'navigate'; areaId: string }
   | { kind: 'problems'; areaId: string; question: string }
   | { kind: 'ask'; areaId: string; question: string }
-  | { kind: 'clarify'; message: string }
+  | { kind: 'clarify'; message: string; reason?: 'missing-navigation-target' }
 
 type Mention = {
   start: number
@@ -35,7 +35,7 @@ const problemList = new RegExp('^(?:(?:查看|列出|显示|看看|看一下|看
 const areaEnd = /(?:街道办事处|街道|社区|乡|镇|村|区|县)$/
 const likelyUnknownArea = /[\p{Script=Han}]{1,18}(?:街道|社区|新区|乡|镇|村|区|县)(?=的|里|有|办结率|治理事件|服务办件|预警|数据|$)/u
 const nonNames = /^(?:社区|社区治理|乡镇|镇街|村社|农村|城区|城区社区|地区|区域|辖区|片区|市区|街道|统计区|园区|全域)$/
-const aliasSuffix = /^(?:的|和|与|及|跟|或|这边|那边|今天|现在|之前|目前|最近|昨天|今年|有哪些|有什么|有多少|还剩|办结|受理量|治理|政务|预警|告警|空气|车流|数据|看板|驾驶舱|情况|趋势|吧)/
+const aliasSuffix = /^(?:的|和|与|及|跟|或|这边|那边|今天|现在|之前|目前|最近|昨天|今年|有哪些|有什么|有多少|还剩|办结|受理量|治理|政务|预警|告警|空气|车流|数据|看板|驾驶舱|情况|趋势|人口|接诉|既诉|即诉|热线|水务|水质|供水|吧)/
 
 function normalize(text: string): string {
   return text.normalize('NFKC').replace(/[\s，。？！、,.!?；;：:“”"「」]/g, '')
@@ -141,6 +141,7 @@ export function interpretCockpitIntent(
   question: string,
   currentAreaId: string,
   locations: readonly CockpitLocation[],
+  isTopicQuestion?: (question: string) => boolean,
 ): CockpitIntent {
   const text = normalize(question).replace(polite, '')
   const byId = new Map(locations.filter((item) => locationId.test(item.id)).map((item) => [item.id, item]))
@@ -184,7 +185,7 @@ export function interpretCockpitIntent(
     return { kind: 'clarify', message: '没有找到该区域。请使用区、镇街或村社的名称。' }
   }
 
-  if (problemQuestion.test(residual) || problemList.test(residual)) {
+  if (!isTopicQuestion?.(residual) && (problemQuestion.test(residual) || problemList.test(residual))) {
     return { kind: 'problems', areaId, question }
   }
   const requestedRegion = Boolean(selected) || remaining !== withoutNames
@@ -193,7 +194,7 @@ export function interpretCockpitIntent(
     return { kind: 'navigate', areaId }
   }
   if (!requestedRegion && explicitNavigation.test(residual) && !questionWords.test(residual.replace(opening, ''))) {
-    return { kind: 'clarify', message: '没有找到要打开的区域。请指定区、镇街或村社。' }
+    return { kind: 'clarify', reason: 'missing-navigation-target', message: '没有找到要打开的区域。请指定区、镇街或村社。' }
   }
   return { kind: 'ask', areaId, question }
 }

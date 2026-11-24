@@ -47,6 +47,15 @@ test('keeps a cross-area metric question intact and preserves ordinary questions
   }
 })
 
+test('resolves topics without bypassing area selection or generic issue routing', () => {
+  const topic = (question) => interpretCockpitIntent(question, 'mentougou', locations, text => /水务|人口|诉求/.test(text))
+  assert.equal(topic('打开人口专题').reason, 'missing-navigation-target')
+  assert.deepEqual(topic('大台水务有哪些问题'), questionAction('ask', 'datai', '大台水务有哪些问题'))
+  assert.deepEqual(topic('哪类诉求最多'), questionAction('ask', 'mentougou', '哪类诉求最多'))
+  assert.deepEqual(topic('大台有哪些问题'), questionAction('problems', 'datai', '大台有哪些问题'))
+  assert.equal(topic('新港街道的水务数据').reason, undefined)
+})
+
 test('uses longest official names and explicit ancestor qualifiers', () => {
   assert.deepEqual(parse('打开军庄镇'), navigate('junzhuang'))
   assert.deepEqual(parse('打开军庄村'), navigate('junzhuang-junzhuang'))
