@@ -77,14 +77,34 @@ async function verifyDistrictMap(page) {
     await page.getByRole('complementary', { name }).locator('li').first().waitFor()
   }
   const choose = async name => {
-    await tool.click()
+    if (await tool.getAttribute('aria-expanded') === 'false') await tool.click()
     await panel.getByRole('button', { name, exact: true }).click()
-    await panel.waitFor({ state: 'hidden' })
+    if (name !== '3D') await panel.waitFor({ state: 'hidden' })
   }
   const zoom = () => map.evaluate(node => Number(node.dataset.zoom))
   for (const mode of ['2D', '3D']) {
     await choose(mode)
     await page.waitForFunction(view => document.querySelector('.tianditu-map')?.dataset.view === view, mode.toLowerCase())
+    if (mode === '3D') {
+      await panel.getByRole('button', { name: '向右旋转' }).click()
+      await panel.getByRole('button', { name: '增大俯仰' }).click()
+      await page.waitForFunction(() => {
+        const data = document.querySelector('.tianditu-map')?.dataset
+        return Number(data?.bearing) === 15 && Number(data?.pitch) === 45
+      })
+      await panel.getByRole('button', { name: '朝向正北' }).click()
+      await page.waitForFunction(() => Number(document.querySelector('.tianditu-map')?.dataset.bearing) === 0)
+      await tool.press('Escape')
+      const anchor = await freeMapPoint(map)
+      await page.mouse.move(anchor.x, anchor.y)
+      await page.mouse.down({ button: 'right' })
+      await page.mouse.move(anchor.x + 45, anchor.y + 25, { steps: 6 })
+      await page.mouse.up({ button: 'right' })
+      await page.waitForFunction(() => {
+        const data = document.querySelector('.tianditu-map')?.dataset
+        return Math.abs(Number(data?.bearing)) > 1 && Math.abs(Number(data?.pitch) - 45) > 1
+      })
+    }
     await choose('复位视角')
     const start = await zoom()
     assert(start > 0)
@@ -148,12 +168,27 @@ async function verifyDistrictMap(page) {
   await page.mouse.up()
   await page.waitForFunction(start => Math.abs(document.querySelector('.map-globe-trigger').getBoundingClientRect().x - start) < 2, beforeDrag.x)
   await choose('2D')
+  for (const [key, direction, limit] of [['Shift+Equal', 1, '50'], ['Shift+Minus', -1, '5000']]) {
+    for (let i = 0; i < 5 && await map.locator('.atlas-scale').getAttribute('data-meters') !== limit; i++) {
+      const previousZoom = await zoom()
+      await canvas.press(key)
+      await zoomChanged(page, previousZoom, direction)
+    }
+    assert.equal(await map.locator('.atlas-scale').getAttribute('data-meters'), limit)
+    await canvas.press(key)
+    await mapLayout(page)
+    const endpoint = await zoom()
+    await canvas.press(key)
+    await mapLayout(page)
+    assert.equal(await zoom(), endpoint)
+  }
+  await choose('复位视角')
   assert.deepEqual(await mapLayout(page), initialLayout)
 }
 
 async function verifyRegionMenuLayout(page) {
   const trigger = page.locator('.region-picker > summary')
-  const menu = page.getByRole('navigation', { name: '下辖区域' })
+  const menu = page.getByRole('navigation', { name: '区域目录' })
   await trigger.scrollIntoViewIfNeeded()
   const original = await pageLayout(page, mapLayoutAnchors)
   await trigger.click()
@@ -190,10 +225,11 @@ try {
   assert.equal(await page.locator('.cockpit-masthead').getByRole('button').count(), 0)
   assert.equal(await page.getByRole('link', { name: '数据管理', exact: true }).count(), 0)
   await page.locator('.cockpit-masthead time[datetime]').waitFor()
-  assert.equal(await page.locator('.area-bar, .model-imagery-source').count(), 0)
+  assert.equal(await page.locator('.area-bar, .model-imagery-source, .atlas-credit').count(), 0)
   await assertNoHorizontalOverflow(page)
   await page.setViewportSize({ width: 1106, height: 893 })
   assert.equal(await page.locator('.map-panel').evaluate(el => parseFloat(getComputedStyle(el).borderTopWidth)), 0)
+  assert.equal(await page.locator('.metric-rail').first().evaluate(el => getComputedStyle(el).borderWidth), '0px')
   assert(await title.evaluate(el => Math.abs(el.getBoundingClientRect().left + el.clientWidth / 2 - innerWidth / 2) < 2))
   await verifyDistrictMap(page)
   await verifyRegionMenuLayout(page)
@@ -218,7 +254,8 @@ try {
   await page.getByRole('link', { name: '返回门头沟区全域' }).click()
   await waitForArea(page, '门头沟区')
   await page.locator('.region-picker > summary').click()
-  const town = page.getByRole('navigation', { name: '下辖区域' }).getByRole('link', { name: '大峪街道' })
+  const directory = page.getByRole('navigation', { name: '区域目录' })
+  const town = directory.getByRole('link', { name: '大峪街道', exact: true })
   await town.focus()
   await town.press('Enter')
   await page.waitForURL('**/areas/dayu')
@@ -228,7 +265,7 @@ try {
   await capture(page, 'cockpit-town.png')
 
   await page.locator('.region-picker > summary').click()
-  const villageLink = page.getByRole('navigation', { name: '下辖区域' }).getByRole('link').first()
+  const villageLink = directory.getByRole('link', { name: '剧场东街社区', exact: true })
   const villageName = await villageLink.textContent()
   await villageLink.click()
   await waitForArea(page, villageName)
@@ -244,6 +281,25 @@ try {
   assert.equal(await workbench.evaluate(() => window.opener), null)
   await workbench.getByRole('button', { name: '区级运行管理者' }).waitFor()
   await page.getByRole('link', { name: '返回上一级 大峪街道' }).click()
+  await waitForArea(page, '大峪街道')
+  await page.locator('.region-picker > summary').click()
+  await directory.getByRole('link', { name: '爨底下村', exact: true }).click()
+  const villageMap = await waitForArea(page, '爨底下村')
+  const villageCanvas = villageMap.locator('canvas')
+  await villageCanvas.focus()
+  for (let i = 0; i < 5 && await villageMap.locator('.atlas-scale').getAttribute('data-meters') !== '5000'; i++) {
+    const before = Number(await villageMap.getAttribute('data-zoom'))
+    await villageCanvas.press('Shift+Minus')
+    await zoomChanged(page, before, -1)
+  }
+  await villageMap.getByRole('button', { name: '查看东斋堂村', exact: true }).click()
+  await page.waitForURL('**/areas/zhaitang-dongzhaitang')
+  await waitForArea(page, '东斋堂村')
+  await page.locator('.region-picker > summary').click()
+  await directory.getByRole('link', { name: '木城涧社区', exact: true }).click()
+  await waitForArea(page, '木城涧社区')
+  await page.locator('.region-picker > summary').click()
+  await directory.getByRole('link', { name: '大峪街道', exact: true }).click()
   await waitForArea(page, '大峪街道')
 
   assert.equal(await page.locator('main #voice-assistant').count(), 0)
