@@ -1,10 +1,16 @@
-import { bars, button, chart, drawing, filaments, fmt, icon, insightSection, insightSelect, insightTable, latest, monthlyChange, months, panel, pct, projectAlertGap, projectGap, projectList, signed } from "./graphics.js";
+import { bars, button, chart, drawing, filaments, fmt, icon, insightSection, insightSelect, insightTable, latest, monthlyChange, panel, pct, projectAlertGap, projectGap, projectList, signed } from "./graphics.js";
+
+const communitiesSource = 'https://invest.beijing.gov.cn/tcgz/tzhd/202606/t20260601_4680281.html';
+const serviceSource = 'https://invest.beijing.gov.cn/zwgk/sqgzdt/202607/t20260721_4774408.html';
+const policySource = 'https://www.beijing.gov.cn/fuwu/lqfw/gggs/202606/t20260612_4697419.html';
+const workspaceSource = 'https://www.beijing.gov.cn/fuwu/lqfw/gggs/202608/t20260831_4843628.html';
 
 export default function economy(context) {
   const { $, showDetail } = context;
   let { economy, scopeLabel: scopeTitle } = context;
   let section = context.section;
   const modes = () => [["地区生产总值", economy.gdp], ["固定资产投资", economy.investment], ["社零总额", economy.sales]];
+  const monthLabels = () => economy.periods.map(({ label }) => label);
   let ecoModes = modes();
   const industryColors = ["#8d92ff", "#60c5ee", "#b49dff", "#71d9c8"];
   const state = { eco: 0, ecoTopic: context.section === "projects" ? "projects" : "", ecoIndustry: 0, ecoProjectFilter: "all" };
@@ -51,16 +57,17 @@ export default function economy(context) {
       <div class="eco-metric-toolbar" role="group" aria-label="趋势指标">${controls}</div>
       <div class="eco-metric-line"><strong>${fmt(latest(selected))}<small>亿元</small></strong>
         <span>较上月末 <b>${signed(monthlyChange(selected))} 亿元</b></span></div>
-      ${chart(selected, "亿元", "violet")}`, "eco-chart");
+      ${chart(selected, "亿元", "violet", false, { labels: monthLabels() })}`, "eco-chart");
   }
 
   function economyOperation() {
     const [label, selected] = ecoModes[state.eco];
     const advances = ecoModes.map(([name, values]) =>
       [name, fmt(latest(values)), fmt(values.at(-2)), `<b>${signed(monthlyChange(values))}</b>`]);
-    const monthsDetail = [...selected].map((value, i) => [months[i], fmt(value), i ? signed(value - selected[i - 1]) : "—"]).reverse();
+    const months = monthLabels();
+    const monthsDetail = selected.map((value, i) => [months[i], fmt(value), i ? signed(value - selected[i - 1]) : "—"]).reverse();
     return economyTrend() +
-      panel("累计指标对比", "亿元", insightTable(["指标", "10月", "9月", "差值"], advances, "本月与上月累计值") +
+      panel("累计指标对比", "亿元", insightTable(["指标", months.at(-1), months.at(-2), "差值"], advances, "本月与上月累计值") +
         economyLink("按月份比较", "economy")) +
       panel("逐月累计值", "亿元", insightTable(["月份", label, "较上月末"], monthsDetail, "各月累计值"));
   }
@@ -127,6 +134,7 @@ export default function economy(context) {
   }
 
   function economyPage() {
+    const period = economy.periods.at(-1);
     const industryTotal = economy.industries.reduce((sum, [, count]) => sum + count, 0);
     const projects = economy.projects.map((project, index) => ({ ...project, index })).sort((a, b) => projectGap(a) - projectGap(b));
     const alerts = projects.filter((project) => projectGap(project) <= -projectAlertGap);
@@ -148,7 +156,8 @@ export default function economy(context) {
     }[state.ecoTopic]?.() ?? economyOverview(projects);
 
     return `<section class="reference ref-economy" aria-label="经济发展">
-      <header class="eco-page-head"><h1>经济发展</h1><span>2026 年 10 月</span></header>
+      <header class="eco-page-head"><h1>经济发展</h1>
+        <div>${economyLink("双谷 OPC", "opc")}<span>${period.year} 年 ${period.month} 月</span></div></header>
       <div class="eco-stage" role="group" aria-label="经济发展专题">
         ${drawing(`<g class="eco-wave">${economyWavePoints}</g>
         ${cards.map(([key, , , , , , , hue, x, y]) => `<g class="eco-flow${state.ecoTopic && state.ecoTopic !== key ? " is-muted" : ""}">
@@ -167,10 +176,11 @@ export default function economy(context) {
 
   function economyInsight() {
     const [label, values] = ecoModes[state.eco];
+    const months = monthLabels();
     showDetail("经济运行分析", "单位为亿元。按各月末累计值比较，展示较上月末累计值的变化。", `
       <div class="insight-filters">${insightSelect("比较月份", "eco-month", months.map((month, i) => [i, month]), values.length - 1)}</div>
       <div id="economic-comparison" aria-live="polite"></div>
-      ${insightSection(label + "累计趋势", chart(values, "亿元", "violet", true))}
+      ${insightSection(label + "累计趋势", chart(values, "亿元", "violet", true, { labels: months }))}
       <div class="insight-actions">${button("企业服务明细", 'data-analysis="services"', "insight-action")}
       ${button("重点产业构成", 'data-analysis="industries"', "insight-action")}
       ${button("重点项目督办", 'data-analysis="projects"', "insight-action")}</div>`, true);
@@ -178,11 +188,25 @@ export default function economy(context) {
   }
 
   function renderEconomyComparison() {
+    const months = monthLabels();
     const index = Number($('[data-insight-field="eco-month"]').value);
     const rows = ecoModes.map(([label, values]) => [label, fmt(values[index]), index ? fmt(values[index - 1]) : "—",
       index ? signed(values[index] - values[index - 1]) : "—"]);
     $("#economic-comparison").innerHTML = insightTable(["累计指标", months[index], index ? months[index - 1] : "上月", "增减"], rows,
-      index ? "各累计指标与上月末比较" : "演示序列始于 5 月");
+      index ? "各累计指标与上月末比较" : "首个观测月");
+  }
+
+  function opcInsight() {
+    const source = (url, text) => `<a class="opc-source" href="${url}" target="_blank" rel="noopener noreferrer">${text} ↗</a>`;
+    showDetail("门头沟双谷 OPC", "区级创业社区与政策", `
+      <div class="opc-brief">
+        ${insightSection("京西智谷 · 创享 OPC 社区",
+          '<p>面向独立开发者与科技创业团队，聚焦国产算力适配、大模型调优和 AI 工具链研发。智谷创享科创服务站与社区管家提供入驻咨询、项目申报及算力资源对接。</p>' + source(serviceSource, "社区服务"))}
+        ${insightSection("京西剧谷 · 星野 OPC 社区",
+          '<p>面向编剧、导演和短剧创作者，围绕剧本生成、数字人和 AI 短剧制作开展活动。双谷通行证积分可兑换专家辅导、算力资源及办公场地等服务。</p>' + source(communitiesSource, "双谷社区公告"))}
+        ${insightSection("AI＋精品微短剧扶持",
+          '<p>门头沟“金钩八条”覆盖创业办公、算力、场景、人才、安居和培训等支持。符合条件的 AI 微短剧或动漫剧从业者和团队可申报创业工位，审核通过后最多获得 5 个工位，最长免费使用 6 个月。</p>' + source(policySource, "政策公告") + source(workspaceSource, "工位申报"))}
+      </div>`, true);
   }
 
   function servicesInsight() {
@@ -235,7 +259,7 @@ export default function economy(context) {
       }
       render();
     },
-    insights: { economy: economyInsight, projects: projectsInsight, services: servicesInsight, industries: industriesInsight },
+    insights: { economy: economyInsight, projects: projectsInsight, services: servicesInsight, industries: industriesInsight, opc: opcInsight },
     onProject: projectDetail,
     onField(key) { if (key === "eco-month") renderEconomyComparison(); },
     onButton(target, render) {
