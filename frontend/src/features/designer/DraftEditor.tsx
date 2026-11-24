@@ -6,20 +6,17 @@ import { useSearchParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { AdminError, AdminIcon, Field } from '../admin/AdminParts'
 import { ScreenCanvas, ScreenComponentContent } from '../playback/ScreenCanvas'
+import { TopicNetwork, topicFocusId, topicModeFor } from '../playback/TopicNetwork'
 import { chartStyleFor, chartStyleLabel, chartStyleOptions } from '../playback/chartStyles'
 import DashboardReleases from './DashboardReleases'
+import { dashboardProjects } from './dashboardProjects'
 import { designerApi } from './designerApi'
 import type { DraftWorkspace } from './designerApi'
 import {
-  alignComponents, cloneMaterial, componentBounds, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer,
+  alignComponents, alignmentGuide, cloneMaterial, componentBounds, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer,
 } from './draftLayout'
 import type { Alignment, Geometry, ScreenComponent } from './draftLayout'
 import './designer.css'
-
-const projects = [
-  { id: 'city-operations', name: '城市运行' },
-  { id: 'public-services', name: '政务服务' },
-]
 
 const glyphs = {
   kpi: 'M4.5 5.5h11v9h-11zm3 3v3m2.5-3v3m2.5-3v3',
@@ -34,6 +31,7 @@ const glyphs = {
   preview: 'M3.5 4.5h13v11h-13zM8.5 8l3.5 2-3.5 2z',
   save: 'M4 3.5h10.5L16 5v11.5H4zm3 0v4h6v-4m-6 13v-5h6v5',
   multi: 'M3 3h8v8H3zm8 4h6v10H7v-6',
+  chevron: 'm6 8 4 4 4-4',
   left: 'M4 3v14m3-11h8v3H7zm0 6h5v3H7z',
   center: 'M10 3v14m-5-11h10v3H5zm2 6h6v3H7z',
   right: 'M16 3v14M5 6h8v3H5zm3 6h5v3H8z',
@@ -81,19 +79,48 @@ function ProjectChoice({ projectId, disabled, onChange }: {
   disabled?: boolean
   onChange: (projectId: string) => void
 }) {
+  const [open, setOpen] = useState(false)
+  const current = dashboardProjects.find(project => project.id === projectId) ?? dashboardProjects[0]
   return (
-    <label className="designer-project">
-      <span>专题</span>
-      <select value={projectId} disabled={disabled} onChange={event => onChange(event.currentTarget.value)}>
-        {projects.map(project => <option value={project.id} key={project.id}>{project.name}</option>)}
-      </select>
-    </label>
+    <div className="designer-project">
+      <span>专题模板</span>
+      <Button className="designer-template-trigger" aria-label={'选择专题模板（当前：' + current.name + '）'}
+        aria-haspopup="dialog" aria-expanded={open} disabled={disabled} onClick={() => setOpen(true)}>
+        <span className="designer-theme-swatch" data-theme={current.theme} aria-hidden="true" />
+        {current.name}<DesignerGlyph name="chevron" />
+      </Button>
+      <Modal title="选择专题模板" open={open} onCancel={() => setOpen(false)} footer={null}
+        width="min(54rem, calc(100vw - 1.5rem))" centered destroyOnHidden
+        className="designer-dialog designer-template-dialog">
+        <ul className="designer-template-grid">
+          {dashboardProjects.map(project => (
+            <li key={project.id}>
+              <button type="button" className="designer-template-card" data-theme={project.theme}
+                aria-pressed={projectId === project.id} onClick={() => {
+                  setOpen(false)
+                  onChange(project.id)
+                }}>
+                <span className="designer-template-art" aria-hidden="true">
+                  <span className="designer-template-left"><i /><i /><i /></span>
+                  <span className="designer-template-core"><i /><i /><i /><i /><i /></span>
+                  <span className="designer-template-right"><i /><i /><i /></span>
+                </span>
+                <span className="designer-template-name"><strong>{project.name}</strong>
+                  {projectId === project.id && <span>正在编辑</span>}</span>
+                <span className="designer-template-description">{project.description}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </Modal>
+    </div>
   )
 }
 
 export default function DraftEditor() {
   const [search, setSearch] = useSearchParams()
-  const projectId = projects.find(project => project.id === search.get('project'))?.id ?? projects[0].id
+  const project = dashboardProjects.find(item => item.id === search.get('project')) ?? dashboardProjects[0]
+  const projectId = project.id
   const setProject = (id: string) => setSearch({ project: id }, { replace: true })
   const query = useQuery({
     queryKey: projectKey(projectId),
@@ -102,7 +129,7 @@ export default function DraftEditor() {
   })
 
   return (
-    <div className="designer-page">
+    <div className="designer-page" data-template-theme={project.theme}>
       <header className="designer-heading">
         <div className="designer-page-title">
           <span className="designer-title-mark"><AdminIcon name="layout" /></span>
@@ -132,6 +159,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
   const [history, setHistory] = useState(() => initialHistory(workspace.components))
   const [selection, setSelection] = useState<string[]>(() => workspace.components.slice(0, 1).map(component => component.id))
   const [multiSelect, setMultiSelect] = useState(false)
+  const [alignment, setAlignment] = useState<Alignment>()
   const [preview, setPreview] = useState(false)
   const [showSaveError, setShowSaveError] = useState(false)
   const [zoom, setZoom] = useState('fit')
@@ -143,11 +171,17 @@ function DraftBoard({ projectId, workspace, setProject }: {
   const canvas = base.template.canvas
   const materials = base.template.components
   const components = history.present
+  const topicMode = topicModeFor(base.template.theme)
+  const visibleComponents = topicMode && transient ? components.map(component => component.id === transient.componentId
+    ? { ...component, geometry: transient.geometry } : component) : components
+  const focusId = topicMode ? topicFocusId(visibleComponents) : undefined
   const selectedIds = new Set(selection)
   const selectedComponents = components.filter(component => selectedIds.has(component.id))
   const selectedCount = selectedComponents.length
   const selected = selectedCount === 1 ? selectedComponents[0] : undefined
   const groupBounds = selectedCount > 1 ? componentBounds(selectedComponents) : null
+  const alignmentReference = selectedCount === 1 ? 'canvas' : 'selection'
+  const guide = alignment && !transient ? alignmentGuide(selectedComponents, alignment, canvas, alignmentReference) : null
   const dirty = JSON.stringify(components) !== JSON.stringify(base.components)
   const scale = zoom === 'fit' ? fitted : Number(zoom)
   const save = useMutation({
@@ -417,25 +451,32 @@ function DraftBoard({ projectId, workspace, setProject }: {
               <Button size="small" autoInsertSpace={false} icon={<DesignerGlyph name="multi" />}
                 aria-pressed={multiSelect} title="开启后点击画布或图层逐个选择，也可按住 Shift 点击"
                 disabled={editingDisabled || !components.length} onClick={() => setMultiSelect(current => !current)}>
-                多选
+                多选组件
               </Button>
               <span className="designer-selection-status" role="status">
                 {selectedCount ? '已选 ' + selectedCount + ' 个' : '未选择'}
               </span>
             </div>
-            <div className="designer-alignment-buttons" role="group" aria-label="组件对齐">
-              {alignmentTools.map(tool => (
-                <Button type="text" size="small" className="designer-align-button" key={tool.id} icon={<DesignerGlyph name={tool.id} />}
-                  aria-label={tool.label} title={tool.label} disabled={editingDisabled || selectedCount < 2}
-                  onClick={() => revise(current => alignComponents(current, selectedIds, tool.id, canvas))}>
-                  <span className="designer-align-label">{tool.label}</span>
-                </Button>
-              ))}
+            <div className="designer-arrange">
+              <span className="designer-arrange-label">组件对齐</span>
+              <div className="designer-alignment-buttons" role="group" aria-label="组件对齐">
+                {alignmentTools.map(tool => (
+                  <Button size="small" className="designer-align-button" key={tool.id} icon={<DesignerGlyph name={tool.id} />}
+                    aria-label={tool.label} title={tool.label} disabled={editingDisabled || !selectedCount}
+                    onFocus={() => setAlignment(tool.id)} onBlur={() => setAlignment(undefined)}
+                    onPointerEnter={() => setAlignment(tool.id)} onPointerLeave={event => {
+                      if (!event.currentTarget.matches(':focus-visible')) setAlignment(undefined)
+                    }}
+                    onClick={() => revise(current => alignComponents(current, selectedIds, tool.id, canvas, alignmentReference))}>
+                    <span className="designer-align-label">{tool.label}</span>
+                  </Button>
+                ))}
+              </div>
             </div>
           </div>
           <div ref={viewport} className="designer-viewport" data-fit={zoom === 'fit'}>
             <div className="designer-canvas-size" style={{ width: canvas.width * scale, height: canvas.height * scale }}>
-              <div className="designer-canvas" data-theme={base.template.theme}
+              <div className="designer-canvas" data-theme={base.template.theme} data-topic-mode={topicMode}
                 style={{ width: canvas.width, height: canvas.height, transform: `scale(${scale})` }}
                 onDragOver={event => {
                   if (!editingDisabled && components.length < maxComponents && event.dataTransfer.types.includes(materialTransfer)) {
@@ -447,7 +488,8 @@ function DraftBoard({ projectId, workspace, setProject }: {
                 onClick={event => {
                   if (event.target === event.currentTarget && !editingDisabled) clearSelection()
                 }}>
-                {components.map(component => {
+                {topicMode && <TopicNetwork theme={base.template.theme} size={canvas} components={visibleComponents} />}
+                {visibleComponents.map(component => {
                   const geometry = transient?.componentId === component.id ? transient.geometry : component.geometry
                   const isSelected = selectedIds.has(component.id)
                   return (
@@ -460,8 +502,10 @@ function DraftBoard({ projectId, workspace, setProject }: {
                         '--designer-outline-width': `${1.5 / scale}px`,
                         '--designer-handle-mark': `${8 / scale}px`,
                       } as CSSProperties}>
-                      <div className="designer-widget-content screen-component" data-kind={component.type} aria-hidden="true">
-                        <ScreenComponentContent component={component} data={values.get(component.metricId)} />
+                      <div className="designer-widget-content screen-component" data-kind={component.type}
+                        data-topic-focus={component.id === focusId || undefined} aria-hidden="true">
+                        <ScreenComponentContent component={component} data={values.get(component.metricId)}
+                          prominent={component.id === focusId} />
                       </div>
                       <button type="button" className="designer-widget-move" disabled={editingDisabled}
                         aria-label={'移动 ' + component.title} aria-pressed={isSelected}
@@ -478,14 +522,20 @@ function DraftBoard({ projectId, workspace, setProject }: {
                     borderWidth: 1 / scale,
                   }} />
                 )}
+                {guide && !editingDisabled && (
+                  <div className="designer-alignment-guide" data-axis={guide.axis} aria-hidden="true" style={{
+                    [guide.axis === 'x' ? 'left' : 'top']: Math.min(guide.offset, (guide.axis === 'x' ? canvas.width : canvas.height) - 1 / scale),
+                    '--guide-pixel': String(1 / scale) + 'px',
+                  } as CSSProperties} />
+                )}
               </div>
             </div>
             {!components.length && <p className="designer-canvas-empty">画布为空。从组件库添加组件。</p>}
           </div>
           <footer className="designer-stage-status">
-            <span>{selectedCount > 1 ? '以所选组件的外框对齐'
-              : selected ? '拖动移动，开启多选后逐个选择'
-                : components.length ? '点击组件或图层选择' : '从组件库添加或拖入组件'}</span>
+            <span>{selectedCount > 1 ? '对齐基准为选区外框'
+              : selected ? '对齐基准为画布'
+                : components.length ? '选中画布或图层中的组件即可对齐' : '从组件库添加或拖入组件'}</span>
             <output aria-label="实际缩放比例">{Math.round(scale * 100)}%</output>
           </footer>
         </section>
@@ -543,7 +593,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
               }} />
           ) : selectedCount ? (
             <div className="designer-group-details">
-              <p>使用画布工具栏对齐所选组件。</p>
+              <p>可同时对齐选区中的 {selectedCount} 个组件。</p>
               <Button size="small" autoInsertSpace={false} onClick={clearSelection} disabled={editingDisabled}>清空选择</Button>
             </div>
           ) : <p className="designer-empty">选择画布或图层中的组件。</p>}
