@@ -21,16 +21,12 @@ public final class DemoIdentityService {
     private static final CurrentIdentity DATA_ADMIN = new CurrentIdentity(
             "demo-data-admin", "数据管理员", "区数据管理组", List.of("DATA_ADMIN"),
             List.of("admin:data:read", "admin:data:write"), "demo", null, "/admin");
-    private static final CurrentIdentity REVIEWER = new CurrentIdentity(
-            "demo-dashboard-reviewer", "大屏审核员", "区大屏审核组", List.of("DASHBOARD_REVIEWER"),
-            List.of("dashboard:review"), "demo", null, "/review");
 
     public CurrentIdentity forPersona(String persona) {
         return switch (persona) {
             case "district" -> DISTRICT;
             case "service" -> SERVICE;
             case "data-admin" -> DATA_ADMIN;
-            case "reviewer" -> REVIEWER;
             default -> throw new ApiFailure(ApiCode.INVALID_REQUEST);
         };
     }

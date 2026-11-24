@@ -89,6 +89,6 @@ class DemoAuthController {
     record CsrfValue(String token, String headerName) {
     }
 
-    record DemoSessionRequest(@NotNull @Pattern(regexp = "district|service|data-admin|reviewer") String persona) {
+    record DemoSessionRequest(@NotNull @Pattern(regexp = "district|service|data-admin") String persona) {
     }
 }
