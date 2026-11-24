@@ -1,6 +1,5 @@
 import { useId } from 'react'
 import type { CockpitArea } from '../../api/client'
-import { defaultSideMetrics, useSideMetrics } from './sideMetrics'
 import './metric-rails.css'
 
 type Metric = CockpitArea['metrics'][number]
@@ -8,6 +7,10 @@ type Metric = CockpitArea['metrics'][number]
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
 const compact = new Intl.NumberFormat('zh-CN', { notation: 'compact', maximumFractionDigits: 2 })
 const signed = new Intl.NumberFormat('zh-CN', { signDisplay: 'exceptZero', maximumFractionDigits: 2 })
+const layout = {
+  left: ['governance-events', 'service-cases', 'completion-rate'],
+  right: ['air-quality-rate', 'road-traffic'],
+} as const
 
 type ChartKind = '环形图' | '柱状图' | '折线图'
 
@@ -73,8 +76,6 @@ function MetricReading({ metric }: { metric: Metric }) {
 }
 
 export default function MetricRails({ area }: { area: CockpitArea }) {
-  const settings = useSideMetrics()
-  const layout = settings.data ?? defaultSideMetrics
   const metrics = new Map(area.metrics.map(metric => [metric.id, metric]))
   return <div className="metric-rails">
     {(['left', 'right'] as const).map(side => <aside key={side} className={'metric-rail rail-' + side}
