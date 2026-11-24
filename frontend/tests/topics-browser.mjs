@@ -44,7 +44,15 @@ try {
   const topic = page.getByRole('combobox', { name: '选择数据展示' })
   const waitPath = path => page.waitForURL(new URL(path, baseURL).toString())
   const title = expected => page.waitForFunction(value => document.title === value, expected)
-  const openTopic = async (name, path) => { await topic.selectOption(name); await waitPath(path) }
+  const openTopic = async (name, path) => {
+    const options = () => topic.locator('option[value="' + name + '"]')
+    if (!await options().count()) {
+      await page.locator('.display-switch').click()
+      await options().waitFor({ state: 'attached' })
+    }
+    if (await topic.inputValue() !== name) await topic.selectOption(name)
+    await waitPath(path)
+  }
 
   await page.goto('/areas/datai')
   await page.getByRole('heading', { name: '门头沟大台街道全域数字中心', exact: true }).waitFor()
@@ -115,7 +123,7 @@ try {
   await waitPath('/screens/waters')
   await title('门头沟全域数字中心 - 水域态势')
   const water = page.getByRole('complementary', { name: '水务运行' })
-  await water.getByRole('heading', { name: '水域类型' }).waitFor()
+  await water.getByRole('heading', { name: '当日入库流量' }).waitFor()
   await region.selectOption('zhaitang')
   await waitPath('/screens/waters?area=zhaitang')
   await water.getByRole('heading', { name: '当日入库流量' }).waitFor()

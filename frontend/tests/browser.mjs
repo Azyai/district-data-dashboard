@@ -152,9 +152,12 @@ async function verifyDeselection() {
 }
 
 async function verifyLandmarks() {
+  await region.selectOption('mentougou')
+  await route('/')
   for (const [id, title] of [['tianjie', '龙湖北京长安天街'], ['jingxi', '京西智谷']]) {
-    const selector = id === 'tianjie' ? subject : page.getByLabel('选择地标')
-    await selector.selectOption(id)
+    if (id === 'jingxi') await page.getByLabel('选择地标').selectOption(id)
+    else if (cleanCI && !diskAsset('district-atlas.geojson')) await page.goto('/twins/' + id)
+    else await map.getByRole('link', { name: '查看' + title + '三维模型' }).click()
     await route('/twins/' + id)
     await currentSubject(title)
     const model = page.locator('.district-local-model')
@@ -174,7 +177,7 @@ async function verifyLandmarks() {
     await singleViewport()
   }
   await page.getByRole('link', { name: '返回地图' }).click()
-  await route('/areas/datai')
+  await route('/')
 }
 
 async function verifyIdentity() {
@@ -256,7 +259,8 @@ try {
   await route('/areas/datai')
   await currentSubject('路网监测', '大台街道')
   for (const [id, title] of [['grid', '网格治理'], ['waters', '水域态势'], ['population', '城镇人口'], ['governance', '基层治理'], ['economy', '经济发展'], ['diagnosis', '区域诊断']]) {
-    await subject.selectOption(id)
+    if (id === 'population') await header.getByRole('link', { name: '切换到数据专题' }).click()
+    else await subject.selectOption(id)
     await route('/screens/' + id + '?area=datai')
     await currentSubject(title, '大台街道')
     assert.equal(await region.inputValue(), 'datai')
@@ -267,7 +271,7 @@ try {
     else await page.frameLocator('main iframe').locator('.ref-' + id).waitFor()
     await singleViewport()
   }
-  await subject.selectOption('overview')
+  await header.getByRole('link', { name: '切换到地图监测' }).click()
   await route('/areas/datai')
   await verifyLandmarks()
   await verifyIdentity()

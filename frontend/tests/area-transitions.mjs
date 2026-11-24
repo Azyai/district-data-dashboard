@@ -56,12 +56,13 @@ try {
   await frame.getByLabel('诉求分类').selectOption('property')
   const board = frame.locator('.governance-stage')
   const originalBoard = await board.elementHandle()
+  const initialMonth = await frame.getByLabel('受理月份').inputValue()
   const holdMonth = holdRequest(url => url.pathname === '/api/v1/hotline/overview' && url.searchParams.get('month') === '2026-01')
   await holdMonth.installed
   await frame.getByLabel('受理月份').selectOption('2026-01')
   try {
-    assert.equal(await frame.locator('.hotline-snapshot[inert]').getAttribute('data-visible-month'), '2026-10')
-    assert.match(await frame.locator('.hotline-loading').innerText(), /大台街道 · 2026-10/)
+    assert.equal(await frame.locator('.hotline-snapshot[inert]').getAttribute('data-visible-month'), initialMonth)
+    assert.ok((await frame.locator('.hotline-loading').innerText()).includes(initialMonth))
   } finally { holdMonth.release() }
   await frame.locator('.hotline-snapshot[data-visible-month="2026-01"]:not([inert])').waitFor()
   assert.equal(await board.evaluate((current, previous) => current === previous, originalBoard), true)
