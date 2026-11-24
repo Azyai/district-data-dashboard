@@ -8,7 +8,9 @@ import type { BufferGeometry, Material, Object3D } from 'three'
 import { Link } from 'react-router'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import type { CockpitArea } from '../../api/client'
+import { loadTerrainDetail, terrainUvProjection } from './detailTerrainTexture'
 import {
   boundaryCenter, boundaryContains, boundaryFor, clearBoundaryMask, districtBounds, geoCoordinates,
   maskToBoundary, modelCoordinates, readBoundaries, terrainSurfaceIndex,
@@ -52,10 +54,17 @@ async function readModel(file: string, limit: number, signal: AbortSignal) {
   if (bytes.byteLength < 20 || bytes.byteLength > limit || new DataView(bytes).getUint32(0) !== 0x676c5446) {
     throw new Error('Invalid local model payload')
   }
-  return (await new GLTFLoader().parseAsync(bytes, assetRoot)).scene
+  return (await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, assetRoot)).scene
 }
 
 async function readDetailedModel(file: string, twin: boolean, signal: AbortSignal) {
+  if (twin) {
+    try {
+      return await readModel(file.replace(/\.glb$/, '-detail.glb'), 36_000_000, signal)
+    } catch {
+      signal.throwIfAborted()
+    }
+  }
   try {
     return await readModel(file.replace(/\.glb$/, '-hd.glb'), twin ? twinModelLimit : districtModelLimit, signal)
   } catch {
@@ -125,8 +134,8 @@ function applyModelStyle(object: Object3D) {
   }
   roads.material.dispose()
   water.material.dispose()
-  roads.material = new MeshBasicMaterial({ color: '#bcc3a1', transparent: true, opacity: .65, depthWrite: false })
-  water.material = new MeshBasicMaterial({ color: '#3ea8de' })
+  roads.material = new MeshBasicMaterial({ color: '#d9c6a3', transparent: true, opacity: .65, depthWrite: false })
+  water.material = new MeshBasicMaterial({ color: '#6dcef4' })
   // The thin overlays need a small display offset to stay above the simplified terrain surface.
   roads.position.y += 18
   water.position.y += 12
@@ -214,6 +223,9 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
     let unbindInput: (() => void) | undefined
     let frame = 0
     let boundaryTexture: Texture | undefined
+    let terrainDetail: Texture | undefined
+    let detailRequest: AbortController | undefined
+    let resetTerrainTexture: (() => void) | undefined
 
     setPhase('loading')
     setLocalView('3d')
@@ -232,6 +244,9 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       model = localModel
       const districtStyle = twin ? undefined : applyModelStyle(localModel)
       const terrain = districtStyle?.terrain
+      const terrainMaterial = terrain?.material instanceof MeshStandardMaterial ? terrain.material : undefined
+      const overviewTexture = districtStyle?.nativeTexture ? terrainMaterial?.map : undefined
+      const projectUv = terrain && overviewTexture ? terrainUvProjection(terrain.geometry) : undefined
       if (twin) localModel.traverse(child => {
         if (!(child instanceof Mesh)) return
         if (!child.geometry.hasAttribute('normal')) child.geometry.computeVertexNormals()
@@ -245,7 +260,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       localModel.position.copy(bounds.getCenter(new Vector3())).multiply(localModel.scale).negate()
       localModel.updateMatrixWorld()
       const scene = new Scene()
-      scene.add(localModel, new AmbientLight('#eceffc', 1.55))
+      scene.add(localModel, new AmbientLight('#eaf5ff', twin ? 1.32 : 1.75))
       const light = new DirectionalLight('#e4f5ff', 2.28)
       light.position.set(-24, 38, -19)
       scene.add(light)
@@ -340,6 +355,34 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           }))
         })
       }
+      resetTerrainTexture = () => {
+        detailRequest?.abort()
+        if (!terrainMaterial || !overviewTexture || !projectUv) return
+        terrainMaterial.map = overviewTexture
+        terrainDetail?.dispose()
+        terrainDetail = undefined
+        surface.domElement.dataset.terrainTexture = 'overview'
+      }
+      const refineTerrain = (boundary?: GeoBoundary) => {
+        resetTerrainTexture?.()
+        if (!boundary || !terrainMaterial || !projectUv) return
+        const { west, east, south, north: top } = boundary.bounds
+        const scope = [[west, south], [west, top], [east, south], [east, top]].map(([longitude, latitude]) =>
+          projectUv(modelCoordinates([longitude, latitude], geographyBounds)))
+        const request = new AbortController()
+        detailRequest = request
+        void loadTerrainDetail(scope, surface.capabilities.maxTextureSize, request.signal).then(texture => {
+          if (controller.signal.aborted || request.signal.aborted) {
+            texture.dispose()
+            return
+          }
+          terrainDetail = texture
+          texture.anisotropy = anisotropy
+          terrainMaterial.map = texture
+          surface.domElement.dataset.terrainTexture = 'detail'
+          draw()
+        }).catch(() => request.abort())
+      }
       const anchor = new Vector3()
       const movement = new Vector3()
       const zoomAt = (factor: number, x = 0, y = 0) => {
@@ -382,17 +425,26 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         surface.domElement.removeEventListener('keydown', keyZoom)
         host.removeEventListener('wheel', wheelZoom)
       }
-      const fit = () => {
+      const adjustProjection = () => {
         const { clientWidth: width, clientHeight: height } = host
         if (!width || !height) return
         const aspect = width / height
-        const heightFactor = currentView === '2d' ? .58 : .39
-        const halfHeight = Math.max(viewSize.z * heightFactor + viewSize.y * .64, viewSize.x * .565 / aspect)
+        camera.updateMatrixWorld()
+        const axes = camera.matrixWorld.elements
+        const span = (axis: number) => .5 * (
+          Math.abs(axes[axis]) * viewSize.x + Math.abs(axes[axis + 1]) * viewSize.y + Math.abs(axes[axis + 2]) * viewSize.z
+        )
+        const halfHeight = Math.max(span(4), span(0) / aspect) * 1.12
         camera.left = -halfHeight * aspect
         camera.right = halfHeight * aspect
         camera.top = halfHeight
         camera.bottom = -halfHeight
         camera.updateProjectionMatrix()
+      }
+      const fit = () => {
+        const { clientWidth: width, clientHeight: height } = host
+        if (!width || !height) return
+        adjustProjection()
         const ratio = Math.min(window.devicePixelRatio || 1, 2, Math.sqrt(renderPixelLimit / (width * height)))
         if (ratio !== surface.getPixelRatio()) surface.setPixelRatio(ratio)
         surface.setSize(width, height, false)
@@ -405,7 +457,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         camera.zoom = zoom
         camera.lookAt(target)
         camera.updateMatrixWorld()
-        camera.updateProjectionMatrix()
+        adjustProjection()
         draw()
       }
       tools.current = {
@@ -463,6 +515,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           }
           positions.push(...nextPlaces.map(place => ({ id: place.id, point: pointFor(boundaryCenter(place.boundary)) })))
           if (refit) {
+            refineTerrain(nextBoundary)
             setPicked(undefined)
             positionCamera(viewTarget)
             fit()
@@ -471,7 +524,10 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
           }
         },
       }
-      orbit.addEventListener('change', draw)
+      orbit.addEventListener('change', () => {
+        adjustProjection()
+        draw()
+      })
       observer = new ResizeObserver(fit)
       observer.observe(host)
       fit()
@@ -494,6 +550,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
     })
     return () => {
       controller.abort()
+      resetTerrainTexture?.()
       cancelAnimationFrame(frame)
       observer?.disconnect()
       controls?.dispose()
@@ -552,7 +609,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         {district && population && (
           <div className="model-population" style={{ left: population.x + '%', top: population.y + '%' }}>
             <span className="model-beacon" aria-hidden="true" />
-            <Link className="model-callout" to="?topic=population" aria-label="查看全区人口专题">
+            <Link className="model-callout" to="/workbench?topic=population" target="_blank" rel="noopener noreferrer" aria-label="查看全区人口专题">
               <span>门头沟区常住人口</span>
               <p><strong>{demoPopulation}</strong> 万人</p>
               <small>演示数据</small>
