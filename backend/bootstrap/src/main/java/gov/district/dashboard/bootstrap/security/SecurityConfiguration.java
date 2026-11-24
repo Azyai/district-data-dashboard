@@ -41,7 +41,9 @@ class SecurityConfiguration {
                     if (demoEnabled) {
                         access.requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf", "/api/v1/cockpit/areas/*",
                                         "/api/v1/cockpit/topics/*/manifest", "/api/v1/cockpit/topics/*/snapshot",
-                                        "/api/v1/cockpit/locations").permitAll()
+                                        "/api/v1/cockpit/locations", "/api/v1/hotline/overview",
+                                        "/api/v1/hotline/tickets", "/api/v1/hotline/tickets/*",
+                                        "/api/v1/hotline/analysis", "/api/v1/hotline/semantics").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/demo-session").permitAll()
                                 .requestMatchers("/api/v1/admin/**").hasRole("DATA_ADMIN")
                                 .requestMatchers("/api/v1/**").authenticated();
