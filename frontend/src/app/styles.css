@@ -1,6 +1,12 @@
 @layer theme, base, antd, components, utilities;
 @import "tailwindcss";
 
+.topic-picker-choices {
+  display: grid;
+  gap: .5rem;
+  margin-top: 1rem;
+}
+
 :root {
   color-scheme: dark;
   --ground: #080f1c;
