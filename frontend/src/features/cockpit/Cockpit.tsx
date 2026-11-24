@@ -1,7 +1,7 @@
 import { keepPreviousData, queryOptions, useQuery } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useMatch, useNavigate } from 'react-router'
-import { dashboardApi, type CockpitArea } from '../../api/client'
+import { dashboardApi, type CockpitArea, type CockpitDirectory } from '../../api/client'
 import MetricRails from './MetricRails'
 import { twinPath, type TwinId } from './twinSites'
 import './cockpit.css'
@@ -26,6 +26,12 @@ const areaQuery = (areaId: string) => queryOptions({
   staleTime: areaRefreshMs,
 })
 
+const directoryQuery = queryOptions({
+  queryKey: ['cockpit-locations'],
+  queryFn: ({ signal }) => dashboardApi.locations(signal),
+  staleTime: 300_000,
+})
+
 function Masthead({ updatedAt }: { updatedAt?: string }) {
   const timestamp = updatedAt ? Date.parse(updatedAt) : NaN
   return (
@@ -45,8 +51,80 @@ function Masthead({ updatedAt }: { updatedAt?: string }) {
   )
 }
 
-function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwin }: {
+function RegionPicker({ area, directory, directoryState }: {
   area: CockpitArea
+  directory?: CockpitDirectory
+  directoryState: 'pending' | 'success' | 'error'
+}) {
+  const picker = useRef<HTMLDetailsElement>(null)
+  const available = directory ?? [
+    ...area.breadcrumbs.map((location, index) => ({ ...location, parentId: area.breadcrumbs[index - 1]?.id ?? null })),
+    ...area.children.map(location => ({ ...location, parentId: area.id })),
+  ]
+  const townId = area.breadcrumbs[1]?.id
+  const districtEntry = available.find(location => location.level === 'district')
+  const towns = available.filter(location => location.level === 'town')
+  const orderedTowns = [
+    ...towns.filter(town => town.id === townId),
+    ...towns.filter(town => town.id !== townId),
+  ]
+  useEffect(() => {
+    const element = picker.current
+    if (!element) return
+    function dismiss(event: PointerEvent) {
+      if (element?.open && event.target instanceof Node && !element.contains(event.target)) element.open = false
+    }
+    document.addEventListener('pointerdown', dismiss)
+    return () => document.removeEventListener('pointerdown', dismiss)
+  }, [])
+
+  const areaLink = (location: CockpitDirectory[number]) => (
+    <Link to={areaPath(location.id)} aria-current={location.id === area.id ? 'page' : undefined}
+      onClick={event => {
+        if (location.id !== area.id || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || !picker.current) return
+        event.preventDefault()
+        picker.current.open = false
+        picker.current.querySelector('summary')?.focus()
+      }}>
+      {location.name}
+    </Link>
+  )
+
+  return (
+    <details className="region-picker" ref={picker}
+      onKeyDown={event => {
+        if (event.key !== 'Escape' || !event.currentTarget.open) return
+        event.preventDefault()
+        event.currentTarget.open = false
+        event.currentTarget.querySelector('summary')?.focus()
+      }}
+      onBlur={event => {
+        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false
+      }}>
+      <summary>选择区域{area.level === 'district' && <span title="镇街数量">{towns.length}</span>}</summary>
+      <nav className="map-directory" aria-label="区域目录">
+        {districtEntry && <div className="map-directory-root">{areaLink(districtEntry)}</div>}
+        {orderedTowns.map(town => (
+          <section className="map-directory-town" key={town.id} aria-label={town.name}>
+            {areaLink(town)}
+            <ul>
+              {available.filter(location => location.parentId === town.id).map(village => (
+                <li key={village.id}>{areaLink(village)}</li>
+              ))}
+            </ul>
+          </section>
+        ))}
+        {directoryState === 'pending' && <p role="status">正在读取区域目录</p>}
+        {directoryState === 'error' && <p role="status">完整区域目录暂不可用</p>}
+      </nav>
+    </details>
+  )
+}
+
+function RegionModel({ area, directory, directoryState, viewMode, onViewModeChange, onSelectArea, onOpenTwin }: {
+  area: CockpitArea
+  directory?: CockpitDirectory
+  directoryState: 'pending' | 'success' | 'error'
   viewMode: '2d' | '3d'
   onViewModeChange: (mode: '2d' | '3d') => void
   onSelectArea: (areaId: string) => void
@@ -63,29 +141,14 @@ function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwi
             <h2 id="area-model">{area.name}{isDistrict && <span>全域</span>}</h2>
           </div>
           <div className="map-actions">
-            {area.children.length > 0 && (
-              <details className="region-picker" key={area.id}
-                onKeyDown={event => {
-                  if (event.key !== 'Escape' || !event.currentTarget.open) return
-                  event.currentTarget.open = false
-                  event.currentTarget.querySelector('summary')?.focus()
-                }}
-                onBlur={event => {
-                  if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false
-                }}>
-                <summary>{isDistrict ? '选择镇街' : '选择村社'}<span>{area.children.length}</span></summary>
-                <nav className="map-directory" aria-label="下辖区域">
-                  {area.children.map(child => <Link to={areaPath(child.id)} key={child.id}>{child.name}</Link>)}
-                </nav>
-              </details>
-            )}
+            <RegionPicker key={area.id} area={area} directory={directory} directoryState={directoryState} />
             {!isDistrict && <a className="level-up" href={'/workbench?area=' + encodeURIComponent(area.id) + '#area-issues'}
               target="_blank" rel="noopener noreferrer">区域数据 <span aria-hidden="true">↗</span></a>}
           </div>
         </div>
         <div className="map-plot">
           <Suspense fallback={<div className="map-wait" role="status">正在打开区域地图</div>}>
-            <TiandituMap area={area} viewMode={viewMode} onViewModeChange={onViewModeChange}
+            <TiandituMap area={area} directory={directory} viewMode={viewMode} onViewModeChange={onViewModeChange}
               onSelectArea={onSelectArea} onOpenTwin={onOpenTwin} />
           </Suspense>
         </div>
@@ -102,6 +165,7 @@ export default function Cockpit() {
   const heading = useRef<HTMLDivElement>(null)
   const lastArea = useRef(areaId)
   const zone = useQuery({ ...areaQuery(areaId), placeholderData: keepPreviousData, refetchInterval: areaRefreshMs })
+  const directory = useQuery(directoryQuery)
   const area = zone.data
 
   useEffect(() => {
@@ -119,7 +183,8 @@ export default function Cockpit() {
         {area ? (
           <div ref={heading} className="cockpit-main" tabIndex={-1} aria-label={area.name}
             inert={zone.isPlaceholderData} aria-busy={zone.isPlaceholderData}>
-            <RegionModel area={area} viewMode={viewMode} onViewModeChange={setViewMode}
+            <RegionModel area={area} directory={directory.data} directoryState={directory.status}
+              viewMode={viewMode} onViewModeChange={setViewMode}
               onSelectArea={id => { void navigate(areaPath(id)) }}
               onOpenTwin={id => { void navigate(twinPath(id), { state: { backArea: area.id } }) }} />
           </div>
