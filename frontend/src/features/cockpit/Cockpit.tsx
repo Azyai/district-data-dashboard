@@ -6,6 +6,7 @@ import { ApiError, dashboardApi, type CockpitArea, type CockpitDirectory } from 
 import { answerFromSnapshot } from '../assistant/answer'
 import { interpretCockpitIntent } from '../assistant/intent'
 import type { AssistantReply } from '../assistant/VoiceAssistant'
+import type { ChartStyle } from '../playback/chartStyles'
 import './cockpit.css'
 
 const AreaIssuesDialog = lazy(() => import('./AreaIssuesDialog'))
@@ -82,6 +83,7 @@ const iconPaths = {
   document: 'M7 3h7l4 4v14H6V3h1zm7 0v5h4M9 12h6m-6 4h6',
   ventilation: 'M3 8h12.5a2.5 2.5 0 1 0-2.5-2.5M3 12h16a2 2 0 1 1-2 2M4 16h7.5A2.5 2.5 0 1 1 9 18.5',
   alert: 'M12 4 3.5 19h17L12 4zm0 6v3m0 3h.01',
+  network: 'M9 12a3 3 0 1 0 6 0 3 3 0 0 0-6 0Zm3-8a1.5 1.5 0 1 0 0-.01ZM5 18a1.5 1.5 0 1 0 0-.01Zm14 0a1.5 1.5 0 1 0 0-.01ZM12 6v3m2.4 5 3.4 3m-8.2-3-3.4 3',
 } as const
 
 type IconName = keyof typeof iconPaths
@@ -158,7 +160,9 @@ function MetricPanel({ metrics, headline }: { metrics: Metric[]; headline?: bool
   const titleId = headline ? 'area-metrics' : 'area-supporting'
   return (
     <section className={headline ? 'key-metrics' : 'supporting-metrics'} aria-labelledby={titleId}>
-      <h2 id={titleId} className={headline ? 'metrics-heading' : 'brief-heading'}>{headline ? '核心指标' : '其他指标'}</h2>
+      <h2 id={titleId} className={headline ? 'metrics-heading' : 'brief-heading'}>
+        {headline && <CockpitIcon name="grid" />}{headline ? '核心指标' : '其他指标'}
+      </h2>
       {metrics.length === 0 ? <p className="cockpit-empty">当前区域暂无指标</p> : (
         <dl className="cockpit-metrics">
           {metrics.map(metric => {
@@ -259,27 +263,42 @@ function RegionMap({ area, onSelectArea }: { area: CockpitArea; onSelectArea: (a
   )
 }
 
+const distributionStyles = [['network', '网络图'], ['radar', '雷达图'], ['ring', '环形图']] as const
+const trendStyles = [['line', '折线图'], ['bar', '柱形图']] as const
+
+function ChartChooser<Style extends ChartStyle>({ styles, value, label, onChange }: {
+  styles: ReadonlyArray<readonly [Style, string]>
+  value: Style
+  label: string
+  onChange: (style: Style) => void
+}) {
+  return (
+    <div className="chart-chooser" role="group" aria-label={label}>
+      {styles.map(([style, title]) => (
+        <button key={style} type="button" aria-pressed={style === value} onClick={() => onChange(style)}>{title}</button>
+      ))}
+    </div>
+  )
+}
+
 function Distribution({ area }: { area: CockpitArea }) {
-  const maximum = Math.max(1, ...area.distribution.map(item => item.value))
+  const [variant, setVariant] = useState<(typeof distributionStyles)[number][0]>('network')
   return (
     <section className="distribution-panel" aria-labelledby="area-distribution">
-      <h2 id="area-distribution" className="brief-heading">治理分布</h2>
-      <ul className="distribution-list">
-        {area.distribution.map(item => (
-          <li key={item.label}>
-            <span>{item.label}</span>
-            <span className="distribution-track" aria-hidden="true">
-              <i style={{ width: Math.max(0, item.value / maximum * 100) + '%' }} />
-            </span>
-            <strong>{values.format(item.value)}</strong>
-          </li>
-        ))}
-      </ul>
+      <div className="chart-panel-heading">
+        <h2 id="area-distribution" className="brief-heading"><CockpitIcon name="network" />治理分布</h2>
+        <span>{area.distribution.length} 类</span>
+      </div>
+      <ChartChooser styles={distributionStyles} value={variant} label="治理分布图形" onChange={setVariant} />
+      <Suspense fallback={<p className="cockpit-empty" role="status">正在加载分布</p>}>
+        <DataChart kind="ranking" label="治理分布" points={area.distribution} unit="件" variant={variant} additive showData />
+      </Suspense>
     </section>
   )
 }
 
 function TrendPanel({ area }: { area: CockpitArea }) {
+  const [variant, setVariant] = useState<(typeof trendStyles)[number][0]>('line')
   const first = area.trend.at(0)?.label
   const last = area.trend.at(-1)?.label
   const shortDate = (label: string) => /^\d{4}-\d{2}-\d{2}$/.test(label) ? label.slice(5) : label
@@ -290,9 +309,12 @@ function TrendPanel({ area }: { area: CockpitArea }) {
         {first && last && <span>{first === last ? shortDate(first) : shortDate(first) + ' 至 ' + shortDate(last)}</span>}
       </div>
       {area.trend.length > 0 ? (
-        <Suspense fallback={<p className="cockpit-empty" role="status">正在加载趋势</p>}>
-          <DataChart kind="trend" label="治理事件趋势" points={area.trend} unit="件" compact />
-        </Suspense>
+        <>
+          <ChartChooser styles={trendStyles} value={variant} label="治理事件趋势图形" onChange={setVariant} />
+          <Suspense fallback={<p className="cockpit-empty" role="status">正在加载趋势</p>}>
+            <DataChart kind="trend" label="治理事件趋势" points={area.trend} unit="件" variant={variant} compact showData />
+          </Suspense>
+        </>
       ) : <p className="trend-empty">当前区域暂无治理事件观测</p>}
     </section>
   )

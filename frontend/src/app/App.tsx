@@ -21,9 +21,9 @@ const client = new QueryClient({
 const districtTheme = {
   algorithm: theme.darkAlgorithm,
   token: {
-    colorPrimary: '#315ce0',
-    colorPrimaryHover: '#3b64e5',
-    colorPrimaryActive: '#274abd',
+    colorPrimary: '#4a63de',
+    colorPrimaryHover: '#596feb',
+    colorPrimaryActive: '#3a4fc1',
     colorLink: '#8cddff',
     colorLinkHover: '#b1eaff',
     colorInfo: '#70dfff',
@@ -51,7 +51,7 @@ const districtTheme = {
       defaultHoverBg: '#1a304f',
       defaultHoverBorderColor: '#73b7fe',
       defaultHoverColor: '#eff6ff',
-      primaryShadow: '0 3px 12px rgba(18, 56, 176, .38)',
+      primaryShadow: '0 5px 16px rgba(20, 32, 93, .42)',
     },
   },
 }
