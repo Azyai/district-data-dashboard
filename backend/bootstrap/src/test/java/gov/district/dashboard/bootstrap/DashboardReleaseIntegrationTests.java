@@ -146,6 +146,37 @@ class DashboardReleaseIntegrationTests {
         }
     }
 
+    @Test
+    void switchesPublicTopicOnlyAfterReviewerPublishes() throws Exception {
+        String topic = "/cockpit/topics/hotline";
+        String draft = "/admin/dashboards/hotline/draft";
+        String releases = "/admin/dashboards/hotline/releases";
+        String reviews = "/dashboard-reviews/hotline";
+        try (var author = new Browser(); var reviewer = new Browser(); var visitor = new Browser()) {
+            author.login("data-admin");
+            reviewer.login("reviewer");
+            JsonNode baseline = visitor.get(topic + "/manifest", ApiCode.OK);
+            String baselineId = baseline.path("releaseId").asString();
+            var edited = layout(baseline, "requests-summary", "热线办理概览");
+            var save = author.mutation(draft).header("If-Match", "\"0\"")
+                    .PUT(HttpRequest.BodyPublishers.ofString(edited.toString())).build();
+            author.send(save, ApiCode.OK);
+            author.post(releases, submission(1), ApiCode.OK);
+            assertThat(visitor.get(topic + "/manifest", ApiCode.OK)).isEqualTo(baseline);
+            reviewer.post(reviews, review(1, 0, "APPROVE", "公开演示模板"), ApiCode.OK);
+
+            JsonNode published = visitor.get(topic + "/manifest", ApiCode.OK);
+            String release = published.path("releaseId").asString();
+            assertThat(release).isNotEqualTo(baselineId);
+            assertThat(published.path("components")).isEqualTo(edited.path("components"));
+            visitor.get(topic + "/snapshot?releaseId=" + baselineId, ApiCode.RELEASE_CONFLICT);
+            JsonNode snapshot = visitor.get(topic + "/snapshot?releaseId=" + release, ApiCode.OK);
+            assertThat(snapshot.path("results").size()).isEqualTo(1);
+            assertThat(snapshot.path("results").get(0).path("componentId").asString()).isEqualTo("requests-summary");
+            assertThat(snapshot.path("results").get(0).path("value").asDouble()).isEqualTo(1248);
+        }
+    }
+
     private static ObjectNode layout(JsonNode baseline, String componentId, String title) {
         var component = (ObjectNode) baseline.path("components").get(0).deepCopy();
         component.put("id", componentId).put("title", title);
