@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { interpretCockpitIntent } from '../src/features/assistant/intent.ts'
+import { interpretCockpitIntent, interpretScreenIntent } from '../src/features/assistant/intent.ts'
+import { screenPath } from '../src/features/screens/screenCatalog.ts'
+import { district, economyFor, populationFor, towns } from '../src/features/screens/screenData.ts'
 
 const locations = [
   { id: 'mentougou', name: '门头沟区', level: 'district', parentId: null },
@@ -82,4 +84,64 @@ test('cannot select unknown or malformed scopes', () => {
   assert.equal(interpretCockpitIntent('跳转到无效路径', 'mentougou', [
     ...locations, { id: '../unsafe', name: '无效路径', level: 'town', parentId: 'mentougou' },
   ]).kind, 'clarify')
+})
+
+test('voice names open a screen using the currently selected or explicitly named area', () => {
+  const askScreen = (question, area = 'datai', screen = 'population') => interpretScreenIntent(question, area, locations, screen)
+  assert.deepEqual(askScreen('我看一下政务的'), { kind: 'screen', screen: 'governance', areaId: 'datai' })
+  assert.deepEqual(askScreen('看一下妙峰山的经济数据'), { kind: 'screen', screen: 'economy', areaId: 'miaofengshan' })
+  assert.deepEqual(askScreen('看全区的人口'), { kind: 'screen', screen: 'population', areaId: 'mentougou' })
+  assert.deepEqual(askScreen('看全域'), { kind: 'home' })
+  assert.deepEqual(askScreen('我想看一下全域数据'), { kind: 'home' })
+  assert.deepEqual(askScreen('回到全区总览'), { kind: 'home' })
+  assert.deepEqual(askScreen('返回地图'), { kind: 'screen', screen: 'overview', areaId: 'datai' })
+  assert.deepEqual(askScreen('返回首页'), { kind: 'home' })
+  assert.deepEqual(askScreen('城镇人数'), { kind: 'screen', screen: 'population', areaId: 'datai' })
+  assert.deepEqual(askScreen('看看大台街道的人数'), { kind: 'screen', screen: 'population', areaId: 'datai' })
+  assert.deepEqual(askScreen('切到千军台社区', 'datai', 'governance'),
+    { kind: 'screen', screen: 'governance', areaId: 'datai-qianjuntai' })
+  assert.equal(askScreen('打开南口镇人口数据').kind, 'clarify')
+  assert.equal(askScreen('先别看政务').kind, 'clarify')
+  assert.equal(askScreen('打开政务和经济').kind, 'clarify')
+})
+
+test('hotline analysis follows selected area and gives precise area override', () => {
+  assert.deepEqual(interpretScreenIntent('哪类诉求最多？', 'datai', locations, 'governance'),
+    { kind: 'hotline', areaId: 'datai', question: '哪类诉求最多？' })
+  assert.deepEqual(interpretScreenIntent('妙峰山镇的接诉即办办结率是多少？', 'datai', locations, 'governance'),
+    { kind: 'hotline', areaId: 'miaofengshan', question: '妙峰山镇的接诉即办办结率是多少？' })
+  assert.deepEqual(interpretScreenIntent('这里的政务服务办件量多少？', 'datai', locations, 'population'),
+    { kind: 'ask', areaId: 'datai', question: '这里的政务服务办件量多少？' })
+  assert.deepEqual(interpretScreenIntent('新港街道的接诉即办有哪些问题？', 'datai', locations, 'governance').kind, 'clarify')
+  assert.deepEqual(interpretScreenIntent('这里有哪些问题？', 'datai', locations, 'governance').kind, 'hotline')
+  assert.deepEqual(interpretScreenIntent('工单表有哪些字段？', 'datai', locations, 'governance').kind, 'hotline')
+})
+
+test('all navigation methods share district and town screen URLs', () => {
+  assert.equal(screenPath('overview'), '/')
+  assert.equal(screenPath('overview', 'datai'), '/areas/datai')
+  assert.equal(screenPath('population', 'mentougou'), '/screens/population')
+  assert.equal(screenPath('governance', 'datai'), '/screens/governance?area=datai')
+  assert.equal(screenPath('governance', 'dayu', '2026-09'), '/screens/governance?area=dayu&month=2026-09')
+  assert.equal(screenPath('economy', 'dayu', '2026-09'), '/screens/economy?area=dayu')
+})
+
+test('district population and cumulative economy figures reconcile with all town mocks', () => {
+  const area = (id, level) => ({ id, level, breadcrumbs: [] })
+  const full = area('mentougou', 'district')
+  assert.equal(populationFor(full).population, 398000)
+  assert.equal(towns.reduce((sum, item) => sum + populationFor(area(item.id, 'town')).population, 0), district.population)
+  const totals = economyFor(full)
+  const local = towns.map(item => economyFor(area(item.id, 'town')))
+  for (const key of ['served', 'serviceCount', 'serviceDone', 'projectCount']) {
+    assert.equal(local.reduce((sum, item) => sum + item[key], 0), totals[key], key)
+  }
+  for (const key of ['investment', 'sales', 'gdp']) {
+    totals[key].forEach((amount, month) => {
+      assert.equal(local.reduce((sum, item) => sum + Math.round(item[key][month] * 10), 0), Math.round(amount * 10))
+    })
+  }
+  for (const town of local) {
+    assert.ok(town.services.every(row => row.count >= row.done))
+  }
 })

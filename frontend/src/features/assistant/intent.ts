@@ -1,3 +1,5 @@
+import type { ScreenId } from '../screens/screenCatalog'
+
 export type CockpitLocation = {
   id: string
   name: string
@@ -21,21 +23,21 @@ type Mention = {
 
 const locationId = /^[a-z][a-z0-9-]{0,63}$/
 const polite = /^(?:请问|请你?|麻烦你?|能否|能不能|可以|帮我|给我|我想要|我想|我要|我希望)+/
-const opening = /^(?:切换(?:到|至)?|跳转(?:到|至)?|返回(?:到)?|回到|进入|打开|定位(?:到)?|看一下|看一看|查看|看看|查询|查一下|浏览|显示|看)/
-const explicitNavigation = /^(?:切换|跳转|返回|回到|进入|打开|定位)/
-const navigationNegated = /^(?:先别|别|不要|不用|不必)(?:切换|跳转|返回|回到|进入|打开|定位)/
+const opening = /^(?:切换(?:到|至)?|切到|换到|跳转(?:到|至)?|返回(?:到)?|回到|进入|打开|定位(?:到)?|看一下|看下|看一看|查看|看看|查询|查一下|浏览|显示|看)/
+const explicitNavigation = /^(?:切换|切到|换到|跳转|返回|回到|进入|打开|定位)/
+const navigationNegated = /^(?:先别|别|不要|不用|不必)(?:切换|切到|换到|跳转|返回|回到|进入|打开|定位)/
 const questionWords = /多少|什么|哪些|哪个|哪里|为何|为什么|怎么|如何|是否|吗|呢|走势|趋势|变化|同比|环比/
 const previousLevel = /^(?:返回(?:到)?|回到?|切换到)?(?:上一级|上一层)(?:区域|区划)?$/
 const currentRef = /此处|这里|这儿|本地|这个(?:区域|地方|区|镇|村)|(?:本|当前)(?:区域|区划|辖区|地区)|当前位置/g
-const relativeRef = /上一级|上一层|全区|本区|(?:全|本)(?:镇|街道|村)/g
+const relativeRef = /上一级|上一层|全区|全域|本区|(?:全|本)(?:镇|街道|村)/g
 const navigationTail = /^(?:的)?(?:最新|当前|今天)?(?:数据(?:面板)?|驾驶舱|看板|页面|界面|概览|总览|运行情况|情况|信息)?(?:吧)?$/
 const problemWord = '(?:问题|预警|告警|风险|异常|待处置事项)'
 const problemQuestion = new RegExp('(?:有|存在|出现)(?:哪些|什么)(?:需要关注的)?' + problemWord)
 const problemList = new RegExp('^(?:(?:查看|列出|显示|看看|看一下|看)?)?(?:当前|近期|最新|待处理|待处置)?(?:的)?' + problemWord + '(?:列表|清单|明细|详情|情况)?$')
 const areaEnd = /(?:街道办事处|街道|社区|乡|镇|村|区|县)$/
 const likelyUnknownArea = /[\p{Script=Han}]{1,18}(?:街道|社区|新区|乡|镇|村|区|县)(?=的|里|有|办结率|治理事件|服务办件|预警|数据|$)/u
-const nonNames = /^(?:社区|社区治理|乡镇|镇街|村社|农村|城区|城区社区|地区|区域|辖区|片区|市区|街道|统计区|园区|全域)$/
-const aliasSuffix = /^(?:的|和|与|及|跟|或|这边|那边|今天|现在|之前|目前|最近|昨天|今年|有哪些|有什么|有多少|还剩|办结|受理量|治理|政务|预警|告警|空气|车流|数据|看板|驾驶舱|情况|趋势|人口|接诉|既诉|即诉|热线|水务|水质|供水|吧)/
+const nonNames = /^(?:(?:哪(?:一?个|些)?)(?:乡镇|镇街|镇|街道|村社|村|社区|区域)|社区|社区治理|乡镇|镇街|村社|农村|城区|城区社区|地区|区域|辖区|片区|市区|街道|统计区|园区|全域)$/
+const aliasSuffix = /^(?:的|和|与|及|跟|或|这边|那边|今天|现在|之前|目前|最近|昨天|今年|有哪些|有什么|有多少|还剩|办结|受理量|基层治理|治理|政务|经济|预警|告警|空气|车流|数据|看板|驾驶舱|情况|趋势|人口|接诉|既诉|即诉|热线|水务|水质|供水|吧)/
 
 function normalize(text: string): string {
   return text.normalize('NFKC').replace(/[\s，。？！、,.!?；;：:“”"「」]/g, '')
@@ -131,7 +133,7 @@ function clarifyAreas(locations: readonly CockpitLocation[], byId: ReadonlyMap<s
 
 function relativeLocation(match: string, path: readonly CockpitLocation[]): CockpitLocation | undefined {
   if (match === '上一级' || match === '上一层') return path.at(-2)
-  if (match === '全区' || match === '本区') return path.find((item) => item.level === 'district')
+  if (match === '全区' || match === '全域' || match === '本区') return path.find((item) => item.level === 'district')
   if (match.endsWith('村')) return path.find((item) => item.level === 'village')
   return path.find((item) => item.level === 'town'
     && (match.endsWith('街道') ? item.name.endsWith('街道') : !item.name.endsWith('街道')))
@@ -197,4 +199,66 @@ export function interpretCockpitIntent(
     return { kind: 'clarify', reason: 'missing-navigation-target', message: '没有找到要打开的区域。请指定区、镇街或村社。' }
   }
   return { kind: 'ask', areaId, question }
+}
+type ScreenTarget = { screen: ScreenId; name: RegExp }
+const screenTargets: readonly ScreenTarget[] = [
+  { screen: 'overview', name: /全区总览|全域总览|综合总览|总览|全域地图|卫星地图|地图/ },
+  { screen: 'population', name: /(?:镇街|城镇|乡镇|街镇|街道|常住)(?:人口|人数)|人口专题|人口|人数/ },
+  { screen: 'governance', name: /基层治理|政务服务|接诉即办|既诉既办|即诉即办|即诉既办|既速既办|政务|治理专题|治理|热线/ },
+  { screen: 'economy', name: /经济发展|经济运行|经济专题|经济/ },
+]
+const homeTarget = /^(?:(?:全域|全区)(?:的?(?:数据|总览|概览|首页|地图|大屏))?|首页|主页|驾驶舱)(?:页面|页|吧)?$/
+const screenTail = /^(?:的)?(?:数据(?:面板)?|看板|驾驶舱|页面|界面|专题|屏|概览|运行情况|情况|信息)?(?:的|吧)?$/
+const screenNegated = /^(?:先别|别|不要|不用|不必)(?:看|查询|查|显示|浏览|分析)/
+const hotlineDomain = /接诉即办|既诉既办|即诉即办|即诉既办|既速既办|热线|诉求|工单|投诉/
+const hotlineMeasure = /受理|办理|办结|逾期|超时|临期|派单|字段|表结构|数据字典|指标口径/
+const analytical = /多少|几件|什么|哪些|哪类|哪个|哪里|为何|为什么|怎么|如何|是否|吗|呢|走势|趋势|变化|同比|环比|最多|最少|最高|最低|分析|排行|分布|问题|字段|表结构|口径/
+const thirdPartyTopic = /水务|水质|供水|用水|水厂|出厂水|水资源/
+
+export type ScreenAssistantIntent = CockpitIntent
+  | { kind: 'home' }
+  | { kind: 'screen'; screen: ScreenId; areaId: string }
+  | { kind: 'hotline'; areaId: string; question: string }
+
+export function interpretScreenIntent(
+  question: string,
+  currentAreaId: string,
+  locations: readonly CockpitLocation[],
+  currentScreen?: ScreenId,
+): ScreenAssistantIntent {
+  const text = normalize(question).replace(polite, '').replace(/^我(?=看|查询|切换|打开|返回|回到)/, '')
+  if (navigationNegated.test(text) || screenNegated.test(text)) {
+    return { kind: 'clarify', message: '已保留当前页面。' }
+  }
+  if (homeTarget.test(text.replace(opening, ''))) return { kind: 'home' }
+
+  const targets = screenTargets.filter(({ name }) => name.test(text))
+  const names = mentionsOf(text, locations.filter(item => locationId.test(item.id)))
+  const instruction = removeMentions(text, names).replace(currentRef, '').replace(relativeRef, '').replace(opening, '')
+  const target = targets[0]
+  if (targets.length > 1 && opening.test(text) && !analytical.test(text)) {
+    return { kind: 'clarify', message: '请指定一个页面。可以打开全区总览、镇街人口、基层治理或经济发展。' }
+  }
+
+  const topical = (residual: string) => hotlineDomain.test(residual) || thirdPartyTopic.test(residual)
+  const navigationTarget = targets.length === 1 && target
+    && screenTail.test(instruction.replace(target.name, ''))
+  // Remove the screen name only for navigation so unknown geography still gets checked.
+  const scopeQuestion = navigationTarget ? text.replace(target.name, '').replace(/的(?:的)?$/, '') : question
+  if (navigationTarget && !scopeQuestion && locations.some(item => item.id === currentAreaId)) {
+    return { kind: 'screen', screen: target.screen, areaId: currentAreaId }
+  }
+  const scope = interpretCockpitIntent(scopeQuestion, currentAreaId, locations, topical)
+  if (scope.kind === 'clarify' && scope.reason !== 'missing-navigation-target') return scope
+  const areaId = 'areaId' in scope ? scope.areaId : currentAreaId
+
+  if (navigationTarget) return { kind: 'screen', screen: target.screen, areaId }
+  const asksCurrentGovernance = currentScreen === 'governance' && !targets.some(item => item.screen !== 'governance')
+    && (hotlineMeasure.test(text) || scope.kind === 'problems' || /分析(?:一下)?(?:当前|这里|本地|本镇)?(?:的数据|数据)?[吧吗]?$/.test(text))
+  if ((hotlineDomain.test(text) || asksCurrentGovernance) && analytical.test(text)
+    && (!thirdPartyTopic.test(text) || hotlineDomain.test(text))) {
+    return { kind: 'hotline', areaId, question }
+  }
+  if (scope.kind === 'navigate' && currentScreen) return { kind: 'screen', screen: currentScreen, areaId }
+  return scope
 }
