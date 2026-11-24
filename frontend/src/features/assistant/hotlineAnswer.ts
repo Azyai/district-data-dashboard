@@ -4,6 +4,7 @@ import { hotlineAnalysis, hotlineSemantics, normalizeHotlineMonth } from '../scr
 import type { SnapshotAnswer } from './answer'
 
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
+const beijingYear = new Intl.DateTimeFormat('zh-CN', { timeZone: 'Asia/Shanghai', year: 'numeric' })
 
 export async function queryHotlineAnswer(
   client: QueryClient,
@@ -15,9 +16,9 @@ export async function queryHotlineAnswer(
   signal.throwIfAborted()
   const namedMonth = question.match(/(?:(\d{4})\s*年\s*)?(\d{1,2})\s*月份?/)
   const selectedMonth = namedMonth
-    ? (namedMonth[1] ?? '2026') + '-' + namedMonth[2].padStart(2, '0') : normalizeHotlineMonth(month)
-  if (selectedMonth !== normalizeHotlineMonth(selectedMonth)) {
-    return { answer: { text: '接诉即办工单覆盖 2026 年 1 至 10 月，请选择这一期间的月份。', evidence: '' } }
+    ? (namedMonth[1] ?? beijingYear.format(new Date()).replace('年', '')) + '-' + namedMonth[2].padStart(2, '0') : normalizeHotlineMonth(month)
+  if (namedMonth && !normalizeHotlineMonth(selectedMonth)) {
+    return { answer: { text: '请从受理月份中选择有效月份。', evidence: '' } }
   }
   const [data, semantics] = await Promise.all([
     client.fetchQuery(hotlineAnalysis(areaId, selectedMonth)),
