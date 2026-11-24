@@ -1,4 +1,4 @@
-import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, queryOptions, useQuery, useQueryClient } from '@tanstack/react-query'
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useLocation, useMatch, useNavigate } from 'react-router'
@@ -167,8 +167,8 @@ function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwi
       <div className="map-plot">
         <div className="district-map-extent">
           <Suspense fallback={<div className="map-wait" role="status">正在加载本地模型</div>}>
-        <LocalDistrictModel area={area} viewMode={viewMode} onViewModeChange={onViewModeChange}
-          onSelectArea={onSelectArea} onOpenTwin={onOpenTwin} />
+            <LocalDistrictModel area={area} viewMode={viewMode} onViewModeChange={onViewModeChange}
+              onSelectArea={onSelectArea} onOpenTwin={onOpenTwin} />
           </Suspense>
         </div>
       </div>
@@ -196,8 +196,9 @@ export default function Cockpit({ identityControl, topicControl, onTopicQuestion
   const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
   const heading = useRef<HTMLDivElement>(null)
   const lastArea = useRef(areaId)
-  const zone = useQuery({ ...areaQuery(areaId), refetchInterval: areaRefreshMs })
-  const area = zone.data
+  const zone = useQuery({ ...areaQuery(areaId), placeholderData: keepPreviousData, refetchInterval: areaRefreshMs })
+  const area = zone.isPlaceholderData ? undefined : zone.data
+  const displayedArea = zone.data
 
   useEffect(() => {
     if (location.hash === '#voice-assistant' || location.hash === '#area-issues') {
@@ -284,16 +285,16 @@ export default function Cockpit({ identityControl, topicControl, onTopicQuestion
     <div className="cockpit">
       <Masthead identityControl={identityControl} topicControl={topicControl} onAsk={area ? openAssistant : undefined} />
       <main className="cockpit-body" aria-label="区域驾驶舱">
-        {area ? (
-          <>
-            <div ref={heading} className="area-focus" tabIndex={-1} aria-label={area.name}><AreaBar area={area} /></div>
+        {displayedArea ? (
+          <div className="cockpit-area" inert={zone.isPlaceholderData} aria-busy={zone.isPlaceholderData}>
+            <div ref={heading} className="area-focus" tabIndex={-1} aria-label={displayedArea.name}><AreaBar area={displayedArea} /></div>
 
             <div className="cockpit-main">
-              <RegionModel area={area} viewMode={viewMode} onViewModeChange={setViewMode}
+              <RegionModel area={displayedArea} viewMode={viewMode} onViewModeChange={setViewMode}
                 onInspect={openIssues} onSelectArea={id => { void navigate(areaPath(id)) }}
-                onOpenTwin={id => { void navigate(twinPath(id), { state: { backArea: area.id } }) }} />
+                onOpenTwin={id => { void navigate(twinPath(id), { state: { backArea: displayedArea.id } }) }} />
             </div>
-          </>
+          </div>
         ) : (
           <section className="cockpit-panel cockpit-state" aria-live="polite" aria-busy={zone.isPending}>
             <h2>{zone.isPending ? '正在加载区域数据' : '区域数据暂不可用'}</h2>
