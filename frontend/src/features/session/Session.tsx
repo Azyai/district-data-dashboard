@@ -86,8 +86,9 @@ export function Session({ children }: { children: (state: SessionState) => React
   }, [identity.isSuccess, identity.data, queryClient])
 
   useEffect(() => {
-    document.title = management ? '门头沟区数据管理' : '门头沟区数字驾驶舱'
-  }, [management])
+    document.title = management ? '门头沟区数据管理'
+      : pathname.toLowerCase().replace(/\/$/, '') === '/workbench' ? '门头沟区数据工作台' : '门头沟区数字驾驶舱'
+  }, [management, pathname])
 
   const current = identity.data ?? null
   const busy = login.isPending || logout.isPending
