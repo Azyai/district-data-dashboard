@@ -4,6 +4,8 @@ import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router'
+import { twinPath, twinSites, type TwinId } from './twinSites'
 import MonitoringLayers, { detailLayers } from './MonitoringLayers'
 import type { MonitorPage, MonitoringSnapshot } from './monitoringData'
 import type { CockpitArea, CockpitDirectory } from '../../api/client'
@@ -32,6 +34,9 @@ type Props = {
 type Pin = { id: string; name: string; point: Coordinates; boundary?: GeoBoundary }
 type AreaGeometry = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>
 const token = (import.meta.env.VITE_TIANDITU_TOKEN as string | undefined)?.trim()
+const landmarks = (Object.keys(twinSites) as TwinId[]).map(id => ({
+  id, name: twinSites[id].name, point: twinSites[id].mapPoint,
+}))
 const featured = new Set(['zhaitang', 'qingshui', 'datai', 'miaofengshan'])
 const empty = (): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', features: [] })
 const districtBox: [Coordinates, Coordinates] = [[districtBounds.west, districtBounds.south], [districtBounds.east, districtBounds.north]]
@@ -170,6 +175,8 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
   const nearbyVillages = useMemo(() => mapPlaces(directory?.filter(location => location.level === 'village' && location.parentId === townId)
     ?? (area.level === 'town' ? area.children : []), villages.data), [area.children, area.level, directory, townId, villages.data])
   const pins = district ? towns : nearbyVillages
+  const visibleLandmarks = landmarks.filter(pin => district || (focus && boundaryContains(focus, pin.point)))
+  const naturalSurroundings = topic === 'roads'
   const pickFeature = useRef(onSelectFeature)
   useEffect(() => { pickFeature.current = onSelectFeature }, [onSelectFeature])
   const pendingSelection = useRef<number | undefined>(undefined)
@@ -252,8 +259,8 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     if (!map || !token || !atlas.data) return
     setBasemap('connecting')
     setReason(undefined)
-    return connectImagery(map, token, atlas.data.mask, (state, message) => { setBasemap(state); setReason(message) })
-  }, [map, atlas.data, attempt])
+    return connectImagery(map, token, atlas.data.mask, naturalSurroundings, (state, message) => { setBasemap(state); setReason(message) })
+  }, [map, atlas.data, attempt, naturalSurroundings])
 
   useEffect(() => {
     if (map && currentView.current === '3d' && viewMode === '2d') {
@@ -363,6 +370,12 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
             clearSelection()
           }}>
           <span className="atlas-pin-dot" /><span className="atlas-pin-label">{pin.name}</span></button>
+    </AreaPin>)}
+    {map && visibleLandmarks.map(pin => <AreaPin key={pin.id} map={map} pin={pin}>
+      <Link className="atlas-landmark" data-site={pin.id} to={twinPath(pin.id)}
+        state={{ backArea: area.id, backTopic: topic }} aria-label={'查看' + pin.name + '三维模型'}>
+        <i aria-hidden="true"/><span>{pin.id === 'tianjie' ? '长安天街' : pin.name} <small>3D</small></span>
+      </Link>
     </AreaPin>)}
     {map && data && <MonitoringLayers map={map} topic={topic} area={area} data={data} selected={selected} status={roadStatus}/>}
     {(status || pendingBoundary) && <div className="atlas-status" aria-live="polite">{status && <span>{status}</span>}

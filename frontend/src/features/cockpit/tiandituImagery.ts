@@ -22,7 +22,7 @@ function maskPath(polygons: Polygon[]) {
   return path
 }
 
-export function connectImagery(map: MapLibreMap, token: string, boundary: Polygon[],
+export function connectImagery(map: MapLibreMap, token: string, boundary: Polygon[], naturalSurroundings: boolean,
   onStatus: (state: Basemap, reason?: string) => void) {
   const scheme = 'tianditu-district-' + ++sequence
   const outline = maskPath(boundary)
@@ -63,10 +63,10 @@ export function connectImagery(map: MapLibreMap, token: string, boundary: Polygo
         const canvas = document.createElement('canvas')
         canvas.width = canvas.height = 256
         const ctx = canvas.getContext('2d', { alpha: false })!
-        ctx.filter = 'grayscale(1) brightness(.77)'
+        ctx.filter = naturalSurroundings ? 'saturate(.94) brightness(.83)' : 'grayscale(1) brightness(.77)'
         ctx.drawImage(bitmap, 0, 0)
         ctx.filter = 'none'
-        ctx.fillStyle = 'rgba(48, 73, 95, .54)'
+        ctx.fillStyle = naturalSurroundings ? 'rgba(10, 29, 48, .13)' : 'rgba(48, 73, 95, .54)'
         ctx.fillRect(0, 0, 256, 256)
         ctx.save()
         const world = 2 ** z * 256
@@ -81,7 +81,7 @@ export function connectImagery(map: MapLibreMap, token: string, boundary: Polygo
         if (!success) {
           success = true
           window.clearTimeout(deadline)
-          map.setPaintProperty('outside', 'fill-opacity', .07)
+          map.setPaintProperty('outside', 'fill-opacity', naturalSurroundings ? 0 : .07)
           map.setPaintProperty('grid', 'line-opacity', 0)
           onStatus('online')
         }
@@ -103,6 +103,10 @@ export function connectImagery(map: MapLibreMap, token: string, boundary: Polygo
     disposed = true
     subscription.abort()
     window.clearTimeout(deadline)
+    if (map.getStyle()) {
+      if (map.getLayer('national-imagery')) map.removeLayer('national-imagery')
+      if (map.getSource('national-imagery')) map.removeSource('national-imagery')
+    }
     removeProtocol(scheme)
   }
 }

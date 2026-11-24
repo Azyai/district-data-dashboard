@@ -1,5 +1,5 @@
 .tianditu-map { position: absolute; inset: 0; overflow: hidden; background: #1b2b3b; color: #edf7ff; }
-.atlas-render { position: absolute; inset: 0; }
+.atlas-render { position:absolute; inset:0; isolation:isolate; z-index:0; }
 .atlas-render .maplibregl-canvas[data-area-hover] { cursor: pointer; }
 .atlas-render .maplibregl-canvas[data-orbiting] { cursor: grabbing; }
 .atlas-gesture-hint { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
@@ -40,3 +40,17 @@
   .atlas-place { width: 22px; height: 22px; }
   .atlas-pin-label { font-size: .64rem; top: 20px; }
 }
+
+.atlas-landmark {
+  display:grid; place-items:center; position:relative; width:18px; height:18px; color:#ffe1a0;
+  border:1px solid #ffd889; border-radius:50%; background:#443923c2; box-shadow:0 0 9px #e5ac5a88;
+}
+.atlas-landmark > i { width:6px; height:6px; border-radius:1px; background:#ffe7b3; transform:rotate(45deg); }
+.atlas-landmark > span {
+  position:absolute; right:12px; bottom:19px; display:flex; gap:5px; align-items:center; white-space:nowrap;
+  padding:3px 7px; background:#111b26eb; border:1px solid #9a8154; border-radius:5px;
+  color:#f7ecd1; font-size:11px; font-weight:600; line-height:1.4;
+}
+.atlas-landmark[data-site="jingxi"] > span { bottom:auto; top:19px; }
+.atlas-landmark small { color:#f6d68b; font:600 9px Bahnschrift,"Segoe UI",sans-serif; }
+.atlas-landmark:hover > span,.atlas-landmark:focus-visible > span { border-color:#fff0c5; background:#2b302c; }
