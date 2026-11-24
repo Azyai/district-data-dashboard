@@ -399,12 +399,65 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/dashboards/{projectId}/releases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取专题发布和送审记录 */
+        get: operations["listDashboardSubmissions"];
+        put?: never;
+        /** 冻结已保存草稿供审核 */
+        post: operations["submitDashboardRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard-reviews/{projectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取专题审核队列 */
+        get: operations["listDashboardReviews"];
+        put?: never;
+        /** 审核发布、退回或回滚专题 */
+        post: operations["reviewDashboardRelease"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/dashboard-reviews/{projectId}/{revision}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 读取不可变送审版本 */
+        get: operations["previewDashboardRelease"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         /** @enum {string} */
-        Persona: "district" | "service" | "data-admin";
+        Persona: "district" | "service" | "data-admin" | "reviewer";
         /** @enum {string} */
         Theme: "city" | "services";
         CsrfToken: {
@@ -694,6 +747,33 @@ export interface components {
             revision: number;
             /** @description 同专题内组件 ID 唯一，组件边界须落在画布内 */
             components: components["schemas"]["DashboardDraftComponent"][];
+        };
+        DashboardReleaseSubmission: {
+            revision: number;
+        };
+        DashboardReleaseReview: {
+            revision: number;
+            serial: number;
+            /** @enum {string} */
+            decision: "APPROVE" | "RETURN" | "ROLLBACK";
+            note?: string;
+        };
+        DashboardReleaseSummary: {
+            revision: number;
+            /** @enum {string} */
+            status: "PENDING" | "APPROVED" | "RETURNED";
+            submittedBy: string;
+            /** Format: date-time */
+            submittedAt: string;
+            reviewedBy: string | null;
+            /** Format: date-time */
+            reviewedAt: string | null;
+            reviewNote: string | null;
+        };
+        DashboardReleaseWorkspace: {
+            serial: number;
+            activeRevision: number | null;
+            releases: components["schemas"]["DashboardReleaseSummary"][];
         };
         Geometry: {
             x: number;
@@ -1670,6 +1750,186 @@ export interface operations {
             403: components["responses"]["Http403"];
             404: components["responses"]["Http404"];
             409: components["responses"]["Http409"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    listDashboardSubmissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["DashboardReleaseWorkspace"];
+                    };
+                };
+            };
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    submitDashboardRelease: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 从当前会话的 CSRF 接口取得 */
+                "X-CSRF-TOKEN": components["parameters"]["CsrfHeader"];
+            };
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardReleaseSubmission"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["DashboardReleaseWorkspace"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            404: components["responses"]["Http404"];
+            409: components["responses"]["Http409"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    listDashboardReviews: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["DashboardReleaseWorkspace"];
+                    };
+                };
+            };
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    reviewDashboardRelease: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description 从当前会话的 CSRF 接口取得 */
+                "X-CSRF-TOKEN": components["parameters"]["CsrfHeader"];
+            };
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DashboardReleaseReview"];
+            };
+        };
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["DashboardReleaseWorkspace"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            404: components["responses"]["Http404"];
+            409: components["responses"]["Http409"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    previewDashboardRelease: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                projectId: components["parameters"]["ProjectId"];
+                revision: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["DashboardDraftWorkspace"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            401: components["responses"]["Http401"];
+            403: components["responses"]["Http403"];
+            404: components["responses"]["Http404"];
             500: components["responses"]["Http500"];
         };
     };

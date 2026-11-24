@@ -1704,6 +1704,368 @@
           }
         }
       }
+    },
+    "/api/v1/admin/dashboards/{projectId}/releases": {
+      "get": {
+        "operationId": "listDashboardSubmissions",
+        "summary": "读取专题发布和送审记录",
+        "tags": [
+          "dashboard-drafts"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DashboardReleaseWorkspace"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "submitDashboardRelease",
+        "summary": "冻结已保存草稿供审核",
+        "tags": [
+          "dashboard-drafts"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DashboardReleaseWorkspace"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardReleaseSubmission"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard-reviews/{projectId}": {
+      "get": {
+        "operationId": "listDashboardReviews",
+        "summary": "读取专题审核队列",
+        "tags": [
+          "dashboard-drafts"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DashboardReleaseWorkspace"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          }
+        ]
+      },
+      "post": {
+        "operationId": "reviewDashboardRelease",
+        "summary": "审核发布、退回或回滚专题",
+        "tags": [
+          "dashboard-drafts"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DashboardReleaseWorkspace"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Http409"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "$ref": "#/components/parameters/CsrfHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DashboardReleaseReview"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/dashboard-reviews/{projectId}/{revision}": {
+      "get": {
+        "operationId": "previewDashboardRelease",
+        "summary": "读取不可变送审版本",
+        "tags": [
+          "dashboard-drafts"
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/DashboardDraftWorkspace"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Http401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Http403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ProjectId"
+          },
+          {
+            "name": "revision",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1768,7 +2130,8 @@
         "enum": [
           "district",
           "service",
-          "data-admin"
+          "data-admin",
+          "reviewer"
         ]
       },
       "Theme": {
@@ -3172,6 +3535,141 @@
           "snapshot",
           "revision",
           "components"
+        ],
+        "additionalProperties": false
+      },
+      "DashboardReleaseSubmission": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "revision"
+        ],
+        "additionalProperties": false
+      },
+      "DashboardReleaseReview": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647
+          },
+          "serial": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "APPROVE",
+              "RETURN",
+              "ROLLBACK"
+            ]
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "revision",
+          "serial",
+          "decision"
+        ],
+        "additionalProperties": false
+      },
+      "DashboardReleaseSummary": {
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "APPROVED",
+              "RETURNED"
+            ]
+          },
+          "submittedBy": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reviewedBy": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
+          },
+          "reviewedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "reviewNote": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "revision",
+          "status",
+          "submittedBy",
+          "submittedAt",
+          "reviewedBy",
+          "reviewedAt",
+          "reviewNote"
+        ],
+        "additionalProperties": false
+      },
+      "DashboardReleaseWorkspace": {
+        "type": "object",
+        "properties": {
+          "serial": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "activeRevision": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "releases": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "$ref": "#/components/schemas/DashboardReleaseSummary"
+            }
+          }
+        },
+        "required": [
+          "serial",
+          "activeRevision",
+          "releases"
         ],
         "additionalProperties": false
       }
