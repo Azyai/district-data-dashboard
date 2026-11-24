@@ -32,6 +32,17 @@ public final class DemoCockpitService {
     private static final List<String> CATEGORIES = List.of("市容环境", "道路交通", "公共设施", "社区治理", "其他");
     private static final List<Integer> CATEGORY_PERCENTAGES = List.of(32, 23, 19, 16, 10);
     private static final String GOVERNANCE_EVENTS = "governance-events";
+    static final List<BaselineMetric> BASELINE = List.of(
+            new BaselineMetric(GOVERNANCE_EVENTS, "治理事件受理", "件", DailyTotals::events),
+            new BaselineMetric("completion-rate", "事件办结率", "%",
+                    total -> percentage(total.closedEvents(), total.events())),
+            new BaselineMetric("service-cases", "政务服务办件", "件", DailyTotals::serviceCases),
+            new BaselineMetric("active-alerts", "待处置预警", "条", DailyTotals::activeAlerts),
+            new BaselineMetric("air-quality-rate", "优良空气监测占比", "%",
+                    total -> percentage(total.goodAirSamples(), total.airSamples())),
+            new BaselineMetric("road-traffic", "道路通行量", "车次", DailyTotals::roadTraffic),
+            new BaselineMetric("tourism-visits", "文旅接待", "人次", DailyTotals::tourismVisits),
+            new BaselineMetric("active-projects", "在建重点项目", "个", DailyTotals::activeProjects));
 
     private final MetricQuery metrics;
 
@@ -57,21 +68,9 @@ public final class DemoCockpitService {
                 .map(item -> new Breadcrumb(item.id(), item.name(), item.level()))
                 .toList();
         List<DailyTotals> week = IntStream.range(0, DAYS).mapToObj(day -> totals(area, day)).toList();
-        List<Metric> baseline = List.of(
-                metric(GOVERNANCE_EVENTS, "治理事件受理", "件", week, DailyTotals::events),
-                metric("completion-rate", "事件办结率", "%", week,
-                        total -> percentage(total.closedEvents(), total.events())),
-                metric("service-cases", "政务服务办件", "件", week, DailyTotals::serviceCases),
-                metric("active-alerts", "待处置预警", "条", week, DailyTotals::activeAlerts),
-                metric("air-quality-rate", "优良空气监测占比", "%", week,
-                        total -> percentage(total.goodAirSamples(), total.airSamples())),
-                metric("road-traffic", "道路通行量", "车次", week, DailyTotals::roadTraffic),
-                metric("tourism-visits", "文旅接待", "人次", week, DailyTotals::tourismVisits),
-                metric("active-projects", "在建重点项目", "个", week, DailyTotals::activeProjects)
-        );
         List<Reading> published = metrics.readArea(areaId);
         var readings = new LinkedHashMap<String, Metric>();
-        baseline.forEach(metric -> readings.put(metric.id(), metric));
+        BASELINE.forEach(definition -> readings.put(definition.id(), definition.read(week)));
         published.stream().map(DemoCockpitService::metric).forEach(metric -> readings.put(metric.id(), metric));
 
         var governance = published.stream().filter(row -> row.definition().id().equals(GOVERNANCE_EVENTS)).findFirst();
@@ -101,12 +100,13 @@ public final class DemoCockpitService {
         return new ChildArea(area.id(), area.name(), area.level(), area.x(), area.z());
     }
 
-    private static Metric metric(String id, String label, String unit, List<DailyTotals> week,
-                                 ToDoubleFunction<DailyTotals> read) {
-        List<BigDecimal> series = week.stream().mapToDouble(read).mapToObj(BigDecimal::valueOf).toList();
-        BigDecimal latest = series.getLast();
-        BigDecimal previous = series.get(series.size() - 2);
-        return new Metric(id, label, latest, unit, latest.subtract(previous), series, Status.READY, null);
+    record BaselineMetric(String id, String label, String unit, ToDoubleFunction<DailyTotals> measure) {
+        Metric read(List<DailyTotals> week) {
+            List<BigDecimal> series = week.stream().mapToDouble(measure).mapToObj(BigDecimal::valueOf).toList();
+            BigDecimal latest = series.getLast();
+            BigDecimal previous = series.get(series.size() - 2);
+            return new Metric(id, label, latest, unit, latest.subtract(previous), series, Status.READY, null);
+        }
     }
 
     private static double percentage(int numerator, int denominator) {
