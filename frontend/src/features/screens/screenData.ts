@@ -72,10 +72,24 @@ const economy = {
 }
 
 export const projectAttentionGap = 5
-export const months = ['5 月', '6 月', '7 月', '8 月', '9 月', '10 月']
 export const latestValue = (values: number[]) => values.at(-1) ?? 0
+const beijingDate = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+})
 
-export function economyFor(area: CockpitArea) {
+function economyPeriods(now: Date) {
+  const [year, month, day] = beijingDate.format(now).split('-').map(Number)
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(Date.UTC(year, month - 6 + index, 1))
+    const periodYear = date.getUTCFullYear()
+    const periodMonth = date.getUTCMonth() + 1
+    const days = new Date(Date.UTC(periodYear, periodMonth, 0)).getUTCDate()
+    return { year: periodYear, month: periodMonth, label: periodMonth + ' 月',
+      elapsed: index === 5 ? day / days : 1 }
+  })
+}
+
+export function economyFor(area: CockpitArea, now = new Date()) {
   const scope = populationFor(area)
   const townIndex = towns.findIndex(town => town.id === scope?.id)
   const preceding = townIndex < 0 ? 0 : towns.slice(0, townIndex).reduce((sum, town) => sum + town.population, 0)
@@ -83,7 +97,16 @@ export function economyFor(area: CockpitArea) {
   const shareEnd = (preceding + (scope?.population ?? 0)) / district.population
   // Round cumulative boundaries so all 13 town shares sum to the district figure.
   const scaleCount = (total: number) => Math.round(total * shareEnd) - Math.round(total * shareStart)
-  const currency = (values: number[]) => values.map(value => scaleCount(Math.round(value * 10)) / 10)
+  const periods = economyPeriods(now)
+  const currency = (values: number[]) => {
+    const monthlyRate = (values[5] - values[0]) / 5
+    const monthEnd = (month: number) => values[month - 5] ??
+      (month < 5 ? values[0] * month / 5 : values[5] + monthlyRate * (month - 10))
+    return periods.map(({ month, elapsed }) => {
+      const opening = month === 1 ? 0 : monthEnd(month - 1)
+      return scaleCount(Math.round((opening + (monthEnd(month) - opening) * elapsed) * 10)) / 10
+    })
+  }
   const industries = economy.industries.map(item => ({ ...item, value: scaleCount(item.value) }))
   const services = economy.services.map(item => {
     const done = scaleCount(item.done)
@@ -91,7 +114,7 @@ export function economyFor(area: CockpitArea) {
   })
   const projects = economy.projects.filter(project => area.level === 'district' || (area.level === 'town' && project.townId === area.id))
   return {
-    gdp: currency(economy.gdp), investment: currency(economy.investment), sales: currency(economy.sales),
+    periods, gdp: currency(economy.gdp), investment: currency(economy.investment), sales: currency(economy.sales),
     served: industries.reduce((sum, item) => sum + item.value, 0),
     serviceCount: services.reduce((sum, item) => sum + item.count, 0),
     serviceDone: services.reduce((sum, item) => sum + item.done, 0),

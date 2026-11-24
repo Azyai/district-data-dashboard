@@ -1,7 +1,7 @@
 import type { CockpitArea } from '../../api/client'
 import type { ScreenId } from '../screens/screenCatalog'
 import {
-  ageNames, economyFor, formatNumber, months, populationFor, projectAttentionGap, towns,
+  ageNames, economyFor, formatNumber, populationFor, projectAttentionGap, towns,
 } from '../screens/screenData'
 import type { SnapshotAnswer } from './answer'
 
@@ -52,7 +52,7 @@ function populationAnswer(question: string, area: CockpitArea): string {
 
 function economyAnswer(question: string, area: CockpitArea): string {
   const sample = economyFor(area)
-  if (/同比|去年|上年|财政收入|税收|失业/.test(question)) return '经济样例涵盖 5 至 10 月的累计生产总值、投资和零售额，暂缺这个口径的数据。'
+  if (/同比|去年|上年|财政收入|税收|失业/.test(question)) return '经济样例涵盖最近六个月的累计生产总值、投资和零售额，暂缺这个口径的数据。'
   if (/项目|风险|问题|预警|关注/.test(question)) {
     const delayed = sample.projects.filter(project => project.planned - project.progress >= projectAttentionGap)
     const names = delayed.map(project => project.name + '落后计划 ' + (project.planned - project.progress) + ' 个百分点')
@@ -70,14 +70,17 @@ function economyAnswer(question: string, area: CockpitArea): string {
     { label: '社会消费品零售总额', values: sample.sales, match: /零售|消费/ },
   ]
   const selected = series.filter(item => item.match.test(question))
-  const namedMonth = question.match(/(\d{1,2})\s*月/)
-  const monthIndex = namedMonth ? Number(namedMonth[1]) - 5 : /上月/.test(question) && !changeWords.test(question) ? 4 : 5
-  if (monthIndex < 0 || monthIndex >= months.length) return '经济样例覆盖 5 至 10 月，请选择这一期间的累计值。'
+  const namedMonth = question.match(/(?:(\d{4})\s*年\s*)?(\d{1,2})\s*月/)
+  const monthIndex = namedMonth
+    ? sample.periods.findIndex(period => period.month === Number(namedMonth[2]) && (!namedMonth[1] || period.year === Number(namedMonth[1])))
+    : sample.periods.length - (/上月/.test(question) && !changeWords.test(question) ? 2 : 1)
+  if (monthIndex < 0) return '经济样例提供截至本月的最近六个月累计值。'
+  const period = sample.periods[monthIndex]
   return (selected.length ? selected : series).map(item => {
     const total = item.values[monthIndex]
-    const headline = months[monthIndex] + '累计' + item.label + '为 ' + formatNumber(total) + ' 亿元'
+    const headline = period.label + '累计' + item.label + '为 ' + formatNumber(total) + ' 亿元'
     if (!changeWords.test(question)) return headline
-    if (!monthIndex) return headline + '，4 月累计值未收录'
+    if (!monthIndex || period.month === 1) return headline + '，该期缺少同年度的上月累计值'
     const delta = total - item.values[monthIndex - 1]
     return headline + '，较上月累计值' + (delta >= 0 ? '增加 ' : '减少 ') + formatNumber(Math.abs(delta)) + ' 亿元'
   }).join('。') + '。'
