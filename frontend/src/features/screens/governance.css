@@ -1,0 +1,140 @@
+body[data-page="governance"] .screen {
+  padding-inline: clamp(.75rem, 1.4vw, 2.2rem);
+  background: radial-gradient(ellipse at 46% 40%, #1b393f, transparent 70%),
+    radial-gradient(ellipse at 0 100%, #252b49, transparent 57%), #0c1b24;
+}
+.ref-governance {
+  grid-template-columns: minmax(0, 3.05fr) minmax(17rem, 1fr);
+  gap: clamp(.75rem, 1.2vw, 1.55rem);
+  padding: clamp(.6rem, 1.6vh, 1.3rem) 0;
+}
+.hotline-stage {
+  min-height: 0;
+  grid-template-rows: minmax(0, 1fr) minmax(7.5rem, 19%);
+  gap: clamp(.55rem, 1.25vh, 1rem);
+}
+.hotline-tree {
+  min-height: 0;
+  grid-template-columns: minmax(0, .78fr) minmax(0, 1.16fr) minmax(0, 1.27fr) minmax(0, 1.5fr);
+  gap: clamp(1.3rem, 3vw, 4.2rem);
+}
+.hotline-column { min-height: 0; }
+.hotline-column-head { padding-bottom: .26rem; }
+.hotline-column-head h2, .hotline-detail section h2, .hotline-context h2 { font-size: 1rem; letter-spacing: .035em; }
+.hotline-column-head > small { font-variant-numeric: tabular-nums; }
+.hotline-root { width: 100%; }
+.hotline-root > span { font-weight: 600; }
+.hotline-core { width: min(80%, 7.25rem); margin-block: 1.65rem; }
+.hotline-core i {
+  background: radial-gradient(circle at 34% 23%, #dbbdff 0, #986fce 11%, #614998 37%, #312b51 71%, #1b233b);
+}
+.hotline-core::before { animation: hotline-orbit 35s linear infinite; }
+@keyframes hotline-orbit { to { transform: rotate(360deg); } }
+#hotline-month, .hotline-category {
+  border: 1px solid #6d9d9a73; border-radius: .38rem; padding: .3rem .38rem;
+  max-width: 100%; background: #10292e; color: #deefed; font: inherit; font-size: .8rem; cursor: pointer;
+}
+#hotline-month:hover, .hotline-category:hover { border-color: #a9d3c6; }
+.hotline-states .hotline-nodes { align-content: space-evenly; gap: .4rem; }
+.hotline-states .hotline-node { min-height: clamp(3.25rem, 7.8vh, 5rem); }
+.hotline-node { padding-inline: .54rem; }
+.hotline-node strong { font-variant-numeric: tabular-nums; }
+.hotline-towns .hotline-nodes {
+  scrollbar-width: thin; scrollbar-color: #52797377 transparent;
+  gap: clamp(.28rem, .56vh, .58rem); padding: .45rem .15rem;
+}
+.hotline-towns .hotline-nodes:has(> :nth-child(8)) {
+  grid-auto-rows: minmax(2.35rem, 1fr); align-content: stretch;
+}
+.hotline-stage .travel {
+  stroke-dasharray: 1 13 6 80; stroke-linecap: round; stroke-width: 1.7;
+  animation: hotline-current 3.9s linear infinite var(--delay, 0s);
+}
+.hotline-stage .is-active .travel { stroke-width: 2.4; filter: drop-shadow(0 0 3px #ffc67a); }
+@keyframes hotline-current { to { stroke-dashoffset: -100; } }
+
+.hotline-cases { grid-template-rows: auto auto minmax(0, 1fr); align-items: stretch; }
+.hotline-category { justify-self: start; margin: .45rem .15rem .25rem; }
+.hotline-cases .governance-branch-window {
+  align-content: start; min-height: 0;
+  scrollbar-width: thin; scrollbar-color: #52797388 transparent;
+}
+.hotline-cases .governance-branch-window::-webkit-scrollbar { display: block; width: 4px; }
+.hotline-cases .governance-branch-window::-webkit-scrollbar-thumb { border-radius: 1em; background: #52797388; }
+.hotline-cases .governance-branch-list { padding-inline: .15rem; }
+.hotline-cases .governance-branch-list > li { height: clamp(3.25rem, 6.9vh, 4.65rem); padding: .23rem 0; }
+.governance-record { height: 100%; min-height: 0; padding-inline: .65rem; gap: .52rem; }
+.governance-record b { font-size: .94rem; }
+.governance-record small { color: #a8c3c3; font-size: .75rem; }
+.record-chevron { transform: rotate(-45deg); }
+.hotline-feed-end { min-height: 1px; color: #a4c0be; font-size: .82rem; }
+.hotline-feed-end:not(:empty) { padding: .4rem .2rem; }
+.hotline-feed-end button { background: none; color: #ffe0ae; border: 0; text-decoration: underline; }
+.hotline-context { padding: .7rem .85rem; }
+.hotline-monitor { min-height: 0; }
+.hotline-trend .chart > svg { width: 100%; height: clamp(5rem, 12vh, 9rem); }
+.hotline-watch-row { min-height: clamp(1.4rem, 2.5vh, 2.4rem); }
+.hotline-watch-chip { min-width: 4.1rem; font-variant-numeric: tabular-nums; }
+
+.hotline-detail {
+  align-self: stretch; justify-content: flex-start; padding: clamp(.85rem, 1.25vw, 1.5rem);
+  border-radius: .9rem; border-color: #7cafa64d;
+  background: radial-gradient(ellipse at 110% 0, #32615e70, transparent 50%),
+    linear-gradient(150deg, #11262c, #1b3033 60%, #102227);
+}
+.hotline-detail .gov-label { color: #abcbc5; margin-bottom: .6rem; }
+.hotline-detail h2.hotline-case-title { font-size: clamp(1.3rem, 1.65vw, 1.95rem); line-height: 1.3; margin: 0 0 .65rem; text-wrap: pretty; }
+.hotline-detail .gov-status { border: 0; background: none; padding: 0; }
+.hotline-detail .gov-status span { padding: .15rem .45rem; }
+.hotline-facts { margin-top: .8rem; }
+.hotline-facts > div, .hotline-monthly dl > div { padding: .58rem .65rem; }
+.hotline-workflow { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: .7rem; }
+.hotline-timeline {
+  display: grid; flex: 1; grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr); gap: .12rem; margin: .45rem 0;
+}
+.hotline-timeline li { display: grid; }
+.hotline-timeline .governance-step {
+  grid-template-columns: .7rem 1fr auto auto; align-content: center; align-items: center;
+  justify-items: start; gap: .44rem; padding: .25rem .36rem; text-align: left; line-height: 1.1;
+}
+.hotline-timeline .governance-step b { font-size: .9rem; }
+.hotline-timeline .governance-step :is(span,time) { font-size: .73rem; color: #a5beb9; }
+.hotline-timeline .governance-step time { font-family: var(--number); font-variant-numeric: tabular-nums; }
+.hotline-timeline li:not(:last-child)::after {
+  top: calc(50% + .44rem); left: .61rem; width: 1px; height: calc(100% - .73rem);
+  background: linear-gradient(#95dfcb88, #83b9ae30);
+}
+.hotline-workflow .gov-progress { min-height: 2.25rem; }
+.hotline-monthly { margin-top: .65rem; }
+.hotline-monthly dd { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.hotline-detail > .hotline-monthly:last-child { margin-top: auto; }
+.hotline-detail .hotline-workflow + .hotline-monthly { margin-top: .65rem; }
+.ref-governance dialog .dialog-head { justify-content: flex-end; }
+
+@media (max-width: 1200px) and (min-width: 731px) {
+  .hotline-tree { gap: 1.8vw; }
+  .hotline-node { padding-inline: .35rem; }
+  .hotline-states .hotline-node { grid-template-columns: .38rem minmax(0, 1fr); gap: .18rem .38rem; }
+  .hotline-states .hotline-count { grid-column: 2; justify-content: start; }
+  .hotline-towns .hotline-node { grid-template-columns: 1.2rem minmax(0, 1fr); }
+  .hotline-towns .hotline-count { grid-column: 2; justify-content: start; }
+  .hotline-towns .hotline-nodes:has(> :nth-child(8)) { grid-auto-rows: minmax(2.85rem, 1fr); }
+}
+@media (max-width: 730px) and (orientation: portrait) {
+  .ref-governance { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto; gap: .65rem; }
+  .hotline-stage { grid-template-rows: minmax(0, 1fr) auto; gap: .6rem; }
+  .hotline-tree { gap: .65rem; grid-template-columns: minmax(0, .77fr) minmax(0, .98fr) minmax(0, 1.13fr) minmax(0, 1.43fr); }
+  .hotline-towns .hotline-nodes:has(> :nth-child(8)) { grid-auto-rows: minmax(2.65rem, 1fr); }
+  .hotline-core { margin-block: 1.2rem; }
+  .hotline-count { flex-wrap: wrap; }
+  .hotline-context { padding: .42rem .52rem; }
+  .hotline-watch-chip { min-width: 3rem; }
+  .hotline-detail { display: grid; grid-template-columns: 1fr 1fr; gap: .3rem .7rem; align-content: start; padding: .7rem; }
+  .hotline-detail .gov-label { margin-bottom: 0; }
+  .hotline-detail h2.hotline-case-title { margin: 0; }
+  .hotline-detail .hotline-workflow, .hotline-detail .hotline-monthly { margin: 0; }
+  .hotline-timeline { gap: .12rem; }
+  .hotline-timeline .governance-step { padding-block: .25rem; }
+  .hotline-monthly dl > div { padding: .4rem; }
+}
