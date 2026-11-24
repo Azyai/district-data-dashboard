@@ -6,6 +6,24 @@ import { tileUrl } from './tiandituStyle'
 export type Basemap = 'offline' | 'connecting' | 'online' | 'unavailable'
 let sequence = 0
 const origin = MercatorCoordinate.fromLngLat([115.8, 40])
+const outsidePalette = Array.from({ length: 256 }, (_, luminance) => {
+  const shade = Math.min(1, Math.max(0, (luminance / 255 - .05) / .78)) ** .8
+  return [9 + 86 * shade, 16 + 118 * shade, 26 + 148 * shade] as const
+})
+
+function gradeSurroundings(ctx: CanvasRenderingContext2D, width: number, height: number) {
+  // The reference uses a steel-blue luminance ramp to retain the terrain texture.
+  const pixels = ctx.getImageData(0, 0, width, height)
+  const { data } = pixels
+  for (let index = 0; index < data.length; index += 4) {
+    const luminance = (data[index] * .299 + data[index + 1] * .587 + data[index + 2] * .114) | 0
+    const [red, green, blue] = outsidePalette[luminance]
+    data[index] = red
+    data[index + 1] = green
+    data[index + 2] = blue
+  }
+  ctx.putImageData(pixels, 0, 0)
+}
 
 // Tint the same source imagery outside the actual multi-polygon. Keeping the
 // mask in tile coordinates makes colours and boundaries agree while pitching.
@@ -22,7 +40,7 @@ function maskPath(polygons: Polygon[]) {
   return path
 }
 
-export function connectImagery(map: MapLibreMap, token: string, boundary: Polygon[], naturalSurroundings: boolean,
+export function connectImagery(map: MapLibreMap, token: string, boundary: Polygon[],
   onStatus: (state: Basemap, reason?: string) => void) {
   const scheme = 'tianditu-district-' + ++sequence
   const outline = maskPath(boundary)
@@ -63,16 +81,14 @@ export function connectImagery(map: MapLibreMap, token: string, boundary: Polygo
         const canvas = document.createElement('canvas')
         canvas.width = canvas.height = 256
         const ctx = canvas.getContext('2d', { alpha: false })!
-        ctx.filter = naturalSurroundings ? 'saturate(.94) brightness(.83)' : 'grayscale(1) brightness(.77)'
         ctx.drawImage(bitmap, 0, 0)
-        ctx.filter = 'none'
-        ctx.fillStyle = naturalSurroundings ? 'rgba(10, 29, 48, .13)' : 'rgba(48, 73, 95, .54)'
-        ctx.fillRect(0, 0, 256, 256)
+        gradeSurroundings(ctx, canvas.width, canvas.height)
         ctx.save()
         const world = 2 ** z * 256
         ctx.setTransform(world, 0, 0, world, origin.x * world - x * 256, origin.y * world - y * 256)
         ctx.clip(outline, 'evenodd')
         ctx.resetTransform()
+        ctx.filter = 'saturate(.87) contrast(1.12) brightness(.8)'
         ctx.drawImage(bitmap, 0, 0)
         ctx.restore()
         const data = await createImageBitmap(canvas)
@@ -81,7 +97,7 @@ export function connectImagery(map: MapLibreMap, token: string, boundary: Polygo
         if (!success) {
           success = true
           window.clearTimeout(deadline)
-          map.setPaintProperty('outside', 'fill-opacity', naturalSurroundings ? 0 : .07)
+          map.setPaintProperty('outside', 'fill-opacity', 0)
           map.setPaintProperty('grid', 'line-opacity', 0)
           onStatus('online')
         }

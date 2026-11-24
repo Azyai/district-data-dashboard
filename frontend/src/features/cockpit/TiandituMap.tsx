@@ -176,7 +176,6 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     ?? (area.level === 'town' ? area.children : []), villages.data), [area.children, area.level, directory, townId, villages.data])
   const pins = district ? towns : nearbyVillages
   const visibleLandmarks = landmarks.filter(pin => district || (focus && boundaryContains(focus, pin.point)))
-  const naturalSurroundings = topic === 'roads'
   const pickFeature = useRef(onSelectFeature)
   useEffect(() => { pickFeature.current = onSelectFeature }, [onSelectFeature])
   const pendingSelection = useRef<number | undefined>(undefined)
@@ -259,8 +258,8 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     if (!map || !token || !atlas.data) return
     setBasemap('connecting')
     setReason(undefined)
-    return connectImagery(map, token, atlas.data.mask, naturalSurroundings, (state, message) => { setBasemap(state); setReason(message) })
-  }, [map, atlas.data, attempt, naturalSurroundings])
+    return connectImagery(map, token, atlas.data.mask, (state, message) => { setBasemap(state); setReason(message) })
+  }, [map, atlas.data, attempt])
 
   useEffect(() => {
     if (map && currentView.current === '3d' && viewMode === '2d') {
