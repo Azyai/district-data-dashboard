@@ -1,9 +1,5 @@
 
 .district-local-model {
-  --map-control-ink: #d7e8fa;
-  --map-control-line: #365474;
-  --map-control-background: #101f35;
-  --map-control-shadow: 0 3px 12px #03091754;
   position: absolute;
   z-index: 4;
   inset: 0;
@@ -199,15 +195,6 @@
 .district-local-model-key li::before { width: .46rem; height: .46rem; border-radius: 2px; background: #9caebf; content: ""; }
 .district-local-model-key [data-surface="roads"]::before { background: #c4b895; }
 .district-local-model-key [data-surface="water"]::before { background: #50bbec; }
-.model-imagery-source {
-  position: absolute;
-  bottom: 19px;
-  left: var(--local-gutter, 15px);
-  color: #afc3dc;
-  font-size: .67rem;
-  text-underline-offset: 2px;
-}
-.model-imagery-source:hover { text-decoration: underline; }
 
 .district-local-landmarks, .district-local-model-detail {
   position: absolute;
@@ -230,45 +217,6 @@
 }
 .district-local-landmarks button:hover, .district-local-model-detail button:hover { background: #24597d; }
 .district-local-model :is(a, button, select):focus-visible { outline: 2px solid #9ee7f9; outline-offset: 2px; }
-.local-model-tools {
-  position: absolute;
-  right: var(--local-gutter, 14px);
-  bottom: 16px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--map-control-ink);
-  font-size: .75rem;
-  line-height: 1.25;
-}
-.local-model-tool-group {
-  display: flex;
-  overflow: hidden;
-  border: 1px solid var(--map-control-line);
-  border-radius: 7px;
-  background: var(--map-control-background);
-  box-shadow: var(--map-control-shadow);
-}
-.local-model-tools button {
-  display: grid;
-  place-items: center;
-  min-width: 36px;
-  min-height: 36px;
-  padding-inline: .55rem;
-  font-weight: 670;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.local-model-tools button + button { border-left: 1px solid var(--map-control-line); }
-.local-model-tools button:hover { background: #244c70; }
-.local-model-tools button[aria-pressed="true"] { color: #eef7ff; background: #255285; }
-.local-model-tools button:focus-visible { outline-offset: -3px; }
-.local-model-zoom-hint { margin-inline-end: .25rem; color: #b8cce5; }
-
-@media (hover: none) {
-  .local-model-zoom-hint { display: none; }
-}
 .model-region-note {
   position: absolute;
   left: var(--local-gutter, 15px);
@@ -305,8 +253,6 @@
 
 @container (max-width: 46rem) {
   .district-local-model-canvas { inset: 63px 0 93px; }
-  .local-model-tools { right: 10px; bottom: 9px; gap: 3px; }
-  .local-model-tools button { padding-inline: .35rem; }
   .model-region-note { left: 12px; bottom: 105px; }
   .district-local-model[data-twin="true"] .district-local-model-canvas { bottom: 65px; }
   .model-callout { right: auto; left: calc(50% - 90px); bottom: calc(50% + 23px); min-width: 9.5rem; padding: .55rem .62rem; }
@@ -322,12 +268,10 @@
     border: 0;
   }
   .district-local-model-key::before { display: none; }
-  .model-imagery-source { bottom: 52px; left: 12px; }
   .district-local-landmarks { left: 12px; bottom: 106px; }
   .district-local-model-detail { left: 12px; bottom: 106px; }
   .district-local-model:has(.district-local-landmarks) .district-local-model-detail { bottom: 154px; }
 }
 @media (pointer: coarse) {
-  .model-twin-label button, .district-local-landmarks button, .local-model-tools button { min-height: 44px; }
-  .local-model-tools button { min-width: 44px; }
+  .model-twin-label button, .district-local-landmarks button { min-height: 44px; }
 }

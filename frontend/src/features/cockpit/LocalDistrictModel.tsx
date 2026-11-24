@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { skipToken, useQuery } from '@tanstack/react-query'
 import {
   AmbientLight, Box3, BufferAttribute, Color, DirectionalLight, Mesh, MeshBasicMaterial,
-  MeshStandardMaterial, OrthographicCamera, Raycaster, Scene, SRGBColorSpace, Texture, TextureLoader, Vector2, Vector3, WebGLRenderer,
+  MeshStandardMaterial, OrthographicCamera, Raycaster, Scene, Texture, Vector2, Vector3, WebGLRenderer,
 } from 'three'
 import type { BufferGeometry, Material, Object3D } from 'three'
 import { Link } from 'react-router'
@@ -10,9 +10,10 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js'
 import type { CockpitArea } from '../../api/client'
+import MapGlobeControl from './MapGlobeControl'
 import { loadTerrainDetail, terrainUvProjection } from './detailTerrainTexture'
 import {
-  boundaryCenter, boundaryContains, boundaryFor, clearBoundaryMask, districtBounds, geoCoordinates,
+  boundaryCenter, boundaryContains, boundaryFor, clearBoundaryMask, geoCoordinates,
   maskToBoundary, modelCoordinates, readBoundaries, terrainSurfaceIndex,
 } from './localModelGeography'
 import type { GeoBoundary } from './localModelGeography'
@@ -20,8 +21,6 @@ import { twinSites, type TwinId } from './twinSites'
 import './local-model.css'
 
 const assetRoot = import.meta.env.BASE_URL + 'maps/local-model/'
-const mapRoot = import.meta.env.BASE_URL + 'maps/'
-const imageryBounds = { west: 115.405, east: 116.181, south: 39.798, north: 40.19 }
 const districtModelLimit = 26_000_000
 const twinModelLimit = 26_000_000
 const renderPixelLimit = 8_300_000
@@ -142,27 +141,6 @@ function applyModelStyle(object: Object3D) {
   return { terrain, nativeTexture }
 }
 
-function applyImagery(terrain: Mesh, texture: Texture) {
-  const positions = terrain.geometry.getAttribute('position')
-  const bounds = terrain.geometry.boundingBox
-  if (!bounds || !(terrain.material instanceof MeshStandardMaterial)) return
-  const uv = new Float32Array(positions.count * 2)
-  const width = bounds.max.x - bounds.min.x
-  const depth = bounds.max.z - bounds.min.z
-  for (let index = 0; index < positions.count; index++) {
-    const longitude = districtBounds.west + (positions.getX(index) - bounds.min.x) / width * (districtBounds.east - districtBounds.west)
-    const latitude = districtBounds.north - (positions.getZ(index) - bounds.min.z) / depth * (districtBounds.north - districtBounds.south)
-    uv[index * 2] = (longitude - imageryBounds.west) / (imageryBounds.east - imageryBounds.west)
-    uv[index * 2 + 1] = (latitude - imageryBounds.south) / (imageryBounds.north - imageryBounds.south)
-  }
-  terrain.geometry.setAttribute('uv', new BufferAttribute(uv, 2))
-  texture.colorSpace = SRGBColorSpace
-  terrain.material.map = texture
-  terrain.material.color.set('#dbe6df')
-  terrain.material.vertexColors = false
-  terrain.material.needsUpdate = true
-}
-
 type ModelTools = {
   reset: () => void
   view: (mode: View) => void
@@ -180,7 +158,6 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
   const [localView, setLocalView] = useState<View>('3d')
   const view = viewMode ?? localView
   const [markers, setMarkers] = useState<ModelMarker[]>([])
-  const [imagery, setImagery] = useState(false)
   const district = area?.level === 'district'
   const areaId = area?.id
   const selectArea = useRef(onSelectArea)
@@ -231,7 +208,6 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
     setLocalView('3d')
     setPicked(undefined)
     setMarkers([])
-    setImagery(false)
     setAppliedScope(undefined)
 
     async function initialize(host: HTMLDivElement) {
@@ -532,17 +508,6 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       observer.observe(host)
       fit()
       setPhase('ready')
-      if (!terrain || districtStyle?.nativeTexture) return
-      new TextureLoader().load(mapRoot + 'mentougou-sentinel-2-20261008.webp', texture => {
-        if (controller.signal.aborted) {
-          texture.dispose()
-          return
-        }
-        texture.anisotropy = anisotropy
-        applyImagery(terrain, texture)
-        setImagery(true)
-        draw()
-      }, undefined, () => undefined)
     }
 
     void initialize(element).catch(() => {
@@ -655,18 +620,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
               <li key={key} data-surface={key}><button type="button" onClick={() => setPicked(surfaceDetail(key))}>{surfaceLabels[key]}</button></li>
             ))}
           </ul>}
-          {imagery && <a href="https://ewds.climate.copernicus.eu/licences/ec-sentinel" target="_blank" rel="noreferrer"
-            className="model-imagery-source">含经修改的 Copernicus Sentinel 2026 数据</a>}
-          <div className="local-model-tools" role="group" aria-label="本地模型操作">
-            <span className="local-model-zoom-hint">滚轮缩放</span>
-            <div className="local-model-tool-group" role="group" aria-label="模型视角">
-              <button type="button" aria-pressed={view === '2d'} onClick={() => changeView('2d')}>2D</button>
-              <button type="button" aria-pressed={view === '3d'} onClick={() => changeView('3d')}>3D</button>
-            </div>
-            <div className="local-model-tool-group">
-              <button type="button" onClick={() => tools.current?.reset()}>复位视角</button>
-            </div>
-          </div>
+          <MapGlobeControl view={view} onViewChange={changeView} onReset={() => tools.current?.reset()} />
         </>
       )}
     </section>
