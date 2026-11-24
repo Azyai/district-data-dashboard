@@ -2,6 +2,7 @@ import { Drawer } from 'antd'
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { ApiError, type CockpitArea } from '../../api/client'
+import type { ScreenId } from '../screens/screenCatalog'
 import { type SnapshotAnswer } from './answer'
 import { demoTranscription, type TranscriptionState } from './transcription'
 import { useMicrophone } from './useMicrophone'
@@ -15,12 +16,13 @@ export type AssistantReply = {
 
 type AssistantContentProps = {
   area: CockpitArea
+  examples?: readonly string[]
   onQuestion: (question: string, previousMetricId: string | undefined, signal: AbortSignal) => Promise<AssistantReply | null>
 }
 
 type Turn = AssistantReply & { id: number; question: string }
 
-const examples = [
+const defaultExamples = [
   '打开人口专题',
   '哪类诉求最多？',
   '看水务数据',
@@ -44,11 +46,12 @@ function transcriptionStatus(state: TranscriptionState) {
 }
 
 function formatTimestamp(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
   const parsed = Date.parse(value)
   return Number.isFinite(parsed) ? dateTime.format(parsed) : value
 }
 
-function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps & { onClose: () => void }) {
+function AssistantContent({ area, onQuestion, onClose, examples = defaultExamples }: AssistantContentProps & { onClose: () => void }) {
   const [question, setQuestion] = useState('')
   const [turns, setTurns] = useState<Turn[]>([])
   const [transcription, setTranscription] = useState<TranscriptionState>({ phase: 'idle' })
@@ -142,7 +145,7 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
     const controller = new AbortController()
     pendingTranscript.current = controller
     void demoTranscription.transcribe(
-      { source: 'demo', text: examples[0] },
+      { source: 'demo', text: examples[0] ?? defaultExamples[0] },
       controller.signal,
       state => {
         if (controller.signal.aborted) return
@@ -202,7 +205,7 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
           </li>
         ))}
       </ol>
-      {turns.length === 0 && (
+      {turns.length === 0 && examples.length > 0 && (
         <div className="voice-assistant-examples" aria-label="示例指令">
           {examples.map(example => (
             <button type="button" key={example} disabled={working} onClick={() => void ask(example)}>{example}</button>
@@ -216,7 +219,7 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
             <input
               id={inputId}
               value={question}
-              placeholder="例如：哪个监测点达标率最低？"
+              placeholder={examples[0] ? '例如：' + examples[0] : '输入问题'}
               maxLength={160}
               disabled={working}
               onChange={event => {
@@ -246,9 +249,10 @@ function AssistantContent({ area, onQuestion, onClose }: AssistantContentProps &
   )
 }
 
-export function VoiceAssistant({ open, onClose, ...content }: AssistantContentProps & {
+export function VoiceAssistant({ open, onClose, screen, ...content }: AssistantContentProps & {
   open: boolean
   onClose: () => void
+  screen?: ScreenId
 }) {
   return (
     <Drawer
@@ -257,6 +261,7 @@ export function VoiceAssistant({ open, onClose, ...content }: AssistantContentPr
       open={open}
       onClose={onClose}
       destroyOnHidden
+      rootClassName={screen ? 'screen-assistant-overlay screen-assistant-' + screen : undefined}
       className="voice-assistant-drawer"
     >
       {open && <AssistantContent {...content} onClose={onClose} />}
