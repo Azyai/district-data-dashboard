@@ -13,6 +13,8 @@ const browser = await chromium.launch({
   args: process.env.E2E_FORCE_WEBGL === '1' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] : [],
 })
 
+const errorMessage = error => error.message.replace(/(\btk=)[^&\s"']+/gi, '$1[redacted]')
+
 async function capture(page, filename) {
   if (!evidence) return
   await mkdir(evidence, { recursive: true })
@@ -30,61 +32,123 @@ async function mapLayout(page) {
 }
 
 async function waitForArea(page, name) {
-  const area = page.getByRole('navigation', { name: '区域层级' })
-  await area.locator('[aria-current="page"]').filter({ hasText: name }).waitFor()
-  await page.getByRole('heading', { name: name + '模型' }).waitFor()
+  await page.locator('.cockpit-main[aria-busy="false"] #area-model').filter({ hasText: name }).waitFor()
   const route = new URL(page.url()).pathname
-  const areaId = route === '/' ? 'mentougou' : decodeURIComponent(route.split('/').at(-1))
-  await page.locator(`.district-local-model[data-model-ready="ready"][data-model-scope=${JSON.stringify(areaId)}] canvas`).waitFor()
+  const id = route === '/' ? 'mentougou' : decodeURIComponent(route.split('/').at(-1))
+  const map = page.locator(`.tianditu-map[data-map-ready="ready"][data-map-scope=${JSON.stringify(id)}]`)
+  await map.locator('canvas.maplibregl-canvas').waitFor()
+  return map
 }
 
-async function verifyLocalModel(page) {
-  const model = page.locator('.district-local-model[data-model-ready="ready"]')
-  const initialLayout = await mapLayout(page)
-  await model.getByRole('link', { name: '查看全区人口专题' }).waitFor()
+async function freeMapPoint(map) {
+  return map.evaluate(node => {
+    const box = node.getBoundingClientRect()
+    for (const height of [.45, .6, .72, .35]) {
+      for (const width of [.5, .56, .43, .65, .37]) {
+        const x = box.x + box.width * width
+        const y = box.y + box.height * height
+        if (document.elementFromPoint(x, y)?.matches('canvas.maplibregl-canvas')) return { x, y }
+      }
+    }
+    throw new Error('No exposed map surface')
+  })
+}
 
-  const markerGeometry = () => {
-    const read = selector => {
-      const rect = document.querySelector(selector)?.getBoundingClientRect()
-      return rect ? { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 } : null
-    }
-    const population = read('.model-population')
-    const town = read('.model-place[data-place="datai"]')
-    return population && town && {
-      ...population, separation: Math.hypot(population.x - town.x, population.y - town.y),
-    }
+async function zoomChanged(page, before, direction) {
+  await page.waitForFunction(({ before, direction }) => {
+    const value = document.querySelector('.tianditu-map')?.getAttribute('data-zoom')
+    return value && (Number(value) - before) * direction > .02
+  }, { before, direction })
+}
+
+async function verifyDistrictMap(page) {
+  const map = await waitForArea(page, '门头沟区')
+  const initialLayout = await mapLayout(page)
+  const tool = map.getByRole('button', { name: '地图工具' })
+  const panel = map.getByRole('group', { name: '地图视角' })
+  const canvas = map.locator('canvas.maplibregl-canvas')
+  await map.getByRole('link', { name: '查看全区人口专题' }).waitFor()
+  const townCount = Number(await page.locator('.region-picker summary span').innerText())
+  assert(townCount > 0)
+  assert.equal(await map.locator('.atlas-place').count(), townCount, 'Every listed town needs a geographic marker')
+  await map.getByRole('button', { name: '长安天街' }).waitFor()
+  await map.getByRole('button', { name: '京西智谷' }).waitFor()
+  for (const name of ['左侧指标', '右侧指标']) {
+    await page.getByRole('complementary', { name }).locator('li').first().waitFor()
   }
-  for (const view of ['2D', '3D']) {
-    await model.getByRole('button', { name: view, exact: true }).click()
-    assert.equal(await model.getAttribute('data-view'), view.toLowerCase())
-    await model.getByRole('button', { name: '复位视角', exact: true }).click()
-    await mapLayout(page)
-    const start = await page.evaluate(markerGeometry)
-    assert(start?.separation > 1)
-    await page.mouse.move(start.x, start.y)
-    await page.mouse.wheel(0, -100)
-    await mapLayout(page)
-    const larger = await page.evaluate(markerGeometry)
-    assert(larger?.separation > start.separation * 1.12, view + ' wheel up should magnify the scene')
-    assert(Math.hypot(larger.x - start.x, larger.y - start.y) < 2, view + ' keeps the cursor anchor')
-    await page.mouse.wheel(0, 100)
-    await mapLayout(page)
-    const restored = await page.evaluate(markerGeometry)
-    assert(Math.abs(restored.separation - start.separation) < 2, view + ' wheel down should shrink the scene')
+  const choose = async name => {
+    await tool.click()
+    await panel.getByRole('button', { name, exact: true }).click()
+    await panel.waitFor({ state: 'hidden' })
   }
-  assert.equal(await model.getByRole('button', { name: /放大模型|缩小模型/ }).count(), 0)
-  const canvas = model.locator('canvas')
-  await canvas.focus()
-  const previous = await page.evaluate(markerGeometry)
-  await canvas.press('+')
+  const zoom = () => map.evaluate(node => Number(node.dataset.zoom))
+  for (const mode of ['2D', '3D']) {
+    await choose(mode)
+    await page.waitForFunction(view => document.querySelector('.tianditu-map')?.dataset.view === view, mode.toLowerCase())
+    await choose('复位视角')
+    const start = await zoom()
+    assert(start > 0)
+    const pointer = await freeMapPoint(map)
+    await page.mouse.move(pointer.x, pointer.y)
+    await page.mouse.wheel(0, -200)
+    await zoomChanged(page, start, 1)
+    const magnified = await zoom()
+    await page.mouse.wheel(0, 200)
+    await zoomChanged(page, magnified, -1)
+    await choose('复位视角')
+    await page.waitForFunction(expected => Math.abs(Number(document.querySelector('.tianditu-map')?.dataset.zoom) - expected) < .05, start)
+  }
+  const datai = map.locator('.atlas-place[data-place="datai"]')
+  const original = await datai.boundingBox()
+  assert(original)
+  const pointer = await freeMapPoint(map)
+  await page.mouse.move(pointer.x, pointer.y)
+  await page.mouse.down()
+  await page.mouse.move(pointer.x + 45, pointer.y - 20, { steps: 6 })
+  await page.mouse.up()
   await page.waitForFunction(({ x, y }) => {
-    const marker = document.querySelector('.model-population')?.getBoundingClientRect()
-    return marker && Math.hypot(marker.x + marker.width / 2 - x, marker.y + marker.height / 2 - y) > 1
-  }, previous)
-  assert((await page.evaluate(markerGeometry))?.separation > previous.separation, 'Keyboard zoom should remain available')
-  await model.getByRole('button', { name: '复位视角', exact: true }).click()
+    const marker = document.querySelector('.atlas-place[data-place="datai"]')?.getBoundingClientRect()
+    return marker && Math.hypot(marker.x - x, marker.y - y) > 12
+  }, original)
+  await choose('复位视角')
+  await page.waitForFunction(({ x, y }) => {
+    const marker = document.querySelector('.atlas-place[data-place="datai"]')?.getBoundingClientRect()
+    return marker && Math.hypot(marker.x - x, marker.y - y) < 3
+  }, original)
+  await canvas.focus()
+  const beforeKeyboard = await zoom()
+  await canvas.press('Equal')
+  await zoomChanged(page, beforeKeyboard, 1)
+  await choose('复位视角')
+
+  const bounds = await map.boundingBox()
+  const beforeDrag = await tool.boundingBox()
+  assert(bounds && beforeDrag)
+  const x = beforeDrag.x + beforeDrag.width / 2
+  const y = beforeDrag.y + beforeDrag.height / 2
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x - 85, y - 15, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForFunction(start => document.querySelector('.map-globe-trigger').getBoundingClientRect().x < start - 70, beforeDrag.x)
+  const moved = await tool.boundingBox()
+  assert(moved.x >= bounds.x && moved.y >= bounds.y)
+  assert.equal(await tool.getAttribute('aria-expanded'), 'false')
+  await tool.press('Enter')
+  await panel.waitFor()
+  const popover = await panel.boundingBox()
+  assert(popover.x >= bounds.x && popover.y >= bounds.y &&
+    popover.x + popover.width <= bounds.x + bounds.width + 1 &&
+    popover.y + popover.height <= bounds.y + bounds.height + 1)
+  await tool.press('Escape')
+  await panel.waitFor({ state: 'hidden' })
+  await page.mouse.move(moved.x + moved.width / 2, moved.y + moved.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(x, y, { steps: 6 })
+  await page.mouse.up()
+  await page.waitForFunction(start => Math.abs(document.querySelector('.map-globe-trigger').getBoundingClientRect().x - start) < 2, beforeDrag.x)
+  await choose('2D')
   assert.deepEqual(await mapLayout(page), initialLayout)
-  assert.equal(await page.getByRole('button', { name: /行政地图|区域地图|行政区划/ }).count(), 0)
 }
 
 async function verifyRegionMenuLayout(page) {
@@ -113,10 +177,10 @@ try {
   const errors = []
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
   page.setDefaultTimeout(15_000)
-  page.on('pageerror', error => errors.push(error.message))
-  const externalMapRequests = []
+  page.on('pageerror', error => errors.push(errorMessage(error)))
+  const retiredMapHosts = []
   await page.route(/^https:\/\/(?:tiles\.openfreemap\.org|elevation-tiles-prod\.s3\.amazonaws\.com)\//, route => {
-    externalMapRequests.push(route.request().url())
+    retiredMapHosts.push(new URL(route.request().url()).hostname)
     return route.abort('failed')
   })
   await page.goto(baseUrl)
@@ -125,12 +189,15 @@ try {
   await waitForArea(page, '门头沟区')
   assert.equal(await page.locator('.cockpit-masthead').getByRole('button').count(), 0)
   assert.equal(await page.getByRole('link', { name: '数据管理', exact: true }).count(), 0)
+  await page.locator('.cockpit-masthead time[datetime]').waitFor()
+  assert.equal(await page.locator('.area-bar, .model-imagery-source').count(), 0)
   await assertNoHorizontalOverflow(page)
-  await page.setViewportSize({ width: 1072, height: 893 })
+  await page.setViewportSize({ width: 1106, height: 893 })
   assert.equal(await page.locator('.map-panel').evaluate(el => parseFloat(getComputedStyle(el).borderTopWidth)), 0)
   assert(await title.evaluate(el => Math.abs(el.getBoundingClientRect().left + el.clientWidth / 2 - innerWidth / 2) < 2))
-  await verifyLocalModel(page)
+  await verifyDistrictMap(page)
   await verifyRegionMenuLayout(page)
+  await capture(page, 'cockpit-1106.png')
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, 'cockpit-1440.png')
 
@@ -144,15 +211,20 @@ try {
     await page.setViewportSize({ width: 1440, height: 900 })
   }
 
-  const districtCanvas = await page.locator('.district-local-model canvas').elementHandle()
+  const districtCanvas = await page.locator('.tianditu-map canvas.maplibregl-canvas').elementHandle()
+  await page.locator('.atlas-place[data-place="datai"]').click()
+  await page.waitForURL('**/areas/datai')
+  await waitForArea(page, '大台街道')
+  await page.getByRole('link', { name: '返回门头沟区全域' }).click()
+  await waitForArea(page, '门头沟区')
   await page.locator('.region-picker > summary').click()
   const town = page.getByRole('navigation', { name: '下辖区域' }).getByRole('link', { name: '大峪街道' })
   await town.focus()
   await town.press('Enter')
   await page.waitForURL('**/areas/dayu')
   await waitForArea(page, '大峪街道')
-  assert.equal(await page.locator('.district-local-model canvas').evaluate((canvas, before) => canvas === before, districtCanvas), true,
-    'Town drill-down should reuse the loaded district model')
+  assert.equal(await page.locator('.tianditu-map canvas.maplibregl-canvas').evaluate((canvas, before) => canvas === before, districtCanvas), true,
+    'Town drill-down should reuse the active map canvas')
   await capture(page, 'cockpit-town.png')
 
   await page.locator('.region-picker > summary').click()
@@ -164,7 +236,7 @@ try {
   const opening = page.context().waitForEvent('page')
   await page.getByRole('link', { name: '区域数据' }).click()
   const workbench = await opening
-  workbench.on('pageerror', error => errors.push(error.message))
+  workbench.on('pageerror', error => errors.push(errorMessage(error)))
   await workbench.getByRole('dialog', { name: villageName + '问题诊断' }).waitFor()
   await workbench.keyboard.press('Escape')
   await verifyAs(workbench, /常规身份/)
@@ -212,15 +284,17 @@ try {
   await assistant.waitFor({ state: 'hidden' })
   console.log('PASS anonymous access, manual drill-down and inspection, command navigation, issue dialog and cross-area question')
 
+  await page.bringToFront()
   await page.setViewportSize({ width: 390, height: 844 })
   await page.getByRole('link', { name: '返回门头沟区全域' }).click()
   await waitForArea(page, '门头沟区')
   await assertNoHorizontalOverflow(page)
-  await verifyLocalModel(page)
+  await verifyDistrictMap(page)
   await verifyRegionMenuLayout(page)
-  assert.deepEqual(externalMapRequests, [], 'District and regional models use local assets')
-  console.log('PASS local model, pointer-anchored 2D/3D wheel zoom, keyboard zoom and stable layout at 1072px and 390px')
+  assert.deepEqual(retiredMapHosts, [], 'Retired map providers should never be requested')
+  console.log('PASS district map, metric rails, geographic drag, wheel and keyboard zoom, globe tools and stable layout at 1106px and 390px')
   await capture(page, 'cockpit-mobile.png')
+  await workbench.bringToFront()
   await workbench.setViewportSize({ width: 390, height: 844 })
   await verifyAs(workbench, /政务服务专项/)
   await workbench.waitForURL('**/play/public-services')
