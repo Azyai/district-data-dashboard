@@ -14,12 +14,6 @@ const metricAliases: Readonly<Record<string, RegExp>> = {
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
 const areas = /全区|全镇|全街道|全村/
 
-export const suggestedQuestions = [
-  '治理事件受理量是多少？',
-  '办结率较上一日有什么变化？',
-  '最近七天治理事件趋势如何？',
-]
-
 export type SnapshotAnswer = {
   text: string
   metricId?: string

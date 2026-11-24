@@ -1,0 +1,58 @@
+.voice-orb {
+  position: fixed;
+  width: 48px;
+  height: 48px;
+  z-index: 100;
+  --voice-light: #94d8fa;
+  color: var(--voice-light);
+  font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
+}
+.voice-orb-button {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border: 1px solid #8cd9f9ad;
+  padding: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 22%, #305477, #112b44 63%, #0b1a2d);
+  box-shadow: inset 0 0 0 3px #10253b, inset 0 0 0 4px #80d3ee40, 0 3px 16px #08122088;
+  color: var(--voice-light);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.voice-orb-button svg { width: 26px; height: 26px; }
+.voice-orb-button:focus-visible { outline: 2px solid #d1f4ff; outline-offset: 3px; }
+.voice-orb[data-dragging="true"] .voice-orb-button { cursor: grabbing; }
+.voice-orb-button[aria-pressed="true"] { border-color: #70dfd1; --voice-light: #98f7e6; }
+.voice-orb:is([data-phase="listening"], [data-phase="speaking"]) .voice-orb-button {
+  animation: voice-orb-pulse 1.25s ease-in-out infinite;
+}
+.voice-orb[data-phase="error"] { --voice-light: #ffcb87; }
+.voice-orb-state {
+  position: absolute;
+  display: block;
+  width: max-content;
+  max-width: min(23rem, calc(50vw - 32px));
+  padding: .48rem .72rem;
+  border: 1px solid #6bb9d24f;
+  border-radius: .57rem;
+  background: #0a1929f2;
+  color: #e1f1fa;
+  font-size: clamp(12px, .83vw, 16px);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  opacity: 0;
+}
+.voice-orb[data-edge="bottom"] .voice-orb-state { bottom: 0; }
+.voice-orb[data-edge="top"] .voice-orb-state { top: 0; }
+.voice-orb[data-side="left"] .voice-orb-state { right: calc(100% + 8px); }
+.voice-orb[data-side="right"] .voice-orb-state { left: calc(100% + 8px); }
+.voice-orb[data-dragging="false"] .voice-orb-state[data-show="true"],
+.voice-orb[data-dragging="false"]:is(:hover, :focus-within) .voice-orb-state { opacity: 1; }
+@keyframes voice-orb-pulse { 50% { box-shadow: inset 0 0 0 3px #112b40, 0 0 0 5px #65d7d11d, 0 0 15px #65d7d153; } }
+@media (prefers-reduced-motion: reduce) {
+  .voice-orb:is([data-phase="listening"], [data-phase="speaking"]) .voice-orb-button { animation: none; }
+}
