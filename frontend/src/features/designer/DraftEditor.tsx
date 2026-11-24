@@ -6,6 +6,7 @@ import { useSearchParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { AdminError, AdminIcon, Field } from '../admin/AdminParts'
 import { ScreenCanvas, ScreenComponentContent } from '../playback/ScreenCanvas'
+import DashboardReleases from './DashboardReleases'
 import { designerApi } from './designerApi'
 import type { DraftWorkspace } from './designerApi'
 import {
@@ -20,6 +21,22 @@ const projects = [
 ]
 
 const kindNames = { kpi: '关键指标', trend: '趋势', ranking: '排行' }
+const glyphs = {
+  kpi: 'M4.5 5.5h11v9h-11zm3 3v3m2.5-3v3m2.5-3v3',
+  trend: 'M3 4v12h14M5.5 12l3.4-4.1 3.1 2.4L16.8 6',
+  ranking: 'M4 5h12m-12 5h9m-9 5h5',
+  layers: 'm10 3 7 4-7 4-7-4 7-4zm-7 7 7 4 7-4m-14 4 7 4 7-4',
+  undo: 'M6.5 4 3 7.5l3.5 3.5M3 7.5h8.5a5 5 0 0 1 0 10H9',
+  redo: 'M13.5 4 17 7.5 13.5 11M17 7.5H8.5a5 5 0 0 0 0 10H11',
+  preview: 'M3.5 4.5h13v11h-13zM8.5 8l3.5 2-3.5 2z',
+  save: 'M4 3.5h10.5L16 5v11.5H4zm3 0v4h6v-4m-6 13v-5h6v5',
+} as const
+
+function DesignerGlyph({ name }: { name: keyof typeof glyphs }) {
+  return <svg className="designer-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.45"
+    strokeLinecap="round" strokeLinejoin="round" focusable="false" aria-hidden="true"><path d={glyphs[name]} /></svg>
+}
+
 const maxHistory = 50
 const materialTransfer = 'application/x-district-material'
 const projectKey = (projectId: string) => ['designer', 'draft', projectId] as const
@@ -68,7 +85,10 @@ export default function DraftEditor() {
   return (
     <div className="designer-page">
       <header className="designer-heading">
-        <h1>大屏编排</h1>
+        <div className="designer-page-title">
+          <span className="designer-title-mark"><AdminIcon name="layout" /></span>
+          <h1>大屏编排</h1>
+        </div>
         {!query.data && <ProjectChoice projectId={projectId} onChange={setProject} />}
       </header>
       {query.data ? <DraftBoard key={projectId} projectId={projectId} workspace={query.data} setProject={setProject} /> :
@@ -318,19 +338,28 @@ function DraftBoard({ projectId, workspace, setProject }: {
           <span data-dirty={dirty}>{dirty ? '有未保存的更改' : base.revision === 0 ? '模板布局' : '已保存'}</span>
         </p>
         <div className="designer-actions">
-          <Button onClick={() => setPreview(true)} disabled={busy} aria-haspopup="dialog">预览草稿</Button>
+          <Button icon={<DesignerGlyph name="preview" />} onClick={() => setPreview(true)} disabled={busy}
+            aria-haspopup="dialog">预览草稿</Button>
+          <DashboardReleases projectId={projectId} revision={base.revision} disabled={dirty || busy || conflict} />
           <Button type="primary" aria-label="保存草稿" aria-busy={save.isPending}
-            loading={save.isPending} disabled={(!dirty && !conflict) || reload.isPending}
+            icon={<DesignerGlyph name="save" />} loading={save.isPending} disabled={(!dirty && !conflict) || reload.isPending}
             onClick={saveDraft}>保存草稿</Button>
         </div>
       </div>
       <div className="designer-workspace">
         <section className="designer-stage" aria-label="画布" onKeyDown={canvasKeys}>
           <header className="designer-stage-bar">
-            <span className="designer-screen-size">{canvas.width} × {canvas.height}</span>
+            <div className="designer-stage-label">
+              <h2><AdminIcon name="layout" />画布</h2>
+              <span className="designer-screen-size">{canvas.width} × {canvas.height}</span>
+            </div>
             <div className="designer-stage-controls">
-              <Button size="small" autoInsertSpace={false} onClick={undo} disabled={busy || !history.past.length}>撤销</Button>
-              <Button size="small" autoInsertSpace={false} onClick={redo} disabled={busy || !history.future.length}>重做</Button>
+              <div className="designer-history" role="group" aria-label="编辑记录">
+                <Button type="text" size="small" autoInsertSpace={false} icon={<DesignerGlyph name="undo" />}
+                  onClick={undo} disabled={busy || !history.past.length}>撤销</Button>
+                <Button type="text" size="small" autoInsertSpace={false} icon={<DesignerGlyph name="redo" />}
+                  onClick={redo} disabled={busy || !history.future.length}>重做</Button>
+              </div>
               <select aria-label="画布缩放" value={zoom} disabled={busy} onChange={event => setZoom(event.currentTarget.value)}>
                 <option value="fit">适合窗口</option>
                 <option value="0.5">50%</option>
@@ -360,6 +389,8 @@ function DraftBoard({ projectId, workspace, setProject }: {
                         left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height,
                         zIndex: isSelected ? 1001 : geometry.z,
                         '--designer-handle-size': `${Math.round(34 / scale)}px`,
+                        '--designer-outline-width': `${1.5 / scale}px`,
+                        '--designer-handle-mark': `${8 / scale}px`,
                       } as CSSProperties}>
                       <div className="designer-widget-content screen-component" data-kind={component.type} aria-hidden="true">
                         <ScreenComponentContent component={component} data={values.get(component.metricId)} />
@@ -377,10 +408,17 @@ function DraftBoard({ projectId, workspace, setProject }: {
             </div>
             {!components.length && <p className="designer-canvas-empty">画布为空。从组件库添加组件。</p>}
           </div>
+          <footer className="designer-stage-status">
+            <span>{selected ? '拖动移动组件，方向键微调' : '从组件库添加或拖入组件'}</span>
+            <output aria-label="实际缩放比例">{Math.round(scale * 100)}%</output>
+          </footer>
         </section>
         <aside className="designer-materials" aria-label="组件库和图层">
-          <div className="designer-panel-title"><h2>组件库</h2><span>{components.length} / {maxComponents}</span></div>
-          <ul className="designer-list">
+          <div className="designer-panel-title">
+            <h2><AdminIcon name="add" />组件库</h2>
+            <span className="designer-count" title="画布已用组件数与上限">{components.length} / {maxComponents}</span>
+          </div>
+          <ul className="designer-list designer-material-list">
             {materials.map(material => (
               <li key={material.id}>
                 <button type="button" className="designer-material" aria-label={'添加 ' + material.title}
@@ -390,19 +428,21 @@ function DraftBoard({ projectId, workspace, setProject }: {
                     event.dataTransfer.effectAllowed = 'copy'
                     event.dataTransfer.setData(materialTransfer, material.id)
                   }}>
-                  <AdminIcon name="add" /><span>{material.title}<small>{kindNames[material.type]}</small></span>
+                  <span className="designer-material-mark" data-kind={material.type}><DesignerGlyph name={material.type} /></span>
+                  <span className="designer-item-text">{material.title}<small>{kindNames[material.type]}</small></span>
+                  <span className="designer-item-add"><AdminIcon name="add" /></span>
                 </button>
               </li>
             ))}
           </ul>
-          <div className="designer-panel-title designer-layer-title"><h2>图层</h2></div>
+          <div className="designer-panel-title designer-layer-title"><h2><DesignerGlyph name="layers" />图层</h2></div>
           {layers.length ? (
             <ul className="designer-list designer-layers">
               {layers.map(component => (
                 <li key={component.id}>
                   <button type="button" className="designer-layer" aria-label={'组件 ' + component.title}
                     aria-pressed={selection === component.id} disabled={busy} onClick={() => setSelection(component.id)}>
-                    <AdminIcon name="chart" /><span>{component.title}</span>
+                    <DesignerGlyph name={component.type} /><span className="designer-item-text">{component.title}</span>
                   </button>
                 </li>
               ))}
@@ -410,7 +450,10 @@ function DraftBoard({ projectId, workspace, setProject }: {
           ) : <p className="designer-empty">暂无组件</p>}
         </aside>
         <aside className="designer-inspector" aria-label="组件属性">
-          <div className="designer-panel-title"><h2>组件属性</h2>{selected && <span>{kindNames[selected.type]}</span>}</div>
+          <div className="designer-panel-title">
+            <h2><AdminIcon name="settings" />组件属性</h2>
+            {selected && <span className="designer-kind" data-kind={selected.type}>{kindNames[selected.type]}</span>}
+          </div>
           {selected ? (
             <Properties component={selected} materials={materials} disabled={busy} canvas={canvas}
               update={update => updateComponent(selected.id, update)}
@@ -428,6 +471,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
         open={preview}
         centered
         width={1152}
+        className="designer-dialog designer-preview-dialog"
         destroyOnHidden
         onCancel={() => setPreview(false)}
         footer={<Button onClick={() => setPreview(false)}>返回编辑</Button>}
@@ -442,6 +486,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
       <Modal
         title="保存草稿失败"
         open={showSaveError && !!save.error}
+        className="designer-dialog"
         centered
         onCancel={() => setShowSaveError(false)}
         footer={(
@@ -461,6 +506,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
       <Modal
         title={confirmation?.kind === 'reload' ? '加载服务器草稿' : '切换专题'}
         open={!!confirmation}
+        className="designer-dialog"
         okText={confirmation?.kind === 'reload' ? '放弃更改并加载' : '放弃更改并切换'}
         cancelText="继续编辑"
         okButtonProps={{ danger: true }}
@@ -503,47 +549,55 @@ function Properties({ component, materials, disabled, canvas, update, layer, can
 
   return (
     <div className="designer-properties">
-      <Field label="组件标题">
-        <Input key={component.id + component.title} defaultValue={component.title} disabled={disabled} maxLength={100}
-          onKeyDown={submitValue} onBlur={event => {
-            const title = event.currentTarget.value.trim() || component.title
-            event.currentTarget.value = title
-            if (title !== component.title) update(current => ({ ...current, title }))
-          }} />
-      </Field>
-      <Field label="绑定指标">
-        <select value={component.metricId} disabled={disabled} onChange={event => {
-          const material = materials.find(item => item.metricId === event.currentTarget.value && item.type === component.type)
-          if (!material) return
-          const previous = materials.find(item => item.metricId === component.metricId)
-          update(current => ({
-            ...current,
-            title: previous?.title === current.title ? material.title : current.title,
-            metricId: material.metricId,
-            unit: material.unit,
-          }))
-        }}>
-          {materials.filter(item => item.type === component.type)
-            .map(item => <option key={item.metricId} value={item.metricId}>{item.title}</option>)}
-        </select>
-      </Field>
-      <div className="designer-geometry">
-        {fields.map(([key, label]) => (
-          <Field label={label} key={key}>
-            <input type="number" step={1} key={component.id + component.geometry[key]} disabled={disabled}
-              defaultValue={component.geometry[key]} onKeyDown={submitValue} onBlur={event => {
-                const value = event.currentTarget.valueAsNumber
-                const original = component.geometry
-                const offset = Number.isFinite(value) ? value - original[key] : 0
-                const geometry = key === 'x' ? moveGeometry(original, offset, 0, canvas)
-                  : key === 'y' ? moveGeometry(original, 0, offset, canvas)
-                    : resizeGeometry(original, key === 'width' ? offset : 0, key === 'height' ? offset : 0, canvas)
-                event.currentTarget.value = String(geometry[key])
-                if (geometry[key] !== original[key]) update(current => ({ ...current, geometry }))
-              }} />
-          </Field>
-        ))}
-      </div>
+      <section className="designer-property-group" aria-label="组件内容与指标">
+        <Field label="组件标题">
+          <Input key={component.id + component.title} defaultValue={component.title} disabled={disabled} maxLength={100}
+            onKeyDown={submitValue} onBlur={event => {
+              const title = event.currentTarget.value.trim() || component.title
+              event.currentTarget.value = title
+              if (title !== component.title) update(current => ({ ...current, title }))
+            }} />
+        </Field>
+        <Field label="绑定指标">
+          <select value={component.metricId} disabled={disabled} onChange={event => {
+            const material = materials.find(item => item.metricId === event.currentTarget.value && item.type === component.type)
+            if (!material) return
+            const previous = materials.find(item => item.metricId === component.metricId)
+            update(current => ({
+              ...current,
+              title: previous?.title === current.title ? material.title : current.title,
+              metricId: material.metricId,
+              unit: material.unit,
+            }))
+          }}>
+            {materials.filter(item => item.type === component.type)
+              .map(item => <option key={item.metricId} value={item.metricId}>{item.title}</option>)}
+          </select>
+        </Field>
+      </section>
+      <section className="designer-property-group designer-placement" aria-labelledby="designer-placement-title">
+        <div className="designer-group-heading">
+          <h3 id="designer-placement-title">位置与大小</h3>
+          <span>px</span>
+        </div>
+        <div className="designer-geometry">
+          {fields.map(([key, label]) => (
+            <Field label={label} key={key}>
+              <input type="number" step={1} key={component.id + component.geometry[key]} disabled={disabled}
+                defaultValue={component.geometry[key]} onKeyDown={submitValue} onBlur={event => {
+                  const value = event.currentTarget.valueAsNumber
+                  const original = component.geometry
+                  const offset = Number.isFinite(value) ? value - original[key] : 0
+                  const geometry = key === 'x' ? moveGeometry(original, offset, 0, canvas)
+                    : key === 'y' ? moveGeometry(original, 0, offset, canvas)
+                      : resizeGeometry(original, key === 'width' ? offset : 0, key === 'height' ? offset : 0, canvas)
+                  event.currentTarget.value = String(geometry[key])
+                  if (geometry[key] !== original[key]) update(current => ({ ...current, geometry }))
+                }} />
+            </Field>
+          ))}
+        </div>
+      </section>
       <div className="designer-property-actions">
         <Button size="small" autoInsertSpace={false} onClick={() => layer('front')} disabled={disabled || !canLayer}>置顶</Button>
         <Button size="small" autoInsertSpace={false} onClick={() => layer('back')} disabled={disabled || !canLayer}>置底</Button>
