@@ -10,6 +10,7 @@ const evidence = process.env.E2E_ARTIFACTS
 const verifyLiveBasemap = process.env.VERIFY_LIVE_BASEMAP === '1'
 const basemapOrigin = 'https://tiles.openfreemap.org'
 const elevationOrigin = 'https://elevation-tiles-prod.s3.amazonaws.com'
+const imageryPath = '/maps/mentougou-sentinel-2-20261008.webp'
 const mapLayoutAnchors = ['.map-panel', '.cockpit-primary', '.cockpit-brief', '.cockpit-trend']
 const browser = await chromium.launch({
   executablePath: browserPath,
@@ -113,7 +114,56 @@ async function waitForCamera(page, { minZoom = 0, minPitch = 0, maxPitch = 85 } 
   }, { minZoom, minPitch, maxPitch })
 }
 
+async function verifyDistrictViewportMask(map) {
+  const mask = map.locator('canvas.district-viewport-mask[data-mask-ready="true"]')
+  await mask.waitFor()
+  const stats = await mask.evaluate(async canvas => {
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    const { width, height } = canvas
+    const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data
+    let inside = 0
+    let outside = 0
+    let feather = 0
+    let insideX = 0
+    let uniform = true
+    for (let y = 0; y < height; y += 4) {
+      for (let x = 0; x < width; x += 4) {
+        const pixel = (y * width + x) * 4
+        const alpha = pixels[pixel + 3]
+        if (alpha === 0) {
+          inside++
+          insideX += x
+        } else if (alpha === 255) {
+          outside++
+          uniform &&= pixels[pixel] === 14 && pixels[pixel + 1] === 29 && pixels[pixel + 2] === 48
+        } else {
+          feather++
+        }
+      }
+    }
+    return {
+      width, inside, outside, feather, uniform,
+      centerX: insideX / inside * canvas.clientWidth / width,
+      aligned: Math.abs(width / canvas.clientWidth - height / canvas.clientHeight) < .02,
+      decorative: canvas.getAttribute('aria-hidden') === 'true' && getComputedStyle(canvas).pointerEvents === 'none',
+    }
+  })
+  const samples = stats.inside + stats.outside + stats.feather
+  assert.ok(stats.inside > samples * .02, 'The official district interior remains visible')
+  assert.ok(stats.uniform && stats.outside > samples * .1, 'Far outside the district, the map is masked by solid navy')
+  assert.ok(stats.feather > 3 && stats.feather < samples * .2, 'The district border has a narrow opacity transition')
+  assert.ok(stats.aligned && stats.decorative, 'The viewport mask is aligned and does not intercept map interaction')
+  return stats
+}
+
 async function verifyOnlineDistrictMap(page) {
+  const appOrigin = new URL(baseUrl).origin
+  let imageryRequested = false
+  const matchesImagery = url => {
+    const { origin, pathname } = new URL(url)
+    return origin === appOrigin && pathname.endsWith(imageryPath)
+  }
+  page.on('request', request => { imageryRequested ||= matchesImagery(request.url()) })
   const [styleResponse, tileResponse] = await Promise.all([
     mapResponse(page, basemapOrigin, /^\/styles\//),
     mapResponse(page, basemapOrigin, /\/\d+\/\d+\/\d+\.(pbf|mvt)$/),
@@ -129,13 +179,41 @@ async function verifyOnlineDistrictMap(page) {
   const map = page.locator('.navigation-map[data-map-ready="true"]')
   const mode2D = map.getByRole('button', { name: '2D', exact: true })
   const mode3D = map.getByRole('button', { name: '3D', exact: true })
+  const imagery = map.getByRole('button', { name: '卫星影像', exact: true })
+  const imageryCredit = map.getByRole('link', { name: 'Contains modified Copernicus Sentinel data 2026' })
   await waitForCamera(page, { maxPitch: 0 })
   await map.getByRole('link', { name: /OpenStreetMap/ }).waitFor()
   await verifyPanelLayout(page, { online: true })
   const startingZoom = Number(await map.getAttribute('data-map-zoom'))
   const layout = await mapLayout(page)
   assert.equal(await mode2D.getAttribute('aria-pressed'), 'true')
+  const flatMask = await verifyDistrictViewportMask(map)
   await capture(page, 'cockpit-online-2d.png')
+
+  assert.equal(imageryRequested, false, 'The default map does not fetch the optional satellite image')
+  const [imageryResponse] = await Promise.all([
+    page.waitForResponse(response => response.ok() && matchesImagery(response.url())),
+    imagery.click(),
+  ])
+  assert.equal((await imageryResponse.body()).toString('ascii', 8, 12), 'WEBP')
+  assert.equal(await imagery.getAttribute('aria-pressed'), 'true')
+  await imageryCredit.waitFor()
+  await verifyPanelLayout(page, { online: true })
+  assert.deepEqual(await verifyDistrictViewportMask(map), flatMask, 'Satellite imagery stays inside the same district mask')
+  await capture(page, 'cockpit-online-satellite.png')
+  await imagery.click()
+  await imageryCredit.waitFor({ state: 'hidden' })
+
+  const frame = await map.locator('.district-map-frame').boundingBox()
+  const dragX = frame.x + frame.width * .45
+  const dragY = frame.y + frame.height * .36
+  await page.mouse.move(dragX, dragY)
+  await page.mouse.down()
+  await page.mouse.move(dragX + 65, dragY + 28, { steps: 10 })
+  await page.mouse.up()
+  const pannedMask = await verifyDistrictViewportMask(map)
+  assert.ok(pannedMask.centerX > flatMask.centerX + 25, 'The district mask follows map panning')
+  await map.getByRole('button', { name: '全域', exact: true }).click()
 
   const [demResponse] = await Promise.all([
     mapResponse(page, elevationOrigin, /^\/terrarium\/\d+\/\d+\/\d+\.png$/),
@@ -145,6 +223,8 @@ async function verifyOnlineDistrictMap(page) {
   await map.and(page.locator('[data-map-mode="3d"]')).waitFor()
   await waitForCamera(page, { minZoom: startingZoom - 1, minPitch: 30 })
   assert.equal(await mode3D.getAttribute('aria-pressed'), 'true')
+  const pitchedMask = await verifyDistrictViewportMask(map)
+  assert.ok(Math.abs(pitchedMask.inside - flatMask.inside) > flatMask.inside / 12, 'The district mask follows the 3D projection')
   await capture(page, 'cockpit-online-3d-overview.png')
 
   const zoomIn = map.getByRole('button', { name: '放大地图', exact: true })
@@ -185,12 +265,20 @@ async function verifyOnlineDistrictMap(page) {
   await page.setViewportSize({ width: 390, height: 844 })
   await verifyPanelLayout(page, { stacked: true, online: true })
   await assertNoHorizontalOverflow(page)
+  const mobileMask = await verifyDistrictViewportMask(map)
+  assert.ok(mobileMask.width < flatMask.width / 2, 'The mask backing canvas resizes with the viewport')
   await capture(page, 'cockpit-online-mobile.png')
+  await imagery.click()
+  await imageryCredit.waitFor()
+  await verifyPanelLayout(page, { stacked: true, online: true })
+  await assertNoHorizontalOverflow(page)
+  await imagery.click()
+  await imageryCredit.waitFor({ state: 'hidden' })
 
   await map.getByRole('button', { name: '大峪街道', exact: true }).press('Enter')
   await page.waitForURL('**/areas/dayu')
   await waitForArea(page, '大峪街道')
-  console.log('PASS live basemap and elevation tiles, 3D camera at building zoom, 2D reset and map pin drill-down')
+  console.log('PASS live road, elevation and satellite imagery, district mask at 2D/3D and after pan/resize, zoom/reset and map pin drill-down')
 }
 
 async function verifyAs(page, name) {
