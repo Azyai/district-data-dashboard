@@ -10,7 +10,11 @@ const stamp = Date.now().toString(36)
 const metricId = 'browser-metric-' + stamp
 const metricName = '同步验收事件 ' + stamp
 const allConnectors = process.env.E2E_VERIFY_ALL_CONNECTORS === '1'
-const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE })
+const workspaceHeaders = { 'X-Dashboard-Workspace': 'management' }
+const browser = await chromium.launch({
+  executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE,
+  args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
+})
 
 async function capture(page, filename) {
   if (!output) return
@@ -63,19 +67,48 @@ async function publish(page, name, version) {
   await page.getByText(name + ' 已发布 v' + version, { exact: true }).waitFor()
 }
 
+async function openSeparateTab(page, link) {
+  const opened = page.context().waitForEvent('page')
+  await link.click()
+  const newPage = await opened
+  await newPage.waitForLoadState()
+  assert.equal(await newPage.evaluate(() => window.opener === null), true)
+  return newPage
+}
+
+async function identity(page, headers) {
+  const response = await page.request.get('/api/v1/me', { headers })
+  assert.equal(response.status(), 200)
+  return (await response.json()).data
+}
+
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
+  const display = await browser.newPage({ baseURL: baseUrl, viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
   const errors = []
+  display.on('pageerror', error => errors.push(error.message))
+  await display.goto('/')
+  await display.getByRole('button', { name: '身份核验' }).click()
+  await display.getByRole('button', { name: /政务服务专项/ }).click()
+  await display.getByRole('heading', { name: '政务服务', exact: true }).waitFor()
+  await display.getByRole('link', { name: '返回驾驶舱' }).click()
+  const originalUrl = new URL('/', baseUrl).toString()
+  const page = await openSeparateTab(display, display.getByRole('link', { name: '数据管理', exact: true }))
   page.setDefaultTimeout(15_000)
   page.on('pageerror', error => errors.push(error.message))
 
-  await page.goto(new URL('/admin', baseUrl).toString())
+  assert.equal(display.url(), originalUrl)
+  assert.equal(await display.title(), '门头沟区数字驾驶舱')
   await page.getByRole('heading', { name: '数据管理员核验' }).waitFor()
-  const response = await page.request.get(new URL('/api/v1/admin/sources', baseUrl).toString())
+  assert.equal(await page.title(), '门头沟区数据管理')
+  const response = await page.request.get('/api/v1/admin/sources', { headers: workspaceHeaders })
   assert.equal(response.status(), 401)
   await page.getByRole('button', { name: '使用演示数据管理员' }).click()
   await page.getByRole('heading', { name: '数据来源', exact: true }).waitFor()
-  console.log('PASS admin route and anonymous HTTP isolation')
+  assert.equal((await identity(page, workspaceHeaders)).id, 'demo-data-admin')
+  assert.equal((await identity(display)).id, 'demo-service')
+  assert.equal((await display.request.get('/api/v1/playback/public-services/manifest')).status(), 200)
+  assert.equal(await page.locator('.district-local-model').count(), 0)
+  console.log('PASS separate admin tab and independent display and management identities')
 
   if (allConnectors) {
     for (const [kind, label] of [['HTTPS_JSON', 'HTTPS 验收'], ['MYSQL_VIEW', 'MySQL 验收']]) {
@@ -137,25 +170,22 @@ try {
   assert.deepEqual(await pageLayout(page, listAnchors), metricsLayout, 'Metric detail should overlay the list')
   await capture(page, 'admin-metric-published.png')
 
-  await metricDetail.getByRole('link', { name: '到驾驶舱核对' }).click()
-  const tile = page.locator('.cockpit-metric').filter({ hasText: metricName })
-  await tile.waitFor()
-  await tile.getByText('73', { exact: true }).waitFor()
-  await capture(page, 'admin-cockpit-verification.png')
-  assert.equal(await page.locator('main .cockpit-sources').count(), 0)
-  const issueTrigger = page.getByRole('button', { name: '查看问题', exact: true })
-  const cockpitAnchors = ['.map-panel', '.cockpit-primary', '.cockpit-brief', '.cockpit-trend']
-  await issueTrigger.scrollIntoViewIfNeeded()
-  const cockpitLayout = await pageLayout(page, cockpitAnchors)
-  await issueTrigger.click()
-  const issues = page.getByRole('dialog', { name: '门头沟区问题诊断' })
+  const verifyTab = await openSeparateTab(page, metricDetail.getByRole('link', { name: '到驾驶舱核对' }))
+  await metricDetail.waitFor()
+  assert.match(page.url(), /\/admin\/metrics/)
+  const issues = verifyTab.getByRole('dialog', { name: '门头沟区问题诊断' })
   const evidence = issues.getByRole('region', { name: '指标与依据' })
-  await evidence.getByText(sourceName, { exact: false }).waitFor()
-  assert.deepEqual(await pageLayout(page, cockpitAnchors), cockpitLayout, 'Evidence should overlay the cockpit')
+  const metricRow = evidence.getByRole('listitem').filter({ hasText: metricName })
+  await metricRow.getByText(sourceName, { exact: false }).waitFor()
+  await metricRow.getByText(/^73\s*件$/).waitFor()
+  await capture(verifyTab, 'admin-cockpit-verification.png')
+  const cockpitAnchors = ['.map-panel', '.district-local-model']
+  const cockpitLayout = await pageLayout(verifyTab, cockpitAnchors)
   await issues.getByRole('button', { name: '关闭', exact: true }).last().click()
   await issues.waitFor({ state: 'hidden' })
-  assert.deepEqual(await pageLayout(page, cockpitAnchors), cockpitLayout)
-  console.log('PASS metric publication, visible cockpit value and evidence without page shifts')
+  assert.deepEqual(await pageLayout(verifyTab, cockpitAnchors), cockpitLayout)
+  await verifyTab.close()
+  console.log('PASS metric publication, separate verification tab and stable cockpit evidence')
 
   await page.setViewportSize({ width: 390, height: 844 })
   await page.goto(new URL('/admin/sources', baseUrl).toString())
@@ -174,8 +204,18 @@ try {
   assert.deepEqual(await pageLayout(page, listAnchors), mobileLayout)
   await page.getByRole('button', { name: '退出管理' }).click()
   await page.getByRole('heading', { name: '数据管理员核验' }).waitFor()
+  assert.equal((await identity(display)).id, 'demo-service')
+  await page.getByRole('link', { name: '发布审核' }).click()
+  await page.getByRole('button', { name: '使用演示审核员' }).click()
+  await page.getByRole('heading', { name: '大屏发布审核' }).waitFor()
+  assert.equal((await identity(page, workspaceHeaders)).id, 'demo-dashboard-reviewer')
+  assert.equal((await identity(display)).id, 'demo-service')
+  await page.getByRole('button', { name: '退出审核' }).click()
+  await page.getByRole('heading', { name: '发布审核员核验' }).waitFor()
+  assert.equal((await identity(display)).id, 'demo-service')
+  assert.equal(display.url(), originalUrl)
   assert.deepEqual(errors, [])
-  console.log('PASS mobile admin, logout and no uncaught browser errors')
+  console.log('PASS mobile admin, independent management/review logout and retained specialist display')
 } finally {
   await browser.close()
 }

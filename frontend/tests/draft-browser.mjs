@@ -8,6 +8,7 @@ const baseUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
 const output = process.env.E2E_ARTIFACTS
 const route = new URL('/admin/dashboards', baseUrl).toString()
 const draftPath = '/api/v1/admin/dashboards/city-operations/draft'
+const managementHeaders = { 'X-Dashboard-Workspace': 'management' }
 const editorAnchors = ['.designer-command', '.designer-stage', '.designer-materials', '.designer-inspector']
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE })
 
@@ -18,7 +19,7 @@ async function capture(page, name, fullPage = false) {
 }
 
 async function readDraft(page) {
-  const reply = await page.request.get(draftPath)
+  const reply = await page.request.get(draftPath, { headers: managementHeaders })
   assert.equal(reply.status(), 200)
   return (await reply.json()).data
 }
@@ -42,7 +43,7 @@ try {
   page.on('pageerror', error => errors.push(error.message))
   await page.goto(route)
   await page.getByRole('heading', { name: '数据管理员核验' }).waitFor()
-  assert.equal((await page.request.get(draftPath)).status(), 401)
+  assert.equal((await page.request.get(draftPath, { headers: managementHeaders })).status(), 401)
   await page.getByRole('button', { name: '使用演示数据管理员' }).click()
   await page.getByRole('heading', { name: '大屏编排', exact: true }).waitFor()
   const stage = page.getByRole('region', { name: '画布', exact: true })
@@ -107,12 +108,12 @@ try {
   await page.getByRole('button', { name: '组件 ' + title, exact: true }).click()
   assert.equal(await page.getByLabel('X 坐标').inputValue(), String(x))
 
-  const csrfReply = await page.request.get('/api/v1/auth/csrf')
+  const csrfReply = await page.request.get('/api/v1/auth/csrf', { headers: managementHeaders })
   assert.equal(csrfReply.status(), 200)
   const csrf = (await csrfReply.json()).data
   const serverTitle = title + ' 服务端'
   const serverUpdate = await page.request.put(draftPath, {
-    headers: { [csrf.headerName]: csrf.token, 'If-Match': '"' + saved.revision + '"' },
+    headers: { ...managementHeaders, [csrf.headerName]: csrf.token, 'If-Match': '"' + saved.revision + '"' },
     data: { components: saved.components.map(component =>
       component.title === title ? { ...component, title: serverTitle } : component) },
   })
