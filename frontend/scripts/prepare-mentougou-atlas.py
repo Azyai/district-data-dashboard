@@ -8,7 +8,7 @@ import struct
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 from shapely import make_valid, union_all
 from shapely.geometry import MultiPolygon, box, mapping, shape
 
@@ -96,14 +96,7 @@ def render_atlas():
     minor = np.maximum(0, 1 - np.abs((heights + 45) % 90 - 45) / 5)
     rgb = np.clip(colors * (.52 + .60 * shading[:, :, None]) + minor[:, :, None] * 9, 0, 255)
     rgba = np.dstack((rgb.astype("uint8"), valid.astype("uint8") * 255))
-    image = Image.fromarray(rgba)
-    draw = ImageDraw.Draw(image)
-    for name, color in [("roads", (152, 146, 106, 255)), ("water", (78, 173, 197, 255))]:
-        points, faces = meshes[name]
-        footprint = np.rint(project(points)).astype("int32")
-        for face in footprint[faces]:
-            draw.polygon([tuple(vertex) for vertex in face], fill=color)
-    image.save(ROOT / "district-relief.webp", quality=92, method=6)
+    Image.fromarray(rgba).save(ROOT / "district-relief.webp", quality=92, method=6)
     # The mesh has no elevations beyond the district cut. Extend its edge for a
     # short transition so draping imagery does not create an artificial cliff.
     pad = 64

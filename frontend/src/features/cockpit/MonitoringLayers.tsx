@@ -8,6 +8,7 @@ import type { MonitorArea, MonitorPage, MonitoringSnapshot } from './monitoringD
 
 export const detailLayers = ['monitor-road', 'monitor-water']
 const source = 'monitor-source'
+const waterways = 'monitor-waterways'
 
 type Props = {
   map: MapLibreMap
@@ -66,6 +67,23 @@ export default function MonitoringLayers({ map, topic, area, data, selected, sta
         },
       })
     } else {
+      map.addSource(waterways, {
+        type: 'geojson',
+        data: import.meta.env.BASE_URL + 'monitoring/waterways.geojson',
+        tolerance: .18,
+      })
+      map.addLayer({
+        id: 'monitor-water-surface', type: 'fill', source: waterways, filter: false,
+        paint: { 'fill-color': '#197be9', 'fill-opacity': .82 },
+      }, 'towns')
+      map.addLayer({
+        id: 'monitor-river-line', type: 'line', source: waterways, filter: false,
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#349dff', 'line-opacity': .94,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 8, .9, 12, 1.3, 16, 2],
+        },
+      }, 'towns')
       map.addSource(source, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
       map.addLayer({
         id: 'monitor-water', type: 'circle', source,
@@ -81,9 +99,10 @@ export default function MonitoringLayers({ map, topic, area, data, selected, sta
 
     return () => {
       if (!map.getStyle()) return
-      for (const layer of ['monitor-highlight', 'monitor-road', 'monitor-water', 'monitor-grid']) {
+      for (const layer of ['monitor-highlight', 'monitor-road', 'monitor-water', 'monitor-water-surface', 'monitor-river-line', 'monitor-grid']) {
         if (map.getLayer(layer)) map.removeLayer(layer)
       }
+      if (map.getSource(waterways)) map.removeSource(waterways)
       if (map.getSource(source)) map.removeSource(source)
     }
   }, [map, topic])
@@ -107,6 +126,9 @@ export default function MonitoringLayers({ map, topic, area, data, selected, sta
     } else if (topic === 'grid') {
       map.setFilter('monitor-grid', regionFilter(area, 'name'))
     } else {
+      const scopedWaterways: ExpressionSpecification = ['in', ['get', 'name'], ['literal', data.waters.map(site => site.name)]]
+      map.setFilter('monitor-water-surface', scopedWaterways)
+      map.setFilter('monitor-river-line', scopedWaterways)
       const features: FeatureCollection<Point> = {
         type: 'FeatureCollection',
         features: data.waters.map(site => ({
