@@ -11,6 +11,55 @@ type MaskOutline = {
 const background = '#0e1d30'
 const feather = 10
 
+function perimeterRings(rings: Ring[]): Ring[] {
+  if (rings.length <= 1) return rings
+  // Exact shared edges between town polygons contribute twice to an even-odd fill and cancel.
+  const points = new Map<string, Position>()
+  const edges = new Map<string, [string, string]>()
+  for (const ring of rings) {
+    const keys = ring.map(point => {
+      const key = point.join(',')
+      points.set(key, point)
+      return key
+    })
+    for (const [index, start] of keys.entries()) {
+      const end = keys[(index + 1) % keys.length]
+      if (start === end) continue
+      const id = start < end ? `${start};${end}` : `${end};${start}`
+      if (!edges.delete(id)) edges.set(id, [start, end])
+    }
+  }
+
+  const links = new Map<string, Array<{ id: string; to: string }>>()
+  for (const [id, [a, b]] of edges) {
+    const first = links.get(a) ?? []
+    const second = links.get(b) ?? []
+    first.push({ id, to: b })
+    second.push({ id, to: a })
+    links.set(a, first)
+    links.set(b, second)
+  }
+
+  const outlines: Ring[] = []
+  while (edges.size) {
+    const segment = edges.values().next().value
+    if (!segment) break
+    const [start] = segment
+    const outline: Ring = []
+    let current = start
+    do {
+      const point = points.get(current)
+      const next = links.get(current)?.find(link => edges.has(link.id))
+      if (!point || !next) return rings
+      outline.push(point)
+      edges.delete(next.id)
+      current = next.to
+    } while (current !== start)
+    if (outline.length > 2) outlines.push(outline)
+  }
+  return outlines
+}
+
 function clipAt(ring: Ring, axis: 0 | 1, edge: number, keepGreater: boolean): Ring {
   const clipped: Ring = []
   let previous = ring.at(-1)
@@ -63,8 +112,8 @@ function visiblePath(map: MapLibreMap, rings: Ring[]): Path2D {
 }
 
 export function attachDistrictViewportMask(map: MapLibreMap, outline: MaskOutline): () => void {
-  const rings = outline.features.flatMap(({ geometry }) =>
-    geometry.type === 'Polygon' ? geometry.coordinates : geometry.coordinates.flat())
+  const rings = perimeterRings(outline.features.flatMap(({ geometry }) =>
+    geometry.type === 'Polygon' ? geometry.coordinates : geometry.coordinates.flat()))
   const canvas = document.createElement('canvas')
   const mapCanvas = map.getCanvas()
   const mapContainer = map.getContainer()

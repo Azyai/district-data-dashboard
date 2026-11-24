@@ -1,7 +1,7 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AttributionControl, LngLatBounds, Map as MapLibreMap, Marker, ScaleControl } from 'maplibre-gl'
-import type { PaddingOptions, RasterDEMSourceSpecification, StyleSpecification } from 'maplibre-gl'
+import type { GeoJSONSource, PaddingOptions, RasterDEMSourceSpecification, StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { styleCockpitBasemap } from './cockpit-map-style'
 import DistrictMap from './DistrictMap'
@@ -9,6 +9,7 @@ import { attachDistrictViewportMask } from './district-viewport-mask'
 import './navigation-map.css'
 
 const LocalDistrictModel = lazy(() => import('./LocalDistrictModel'))
+const AdministrativeMapLayer = lazy(() => import('./AdministrativeMapLayer'))
 
 type Position = [number, number]
 type Town = { id: string; name: string }
@@ -173,15 +174,19 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
   const frame = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const bounds = useRef<LngLatBounds | null>(null)
+  const applyDistrictOutline = useRef<((outline?: Outline) => void) | null>(null)
   const hasFullExtent = useRef(true)
   const elevationTimer = useRef<number | undefined>(undefined)
   const [district, setDistrict] = useState<District>()
   const [phase, setPhase] = useState<MapPhase>('loading')
   const [mode, setMode] = useState<MapMode>('2d')
   const [localModel, setLocalModel] = useState(false)
+  const [administrativeMap, setAdministrativeMap] = useState<MapLibreMap | null>(null)
   const [imagery, setImagery] = useState(false)
   const [camera, setCamera] = useState<Camera>({ pitch: 0, zoom: 0 })
   const [terrainNotice, setTerrainNotice] = useState(false)
+  const administrative = administrativeMap !== null
+  const changeDistrictBoundary = useCallback((outline?: Outline) => applyDistrictOutline.current?.(outline), [])
 
   useEffect(() => {
     const container = root.current
@@ -199,6 +204,7 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
       observer?.disconnect()
       detachMask?.()
       detachMask = undefined
+      applyDistrictOutline.current = null
       if (map) map.remove()
       map = null
       mapRef.current = null
@@ -212,6 +218,7 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
       window.clearTimeout(elevationTimer.current)
       release()
       setMode('2d')
+      setAdministrativeMap(null)
       setCamera({ pitch: 0, zoom: 0 })
       setTerrainNotice(false)
       setPhase('fallback')
@@ -249,6 +256,15 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
       mapRef.current = instance
       bounds.current = local.bounds
       detachMask = attachDistrictViewportMask(instance, local.outline)
+      applyDistrictOutline.current = supplied => {
+        const outline = supplied ?? local.outline
+        detachMask?.()
+        detachMask = attachDistrictViewportMask(instance, outline)
+        instance.getSource<GeoJSONSource>(districtSource)?.setData(outline)
+        for (const id of ['mentougou-boundary', 'mentougou-boundary-halo']) {
+          if (instance.getLayer(id)) instance.setLayoutProperty(id, 'visibility', supplied ? 'none' : 'visible')
+        }
+      }
       instance.keyboard.disableRotation()
       instance.touchZoomRotate.disableRotation()
       instance.getCanvas().setAttribute('aria-label', '北京市门头沟区导航地图')
@@ -405,8 +421,20 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
     setImagery(!imagery)
   }
 
+  function fitFeature(feature: LngLatBounds) {
+    const map = mapRef.current
+    if (!map || !root.current || !frame.current) return
+    hasFullExtent.current = false
+    map.fitBounds(feature, { padding: framePadding(root.current, frame.current), duration: 0, maxZoom: 17.5 })
+  }
+
+  function openTown(name: string) {
+    const selected = areas.find(area => area.name === name)
+    if (selected) onSelectArea(selected.id)
+  }
+
   return (
-    <div className="navigation-map" ref={root} data-map-mode={mode} data-local-model={localModel}
+    <div className="navigation-map" ref={root} data-map-mode={mode} data-local-model={localModel} data-administrative-map={administrative}
       data-map-ready={phase === 'ready' ? 'true' : phase} data-map-zoom={camera.zoom} data-map-pitch={camera.pitch}>
       <div ref={frame} className="district-map-frame" aria-hidden="true" />
       <div ref={mount} className="navigation-map-surface" hidden={phase === 'fallback'} inert={localModel} />
@@ -419,6 +447,17 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
       )}
       {phase === 'ready' && !localModel && (
         <>
+          <button className="navigation-map-model-toggle navigation-map-administration-toggle" type="button" aria-pressed={administrative}
+            onClick={() => {
+              if (administrative) reset()
+              setAdministrativeMap(administrative ? null : mapRef.current)
+            }}>{administrative ? '关闭区划' : '行政区划'}</button>
+          {administrativeMap && (
+            <Suspense fallback={<p className="navigation-map-status" role="status">正在加载行政区划</p>}>
+              <AdministrativeMapLayer map={administrativeMap} mode={mode} onFit={fitFeature} onOpenTown={openTown}
+                onDistrictOutline={changeDistrictBoundary} />
+            </Suspense>
+          )}
           <div className="navigation-map-tools" aria-label="地图操作">
             <button type="button" aria-label="卫星影像" aria-pressed={imagery} onClick={toggleImagery}>影像</button>
             <div className="navigation-map-mode" aria-label="地图模式">
@@ -435,7 +474,13 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
         </>
       )}
       <button className="navigation-map-model-toggle" type="button" aria-pressed={localModel}
-        onClick={() => setLocalModel(current => !current)}>{localModel ? '返回地图' : '本地模型'}</button>
+        onClick={() => {
+          if (administrative) {
+            setAdministrativeMap(null)
+            reset()
+          }
+          setLocalModel(current => !current)
+        }}>{localModel ? '返回地图' : '本地模型'}</button>
       {localModel && (
         <Suspense fallback={<p className="navigation-map-status" role="status">正在加载本地三维模型</p>}>
           <LocalDistrictModel />

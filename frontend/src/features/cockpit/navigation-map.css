@@ -181,6 +181,8 @@
 .navigation-map-model-toggle:hover { background: #244c70; }
 .navigation-map-model-toggle[aria-pressed='true'] { background: #20679a; }
 .navigation-map-model-toggle:focus-visible { outline: 2px solid #9ee7f9; outline-offset: -3px; }
+.navigation-map-administration-toggle { left: calc(var(--district-map-inset-left, 0px) + 14px); right: auto; }
+.navigation-map[data-administrative-map='true'] .navigation-map-pin { display: none; }
 
 @media (pointer: coarse) {
   .navigation-map-tools button { min-width: 44px; min-height: 44px; }
@@ -195,6 +197,7 @@
   .navigation-map > .district-map-frame { bottom: 113px; }
   .navigation-map-tools { right: 10px; bottom: 9px; }
   .navigation-map-model-toggle { top: 10px; right: 10px; }
+  .navigation-map-administration-toggle { left: 10px; right: auto; }
   .navigation-map .maplibregl-ctrl-bottom-left { left: 10px; right: 10px; }
 }
 
