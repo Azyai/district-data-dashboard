@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { skipToken, useQuery } from '@tanstack/react-query'
 import {
-  AmbientLight, Box3, BufferAttribute, Color, DirectionalLight, Mesh, MeshBasicMaterial,
+  ACESFilmicToneMapping, AmbientLight, Box3, BufferAttribute, Color, DirectionalLight, HemisphereLight, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, OrthographicCamera, Raycaster, Scene, Texture, Vector2, Vector3, WebGLRenderer,
 } from 'three'
 import type { BufferGeometry, Material, Object3D } from 'three'
@@ -17,6 +17,8 @@ import {
   maskToBoundary, modelCoordinates, readBoundaries, terrainSurfaceIndex,
 } from './localModelGeography'
 import type { GeoBoundary } from './localModelGeography'
+import { applyTwinMaterials } from './twinMaterials'
+import { createTwinSurroundings } from './twinSurroundings'
 import { twinSites, type TwinId } from './twinSites'
 import './local-model.css'
 
@@ -42,6 +44,7 @@ type DistrictModelProps = {
 const displayedTowns = new Set(['qingshui', 'zhaitang', 'datai', 'junzhuang'])
 const demoPopulation = new Intl.NumberFormat('zh-CN').format(392_000 / 10_000)
 const initialPosition = new Vector3(5, 44, 63)
+const twinPosition = new Vector3(38, 52, 73)
 const topPosition = new Vector3(0, 76, 0)
 const north = new Vector3(0, 0, -1)
 const up = new Vector3(0, 1, 0)
@@ -194,6 +197,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
     if (!element) return
     const controller = new AbortController()
     let model: Object3D | undefined
+    let surroundings: Object3D | undefined
     let renderer: WebGLRenderer | undefined
     let controls: OrbitControls | undefined
     let observer: ResizeObserver | undefined
@@ -223,10 +227,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       const terrainMaterial = terrain?.material instanceof MeshStandardMaterial ? terrain.material : undefined
       const overviewTexture = districtStyle?.nativeTexture ? terrainMaterial?.map : undefined
       const projectUv = terrain && overviewTexture ? terrainUvProjection(terrain.geometry) : undefined
-      if (twin) localModel.traverse(child => {
-        if (!(child instanceof Mesh)) return
-        if (!child.geometry.hasAttribute('normal')) child.geometry.computeVertexNormals()
-      })
+      if (standaloneTwin) applyTwinMaterials(localModel, standaloneTwin)
       const bounds = new Box3().setFromObject(localModel)
       const geographyBounds = terrain ? new Box3().setFromObject(terrain) : bounds
       const rawSize = bounds.getSize(new Vector3())
@@ -236,14 +237,36 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       localModel.position.copy(bounds.getCenter(new Vector3())).multiply(localModel.scale).negate()
       localModel.updateMatrixWorld()
       const scene = new Scene()
-      scene.add(localModel, new AmbientLight('#eaf5ff', twin ? 1.32 : 1.75))
-      const light = new DirectionalLight('#e4f5ff', 2.28)
-      light.position.set(-24, 38, -19)
-      scene.add(light)
+      scene.add(localModel)
+      const setting = standaloneTwin ? await createTwinSurroundings(standaloneTwin, bounds, scale, controller.signal) : undefined
+      if (controller.signal.aborted) {
+        if (setting) releaseModel(setting.object)
+        return
+      }
+      if (setting) {
+        surroundings = setting.object
+        scene.add(surroundings)
+      }
+      if (twin) {
+        scene.add(new HemisphereLight('#d9ecff', '#465361', 1.08))
+        const keyLight = new DirectionalLight('#fff0da', 2.12)
+        keyLight.position.set(-28, 45, 35)
+        const skyLight = new DirectionalLight('#8ec9ef', .85)
+        skyLight.position.set(31, 25, -30)
+        scene.add(keyLight, skyLight)
+      } else {
+        const light = new DirectionalLight('#e4f5ff', 2.28)
+        light.position.set(-24, 38, -19)
+        scene.add(light, new AmbientLight('#eaf5ff', 1.75))
+      }
       const camera = new OrthographicCamera(-1, 1, 1, -1, .1, 250)
-      camera.position.copy(initialPosition)
+      camera.position.copy(twin ? twinPosition : initialPosition)
       const surface = new WebGLRenderer({ alpha: true, antialias: true })
       renderer = surface
+      if (twin) {
+        surface.toneMapping = ACESFilmicToneMapping
+        surface.toneMappingExposure = 1.04
+      }
       const anisotropy = Math.min(8, surface.capabilities.getMaxAnisotropy())
       for (const texture of modelResources(localModel).textures) texture.anisotropy = anisotropy
       surface.domElement.setAttribute('role', 'img')
@@ -269,7 +292,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       const districtTerrainIndex = terrain?.geometry.index ?? null
       let regionTerrainIndex: BufferAttribute | null | undefined
       let childPlaces: ModelPlace[] = []
-      let viewSize = size
+      let viewSize = setting?.size ?? size
       let viewTarget = new Vector3()
       const towardGround = new Vector3(0, -1, 0)
       const pointAt = (x: number, z: number) => {
@@ -324,6 +347,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         frame = requestAnimationFrame(() => {
           frame = 0
           surface.render(scene, camera)
+          if (twin) return
           const point = new Vector3()
           setMarkers(positions.map(({ id, point: world }) => {
             point.copy(world).project(camera)
@@ -429,7 +453,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       const positionCamera = (target: Vector3, zoom = 1) => {
         camera.up.copy(currentView === '2d' ? north : up)
         orbit.target.copy(target)
-        camera.position.copy(target).add(currentView === '2d' ? topPosition : initialPosition)
+        camera.position.copy(target).add(currentView === '2d' ? topPosition : twin ? twinPosition : initialPosition)
         camera.zoom = zoom
         camera.lookAt(target)
         camera.updateMatrixWorld()
@@ -521,6 +545,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
       controls?.dispose()
       unbindInput?.()
       if (model) releaseModel(model)
+      if (surroundings) releaseModel(surroundings)
       renderer?.dispose()
       renderer?.forceContextLoss()
       renderer?.domElement.remove()
