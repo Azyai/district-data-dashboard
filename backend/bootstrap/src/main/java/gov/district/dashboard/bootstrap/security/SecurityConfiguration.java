@@ -50,6 +50,7 @@ class SecurityConfiguration {
                         access.requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf", "/api/v1/cockpit/areas/*",
                                         "/api/v1/cockpit/locations").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/demo-session").permitAll()
+                                .requestMatchers("/api/v1/dashboard-reviews/**").hasRole("DASHBOARD_REVIEWER")
                                 .requestMatchers("/api/v1/admin/**").hasRole("DATA_ADMIN")
                                 .requestMatchers("/api/v1/**").authenticated();
                     }
