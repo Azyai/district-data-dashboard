@@ -99,4 +99,9 @@ export const dashboardApi = {
   manifest: (projectId: string, signal: AbortSignal) => request<Manifest>(playbackPath(projectId) + '/manifest', { signal }),
   components: (projectId: string, query: ComponentQuery, signal: AbortSignal) =>
     post<ComponentData>(playbackPath(projectId) + '/component-queries', query, signal),
+  topicManifest: (topicId: string, signal: AbortSignal) =>
+    request<Manifest>('/api/v1/cockpit/topics/' + encodeURIComponent(topicId) + '/manifest', { signal }),
+  topicSnapshot: (topicId: string, releaseId: string, signal: AbortSignal) =>
+    request<ComponentData>('/api/v1/cockpit/topics/' + encodeURIComponent(topicId) + '/snapshot?' +
+      new URLSearchParams({ releaseId }), { signal }),
 }
