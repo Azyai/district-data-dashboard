@@ -731,6 +731,11 @@ export interface components {
                 height: number;
                 z: number;
             };
+            /**
+             * @description 图表呈现方式。趋势支持折线和柱状，分布支持柱状、雷达、网络和环形。
+             * @enum {string}
+             */
+            chartStyle?: "line" | "bar" | "radar" | "network" | "ring";
         };
         DashboardDraftInput: {
             /** @description 同专题内组件 ID 唯一，组件边界须落在画布内 */
@@ -794,6 +799,11 @@ export interface components {
             metricId: string;
             unit: string;
             geometry: components["schemas"]["Geometry"];
+            /**
+             * @description 图表呈现方式。趋势支持折线和柱状，分布支持柱状、雷达、网络和环形。
+             * @enum {string}
+             */
+            chartStyle?: "line" | "bar" | "radar" | "network" | "ring";
         };
         /** DashboardManifest */
         "dashboard-manifest.schema": {
@@ -828,6 +838,11 @@ export interface components {
                     metricId: string;
                     unit: string;
                     geometry: components["schemas"]["Geometry"];
+                    /**
+                     * @description 图表呈现方式。趋势支持折线和柱状，分布支持柱状、雷达、网络和环形。
+                     * @enum {string}
+                     */
+                    chartStyle?: "line" | "bar" | "radar" | "network" | "ring";
                 };
             };
         };

@@ -3455,6 +3455,17 @@
               "z"
             ],
             "additionalProperties": false
+          },
+          "chartStyle": {
+            "type": "string",
+            "enum": [
+              "line",
+              "bar",
+              "radar",
+              "network",
+              "ring"
+            ],
+            "description": "图表呈现方式。趋势支持折线和柱状，分布支持柱状、雷达、网络和环形。"
           }
         },
         "required": [
