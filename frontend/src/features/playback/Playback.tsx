@@ -24,6 +24,7 @@ export default function Playback({ identity, identityControl }: { identity: Me; 
   const manifestQuery = useQuery({
     queryKey: ['manifest', identity.id, projectId],
     queryFn: ({ signal }) => dashboardApi.manifest(projectId, signal),
+    refetchInterval: 10_000,
   })
   const manifest = manifestQuery.data
   const dataQuery = useQuery({
