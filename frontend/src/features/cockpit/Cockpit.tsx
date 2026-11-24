@@ -3,6 +3,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { Link, useMatch, useNavigate } from 'react-router'
 import { dashboardApi, type CockpitArea, type CockpitDirectory } from '../../api/client'
 import MetricRails from './MetricRails'
+import ScreenAgent from '../assistant/ScreenAgent'
+import { screenPath, screens } from '../screens/screenCatalog'
 import { twinPath, type TwinId } from './twinSites'
 import './cockpit.css'
 
@@ -17,7 +19,7 @@ const clock = new Intl.DateTimeFormat('zh-CN', {
 })
 
 function areaPath(areaId: string) {
-  return areaId === district ? '/' : '/areas/' + encodeURIComponent(areaId)
+  return screenPath('overview', areaId)
 }
 
 const areaQuery = (areaId: string) => queryOptions({
@@ -127,7 +129,7 @@ function RegionPicker({ area, directory, directoryState }: {
   )
 }
 
-function RegionModel({ area, directory, directoryState, viewMode, onViewModeChange, onSelectArea, onOpenTwin }: {
+function RegionDisplay({ area, directory, directoryState, viewMode, onViewModeChange, onSelectArea, onOpenTwin }: {
   area: CockpitArea
   directory?: CockpitDirectory
   directoryState: 'pending' | 'success' | 'error'
@@ -136,6 +138,7 @@ function RegionModel({ area, directory, directoryState, viewMode, onViewModeChan
   onSelectArea: (areaId: string) => void
   onOpenTwin: (id: TwinId) => void
 }) {
+  const navigate = useNavigate()
   const isDistrict = area.level === 'district'
   const parent = area.breadcrumbs.at(-2)
   return (
@@ -147,6 +150,14 @@ function RegionModel({ area, directory, directoryState, viewMode, onViewModeChan
         </div>
         <div className="map-actions">
           <RegionPicker key={area.id} area={area} directory={directory} directoryState={directoryState} />
+          <select className="screen-picker" aria-label="选择数据展示" value="overview"
+            onChange={event => {
+              const next = screens.find(item => item.id === event.target.value)
+              if (next) void navigate(screenPath(next.id, area.id))
+            }}>
+            {screens.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </select>
+          {directory && <ScreenAgent area={area} locations={directory} />}
           {!isDistrict && <a className="level-up" href={'/data/areas/' + encodeURIComponent(area.id) + '#area-issues'}
             target="_blank" rel="noopener noreferrer">区域数据 <span aria-hidden="true">↗</span></a>}
         </div>
@@ -187,7 +198,7 @@ export default function Cockpit() {
         {area ? (
           <div ref={heading} className="cockpit-main" tabIndex={-1} aria-label={area.name}
             inert={zone.isPlaceholderData} aria-busy={zone.isPlaceholderData}>
-            <RegionModel area={area} directory={directory.data} directoryState={directory.status}
+            <RegionDisplay area={area} directory={directory.data} directoryState={directory.status}
               viewMode={viewMode} onViewModeChange={setViewMode}
               onSelectArea={id => { void navigate(areaPath(id)) }}
               onOpenTwin={id => { void navigate(twinPath(id), { state: { backArea: area.id } }) }} />

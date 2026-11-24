@@ -65,7 +65,7 @@
 .map-panel {
   grid-template-rows: auto minmax(0,1fr);
   height: calc(100svh - clamp(4.1rem, 7.8svh, 7rem));
-  min-height: 26rem;
+  min-height: 0;
 }
 .map-plot { grid-area: 1 / 1 / span 2; overflow: hidden; background: var(--page-ground); }
 .map-panel > .metric-rails { position: relative; inset: auto; grid-area: 2 / 1; }
@@ -88,6 +88,13 @@
 .map-parent { color: #d3e8f4; font-size: .82em; }
 .map-parent:hover { color: var(--panel-accent); }
 .map-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .4em; }
+.screen-picker {
+  pointer-events: auto; cursor: pointer; min-height: 2.7em; padding: .4em .7em;
+  color-scheme: dark; color: #ecf8ff; background: #081a2d80; border: 1px solid #b1d9ec55;
+  border-radius: 999px; backdrop-filter: blur(8px); font: inherit; font-size: .83em;
+}
+.screen-picker option { background: #10273a; color: #edf6ff; }
+.map-actions > .screen-agent-trigger { pointer-events: auto; }
 .map-parent, .level-up, .region-picker > summary, .map-directory { pointer-events: auto; }
 .level-up, .region-picker > summary {
   display: inline-flex; min-height: 2.7em; align-items: center; gap: .45em; padding: .4em .8em;
@@ -128,7 +135,7 @@
 @media (max-width: 46.25rem) {
   .cockpit { --atlas-inset: 0px; }
   .cockpit-main { align-content: start; }
-  .map-panel { height: auto; min-height: 0; grid-template-rows: auto clamp(21rem, 58svh, 38rem) auto; }
+  .map-panel { grid-template-rows: auto minmax(0, 1fr) auto; }
   .map-panel > .metric-rails { grid-area: 3 / 1; }
   .map-toolbar { grid-template-columns: minmax(0, 1fr) auto; }
   .map-heading h2 { font-size: 1em; }
@@ -144,11 +151,13 @@
   .masthead-time small { display: none; }
 }
 @media (max-width: 28rem) {
+  .map-toolbar { grid-template-columns: minmax(0,1fr); }
+  .map-actions { justify-content: start; }
   .cockpit { --local-gutter: .7rem; }
   .cockpit-masthead h1 { font-size: clamp(1.02rem,4.5vw,1.26rem); letter-spacing: .02em; }
   .cockpit-brand { width: 2.45em; }
 }
 @media (pointer: coarse) {
-  .cockpit-brand, .level-up, .region-picker > summary, .map-directory a { min-height: 44px; }
+  .cockpit-brand, .level-up, .region-picker > summary, .map-directory a, .screen-picker { min-height: 44px; }
   .cockpit-brand { min-width: 44px; }
 }

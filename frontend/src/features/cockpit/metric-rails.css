@@ -75,3 +75,11 @@
   .rail-visual-gauge { width: 4.85em; }
   .rail-visual-gauge .rail-value strong { font-size: 1.1em; }
 }
+@media (max-width: 46.25rem) {
+  .metric-rails { padding-block: .32rem; }
+  .metric-rail header { padding-block: .25em; }
+  .rail-reading, .rail-reading + .rail-reading { padding-block: .32em; }
+  .rail-value { margin-block: .08em; }
+  .rail-history { height: clamp(.72rem, 2.4svh, 1.25rem); margin-bottom: .1rem; }
+  .rail-visual-gauge { width: clamp(3rem, 7svh, 5.25em); }
+}
