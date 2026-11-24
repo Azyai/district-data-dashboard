@@ -141,7 +141,8 @@ function MetricEvidence({ metric, sources, onClose }: { metric: Metric; sources:
           <h2>{definition.label}</h2>
           <p>{published ? '生效口径 · v' + published.version : '草稿口径'}</p>
         </div>
-        {published && <a href="/workbench#area-issues" className="admin-text-link" target="_blank" rel="noopener noreferrer">到工作台核对</a>}
+        {published && <a href={'/screens/diagnosis?metric=' + encodeURIComponent(metric.id)} className="admin-text-link"
+          target="_blank" rel="noopener noreferrer">核对指标依据</a>}
       </header>
       <div className="admin-detail-body">
         <dl className="admin-kv">
