@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
     throw new Error('DASHBOARD_WEB_PORT must be between 1 and 65535')
   }
   const proxy = {
+    ...(env.DASHBOARD_HOTLINE_API_ORIGIN && { '/api/v1/hotline': { target: env.DASHBOARD_HOTLINE_API_ORIGIN } }),
     '/api': { target: env.DASHBOARD_API_ORIGIN || 'http://127.0.0.1:8080' },
   }
   return {
