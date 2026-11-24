@@ -1,5 +1,6 @@
 import { apiCodes, type ApiCode } from './generated/codes'
 import type { paths } from './generated/openapi'
+import { managementWorkspaceHeader, workspaceForPath } from './workspace'
 
 type Me = paths['/api/v1/me']['get']['responses'][200]['content']['application/json']['data']
 type Manifest = paths['/api/v1/playback/{projectId}/manifest']['get']['responses'][200]['content']['application/json']['data']
@@ -40,12 +41,16 @@ function fallbackMessage(status: number) {
 
 export async function request<Data>(path: string, options: RequestInit = {}): Promise<Data> {
   let response: Response
+  const headers = new Headers(options.headers)
+  if (workspaceForPath(window.location.pathname) === 'management') {
+    headers.set(managementWorkspaceHeader, 'management')
+  }
   try {
     response = await fetch(path, {
       ...options,
       credentials: 'same-origin',
       cache: 'no-store',
-      headers: new Headers(options.headers),
+      headers,
     })
   } catch (error) {
     if (options.signal?.aborted) throw error
