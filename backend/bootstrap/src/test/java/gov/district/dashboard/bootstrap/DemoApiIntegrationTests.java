@@ -70,6 +70,40 @@ class DemoApiIntegrationTests {
     }
 
     @Test
+    void publishesOnlyValidPublicSideMetricsWithAdminAndRevisionChecks() throws Exception {
+        String layout = "/cockpit/side-metrics";
+        String settings = "/admin/cockpit/side-metrics";
+        try (var admin = new Browser(); var viewer = new Browser()) {
+            JsonNode initial = viewer.get(layout, ApiCode.OK);
+            long revision = initial.path("revision").asLong();
+            String match = "\"" + revision + "\"";
+            assertThat(initial.path("left").size()).isEqualTo(2);
+            JsonNode edited = JSON.readTree("""
+                    {"left":["active-projects"],"right":["active-alerts","tourism-visits"]}
+                    """);
+            admin.putDraft(settings, edited, match, admin.csrf(), ApiCode.AUTH_REQUIRED);
+            viewer.login("district");
+            viewer.putDraft(settings, edited, match, viewer.csrf(), ApiCode.ACCESS_DENIED);
+            admin.login("data-admin");
+            admin.putDraft(settings, edited, match, null, ApiCode.CSRF_INVALID);
+            Csrf csrf = admin.csrf();
+            admin.putDraft(settings, edited, null, csrf, ApiCode.INVALID_REQUEST);
+            for (String left : List.of("[]", "[\"unknown\"]", "[\"active-alerts\"]", "[\"active-projects\",\"active-projects\"]",
+                    "[\"governance-events\",\"service-cases\",\"active-projects\",\"road-traffic\"]")) {
+                JsonNode invalid = JSON.readTree("{\"left\":" + left + ",\"right\":[\"active-alerts\"]}");
+                admin.putDraft(settings, invalid, match, csrf, ApiCode.INVALID_REQUEST);
+            }
+            assertThat(viewer.get(layout, ApiCode.OK)).isEqualTo(initial);
+            JsonNode saved = admin.putDraft(settings, edited, match, csrf, ApiCode.OK);
+            assertThat(saved.path("revision").asLong()).isEqualTo(revision + 1);
+            assertThat(saved.path("left")).isEqualTo(edited.path("left"));
+            assertThat(saved.path("right")).isEqualTo(edited.path("right"));
+            admin.putDraft(settings, edited, match, csrf, ApiCode.VERSION_CONFLICT);
+            assertThat(viewer.get(layout, ApiCode.OK)).isEqualTo(saved);
+        }
+    }
+
+    @Test
     void publicTopicsExposeOnlyActiveAggregateTemplatesAndMatchingSnapshots() throws Exception {
         try (var browser = new Browser()) {
             for (String topic : List.of("population", "hotline", "water")) {
