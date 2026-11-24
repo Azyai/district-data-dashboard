@@ -4,9 +4,8 @@ import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router'
-import { district as populationSample, formatNumber } from '../screens/screenData'
-import { screenPath } from '../screens/screenCatalog'
+import MonitoringLayers, { detailLayers } from './MonitoringLayers'
+import type { MonitorPage, MonitoringSnapshot } from './monitoringData'
 import type { CockpitArea, CockpitDirectory } from '../../api/client'
 import { createAtlasScale } from './atlasScale'
 import MapGlobeControl from './MapGlobeControl'
@@ -14,7 +13,6 @@ import { boundaryCenter, boundaryContains, boundaryFor, districtBounds, parseBou
 import type { Coordinates, GeoBoundary, Polygon } from './mapBoundaries'
 import { atlasStyle, atlasUrl, reliefUrl } from './tiandituStyle'
 import { connectImagery, type Basemap } from './tiandituImagery'
-import type { TwinId } from './twinSites'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import './tianditu-map.css'
 
@@ -25,14 +23,17 @@ type Props = {
   viewMode: View
   onViewModeChange: (mode: View) => void
   onSelectArea: (id: string) => void
-  onOpenTwin: (id: TwinId) => void
+  topic: MonitorPage
+  data?: MonitoringSnapshot
+  selected: string
+  status: string
+  onSelectFeature: (name: string) => void
 }
 type Pin = { id: string; name: string; point: Coordinates; boundary?: GeoBoundary }
 type AreaGeometry = GeoJSON.FeatureCollection<GeoJSON.Polygon | GeoJSON.MultiPolygon>
 const token = (import.meta.env.VITE_TIANDITU_TOKEN as string | undefined)?.trim()
 const featured = new Set(['zhaitang', 'qingshui', 'datai', 'miaofengshan'])
 const empty = (): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', features: [] })
-const twinPoint: Coordinates = [116.122, 39.901]
 const districtBox: [Coordinates, Coordinates] = [[districtBounds.west, districtBounds.south], [districtBounds.east, districtBounds.north]]
 const initialPitch = 35
 const orbitThreshold = 4
@@ -140,7 +141,7 @@ function AreaPin({ map, pin, children }: { map: MapLibreMap; pin: Pin; children:
   return createPortal(children, el)
 }
 
-export default function TiandituMap({ area, directory, viewMode, onViewModeChange, onSelectArea, onOpenTwin }: Props) {
+export default function TiandituMap({ area, directory, viewMode, onViewModeChange, onSelectArea, topic, data, selected, status: roadStatus, onSelectFeature }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLDivElement>(null)
   const navigationHint = useId()
@@ -168,15 +169,9 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     ?? (district ? area.children : []), atlas.data?.towns), [directory, district, area.children, atlas.data])
   const nearbyVillages = useMemo(() => mapPlaces(directory?.filter(location => location.level === 'village' && location.parentId === townId)
     ?? (area.level === 'town' ? area.children : []), villages.data), [area.children, area.level, directory, townId, villages.data])
-  const places = district ? towns : nearbyVillages
-  const pins = useMemo(() => {
-    const result = [...places]
-    if (district) result.push({ id: 'population', name: '全区人口专题', point: [115.81, 40.042] })
-    if (district || (focus && boundaryContains(focus, twinPoint))) {
-      result.push({ id: 'landmarks', name: '重点地标', point: twinPoint })
-    }
-    return result
-  }, [district, focus, places])
+  const pins = district ? towns : nearbyVillages
+  const pickFeature = useRef(onSelectFeature)
+  useEffect(() => { pickFeature.current = onSelectFeature }, [onSelectFeature])
   const pendingSelection = useRef<number | undefined>(undefined)
   const actions = useRef({ towns, nearbyVillages, townId, areaId: area.id, parentId, onSelectArea })
   useEffect(() => {
@@ -232,6 +227,12 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     })
     instance.on('click', event => {
       if ((event.originalEvent.target as Element | null)?.closest('button, a')) return
+      const layers = detailLayers.filter(id => instance.getLayer(id))
+      const feature = layers.length ? instance.queryRenderedFeatures(event.point, { layers })[0] : undefined
+      if (typeof feature?.properties.name === 'string') {
+        pickFeature.current(feature.properties.name)
+        return
+      }
       const place = placeAt([event.lngLat.lng, event.lngLat.lat])
       if (place) selectOnClick(place.id, event.originalEvent.detail)
     })
@@ -292,11 +293,15 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
       const v = Math.min(65, Math.round(height * .11))
       return { top: v, bottom: v, left: inset + 14, right: inset + 14 }
     }
+    let fittedCamera: { lng: number; lat: number; zoom: number; bearing: number; pitch: number } | undefined
     const fit = () => {
       const position = map.cameraForBounds([[west, south], [east, north]], {
         padding: padding(), maxZoom: map.getMaxZoom(),
       })
-      if (position) map.jumpTo({ ...position, pitch: currentView.current === '3d' ? initialPitch : 0 })
+      if (position) {
+        map.jumpTo({ ...position, pitch: currentView.current === '3d' ? initialPitch : 0 })
+        fittedCamera = { ...map.getCenter(), ...readCamera(map) }
+      }
     }
     const rows = (items: GeoBoundary[]) => ({
       type: 'FeatureCollection' as const,
@@ -307,9 +312,14 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     map.getSource<GeoJSONSource>('children')?.setData(!district && villages.data ? rows(villages.data) : empty())
     reset.current = fit
     const onResize = () => {
+      const center = map.getCenter()
+      const stillFitted = fittedCamera && Math.abs(center.lng-fittedCamera.lng)<.00001 && Math.abs(center.lat-fittedCamera.lat)<.00001
+        && Math.abs(map.getZoom()-fittedCamera.zoom)<.001 && Math.abs(map.getBearing()-fittedCamera.bearing)<.1
+        && Math.abs(map.getPitch()-fittedCamera.pitch)<.1
       map.resize()
       const overview = map.cameraForBounds(districtBox, { padding: padding() })
       if (overview?.zoom !== undefined) scale.current?.setOverviewZoom(map, overview.zoom)
+      if (stillFitted) fit()
     }
     const observer = new ResizeObserver(onResize)
     observer.observe(frame.current)
@@ -318,6 +328,12 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     setScope(area.id)
     return () => { observer.disconnect() }
   }, [map, area.id, area.level, district, focus, town, village, villages.data, villages.isPending])
+
+  const previousFocus = useRef('')
+  useEffect(() => {
+    if (previousFocus.current && !selected) reset.current()
+    previousFocus.current = selected
+  }, [selected])
 
   const failed = graphicsError || atlas.isError
   const status = basemap === 'connecting' ? '正在连接天地图'
@@ -337,13 +353,7 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     {failed && <div className="atlas-static"><img src={reliefUrl} alt="门头沟区地形概览" />
       <p role="status">{graphicsError ? '浏览器图形加速不可用' : '区界数据暂不可用'}</p></div>}
     {map && pins.map(pin => <AreaPin key={pin.id} map={map} pin={pin}>
-      {pin.id === 'population' ? <Link className="atlas-population" to={screenPath('population')} aria-label="查看全区人口专题">
-        <span className="atlas-pin-dot" /><span className="atlas-callout"><small>全区常住人口</small>
-          <strong>{formatNumber(populationSample.population / 10_000)} <em>万人</em></strong></span></Link>
-        : pin.id === 'landmarks' ? <div className="atlas-landmarks"><span className="atlas-pin-dot" />
-          <nav aria-label="重点地标"><button type="button" onClick={() => onOpenTwin('tianjie')}>长安天街</button>
-            <button type="button" onClick={() => onOpenTwin('jingxi')}>京西智谷</button></nav></div>
-        : <button className="atlas-place" data-place={pin.id} data-featured={!district || featured.has(pin.id)}
+      <button className="atlas-place" data-place={pin.id} data-featured={!district || featured.has(pin.id)}
           aria-label={'查看' + pin.name} aria-current={pin.id === area.id ? 'location' : undefined}
           title={pin.id === area.id ? '双击取消选区' : undefined}
           onClick={event => selectOnClick(pin.id, event.detail)}
@@ -352,8 +362,9 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
             event.stopPropagation()
             clearSelection()
           }}>
-          <span className="atlas-pin-dot" /><span className="atlas-pin-label">{pin.name}</span></button>}
+          <span className="atlas-pin-dot" /><span className="atlas-pin-label">{pin.name}</span></button>
     </AreaPin>)}
+    {map && data && <MonitoringLayers map={map} topic={topic} area={area} data={data} selected={selected} status={roadStatus}/>}
     {(status || pendingBoundary) && <div className="atlas-status" aria-live="polite">{status && <span>{status}</span>}
       {basemap === 'unavailable' && <button onClick={() => setAttempt(value => value + 1)}>重连</button>}
       {pendingBoundary && <span>当前显示镇街范围</span>}
