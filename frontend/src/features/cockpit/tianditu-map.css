@@ -1,0 +1,51 @@
+.tianditu-map { position: absolute; inset: 0; overflow: hidden; background: #1b2b3b; color: #edf7ff; }
+.atlas-render { position: absolute; inset: 0; }
+.atlas-camera-frame { position: absolute; inset: 0 var(--atlas-inset, 0px); pointer-events: none; }
+.atlas-render .maplibregl-ctrl-bottom-left { bottom: 14px; left: var(--local-gutter, 16px); }
+.atlas-render .maplibregl-ctrl-scale { margin: 0; border: 1px solid #d8eaf0b3; border-top: 0;
+  color: #eff9ff; font: 10px/1.5 "Segoe UI", sans-serif; text-align: center; background: #142739bf; }
+.atlas-credit { position: absolute; z-index: 2; left: calc(var(--local-gutter, 16px) + 92px); bottom: 12px;
+  display: flex; align-items: center; gap: 6px; padding: 2px 7px; border-radius: 3px; color: #d5e1eb;
+  background: #102031bd; font-size: .64rem; }
+.atlas-credit button { cursor: pointer; color: #99d7e6; text-decoration: underline; }
+.atlas-render .maplibregl-marker { z-index: 1; font-family: inherit; }
+.atlas-render .maplibregl-marker:has(.atlas-population) { z-index: 2; }
+.atlas-render .maplibregl-marker:focus-within, .atlas-render .maplibregl-marker:hover { z-index: 4; }
+.atlas-place, .atlas-population, .atlas-landmarks { position: relative; display: grid; place-items: center;
+  width: 26px; height: 26px; color: #f2fbff; }
+.atlas-place, .atlas-population, .atlas-landmarks button { cursor: pointer; }
+.atlas-pin-dot { width: 8px; height: 8px; background: #c6f5f3; border: 1px solid #f1fffe; border-radius: 50%;
+  box-shadow: 0 0 0 3px #256d78b0, 0 0 0 4px #86e4e687, 0 0 12px #68ddd4a8; }
+.atlas-pin-label { position: absolute; top: 23px; white-space: nowrap; color: #f0ffff; font-size: .72rem;
+  font-weight: 650; line-height: 1.36; padding: .1rem .3rem; border-radius: 3px;
+  text-shadow: 0 1px 2px #071827; background: #102635c9; }
+.atlas-place[data-featured="false"]:not(:hover, :focus-visible) .atlas-pin-label { display: none; }
+@media (min-width: 84rem) {
+  .atlas-place:is([data-place="yanchi"], [data-place="wangping"], [data-place="junzhuang"], [data-place="tanzhesi"])[data-featured="false"]:not(:hover, :focus-visible) .atlas-pin-label { display: block; }
+}
+.atlas-place[data-featured="false"] .atlas-pin-dot { width: 5px; height: 5px; box-shadow: 0 0 0 2px #325767aa; }
+.atlas-place:focus-visible, .atlas-population:focus-visible, .atlas-landmarks button:focus-visible {
+  outline: 2px solid #d3f5ff; outline-offset: 3px; }
+.atlas-population .atlas-pin-dot { width: 12px; height: 12px; background: #d5effe; box-shadow: 0 0 0 5px #6dc9e875, 0 0 0 8px #a5dfe24a; }
+.atlas-callout { position: absolute; bottom: 29px; left: 50%; transform: translateX(-50%); display: grid;
+  min-width: 106px; padding: 7px 11px; border-left: 2px solid #8fdcf0; border-radius: 2px;
+  background: linear-gradient(110deg, #0c2439f5, #122536da); box-shadow: 0 3px 12px #08142755; }
+.atlas-callout::after { content: ""; width: 1px; height: 12px; position: absolute; top: 100%; left: 50%; background: #a4dce6; }
+.atlas-callout small { font-size: .63rem; font-weight: 600; color: #cadce8; white-space: nowrap; }
+.atlas-callout strong { display: block; white-space: nowrap; font: 630 1.48rem/1.12 "Bahnschrift", "Segoe UI", sans-serif; color: #f4fbff; }
+.atlas-callout em { font-size: .65rem; font-style: normal; font-weight: 550; }
+.atlas-landmarks .atlas-pin-dot { background: #f2d79e; box-shadow: 0 0 0 3px #b38b5155; }
+.atlas-landmarks nav { position: absolute; top: 24px; right: 5px; display: flex; white-space: nowrap;
+  border-left: 2px solid #d4ad75; border-radius: 2px; background: #122635f2; }
+.atlas-landmarks button { padding: 5px 6px; font-size: .69rem; }
+.atlas-landmarks button + button { border-left: 1px solid #71858c50; }
+.atlas-landmarks button:is(:hover,:focus-visible) { background: #28516b; }
+.atlas-static { position: absolute; inset: 12% 10%; display: grid; place-items: center; pointer-events: none; }
+.atlas-static img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.atlas-static p { position: absolute; bottom: 8px; background: #102137e0; font-size: .8rem; padding: .3rem .7rem; }
+@media (max-width: 740px) {
+  .atlas-credit { bottom: 13px; left: 92px; max-width: calc(100% - 156px); font-size: .58rem; }
+  .atlas-place { width: 22px; height: 22px; }
+  .atlas-callout { min-width: 90px; }
+  .atlas-pin-label { font-size: .64rem; top: 20px; }
+}
