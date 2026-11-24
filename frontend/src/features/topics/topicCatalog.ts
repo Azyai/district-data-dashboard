@@ -1,3 +1,5 @@
+import { screenPath } from '../screens/screenCatalog'
+
 export const topics = [
   { id: 'population', title: '人口专题', match: /人口|老龄|年龄结构|家庭户/, samples: ['常住人口有多少？', '年龄结构如何？'] },
   { id: 'hotline', title: '接诉即办', match: /接诉即办|既诉既办|即诉即办|热线|诉求|工单/, samples: ['哪类诉求最多？', '近期受理量如何变化？'] },
@@ -6,7 +8,9 @@ export const topics = [
 
 export type TopicId = (typeof topics)[number]['id']
 
-export function topicPath(id: TopicId) {
+export function topicPath(id: TopicId, areaId?: string, month?: string | null) {
+  if (id === 'population') return screenPath('population', areaId)
+  if (id === 'hotline') return screenPath('governance', areaId, month)
   return '/topics/' + id
 }
 
