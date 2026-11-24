@@ -1,6 +1,8 @@
 .cockpit {
-  --page-ground:#0a1828; --panel-accent:#87daff; --text-main:#edf6ff; --text-secondary:#a7bed2;
-  --local-gutter:clamp(12px,1.55vw,32px); --rail-width:clamp(202px,19vw,326px);
+  --page-ground:#050814; --panel-accent:#4cc9ff; --text-main:#e8f1ff; --text-secondary:#8ea3c7;
+  --board-line:rgba(140,186,255,.18);
+  --board-glass:linear-gradient(180deg,rgba(10,20,40,.78),rgba(6,12,24,.62));
+  --local-gutter:clamp(12px,.92vw,20px); --rail-width:clamp(220px,20vw,360px);
   --atlas-inset:calc(var(--rail-width) + var(--local-gutter));
   color:var(--text-main); background:var(--page-ground);
 }
@@ -12,15 +14,16 @@
 .map-wait { display:grid; place-items:center; height:100%; color:var(--text-secondary); }
 .monitor-data-error { position:absolute; top:1rem; left:50%; transform:translateX(-50%); background:#071425ed; padding:.7rem 1rem; }
 .monitor-overlay {
-  pointer-events:none; color:#eaf5fc; font:clamp(12px,.84vw,17px)/1.45 "Bahnschrift","Segoe UI","Microsoft YaHei",sans-serif;
+  z-index:2; pointer-events:none; color:#e8f1ff; font:clamp(12px,.83vw,16px)/1.45 "Microsoft YaHei","PingFang SC","Segoe UI",sans-serif;
   font-variant-numeric:tabular-nums;
-  background:linear-gradient(180deg,#0713215c,transparent 16%,transparent 80%,#07142347);
+  background:radial-gradient(ellipse at center,transparent 42%,rgba(3,6,14,.42)),
+    linear-gradient(to bottom,rgba(5,8,16,.15),transparent 16%,transparent 78%,rgba(5,8,16,.36));
 }
 .monitor-overlay button { cursor:pointer; font:inherit; color:inherit; }
 .monitor-overlay button:disabled { cursor:default; }
 .monitor-overlay button:focus-visible,.monitor-overlay input:focus-visible { outline:2px solid #97e4ff; outline-offset:-2px; }
 .monitor-kpis {
-  position:absolute; top:clamp(14px,3.6svh,42px); inset-inline:calc(var(--atlas-inset) + 8px);
+  position:absolute; top:clamp(9px,1.5svh,24px); inset-inline:calc(var(--atlas-inset) + 8px);
   display:flex; justify-content:center; align-items:flex-start; text-align:center; text-shadow:0 2px 6px #06111c,0 0 15px #06111c;
 }
 .monitor-kpis > div { flex:1 1 0; max-width:10.5rem; padding-inline:3px; display:grid; justify-items:center; align-content:start; }
@@ -29,40 +32,40 @@
 .monitor-kpis small { color:#bacdda; font-size:.83em; }
 .monitor-kpis p { font-size:.85em; }
 .monitor-wing { pointer-events:auto; position:absolute; top:var(--local-gutter); bottom:clamp(55px,7svh,82px); width:var(--rail-width);
-  min-height:0; display:flex; flex-direction:column; gap:clamp(10px,1.7svh,22px);
+  min-height:0; display:flex; flex-direction:column; gap:12px;
   overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; scrollbar-color:#65839670 transparent; }
 .monitor-left { left:var(--local-gutter); }
 .monitor-right { right:var(--local-gutter); }
 .monitor-panel {
-  --glass:linear-gradient(104deg,#071627eb,#102538be 75%,#102c405e);
-  background:var(--glass); padding:clamp(10px,1.08vw,19px); backdrop-filter:blur(6px); min-width:0;
-  position:relative; border-radius:0 4px 4px 0;
+  position:relative; min-width:0; padding:clamp(10px,.9vw,16px);
+  border:1px solid var(--board-line); border-radius:12px;
+  background:var(--board-glass); backdrop-filter:blur(10px);
+  box-shadow:inset 0 0 30px rgba(40,90,180,.08),0 10px 30px rgba(0,0,0,.2);
 }
-.monitor-right .monitor-panel { --glass:linear-gradient(256deg,#071627ed,#102538cf 76%,#102c407f); }
 .monitor-panel > header { display:flex; align-items:center; justify-content:space-between; gap:7px; margin:0 0 .9em; padding-bottom:.55em;
-  background:linear-gradient(90deg,#619cba80,transparent) left bottom / 100% 1px no-repeat; }
+  color:#f4f8ff; }
 .monitor-panel h2 { margin:0; font-size:1.13em; color:#f2fbff; font-weight:660; letter-spacing:.055em;
   display:flex; align-items:center; gap:.55em; min-width:0; }
-.monitor-panel h2::before { content:""; width:3px; height:.83em; background:#6be2fb; box-shadow:0 0 7px #42d1ed66; flex:none; }
+.monitor-panel h2::before { content:""; width:3px; height:.83em; border-radius:2px; background:linear-gradient(#8ae6ff,#3b82f6); box-shadow:0 0 8px #4cc9ff66; flex:none; }
 .monitor-panel header small,.monitor-column-title,.monitor-panel em,.monitor-panel button small,.monitor-trend small { color:#a7bfcd; font-size:.82em; font-style:normal; }
 .monitor-panel header small { white-space:nowrap; }
 .road-browser,.monitor-grow { min-height:0; display:flex; flex-direction:column; }
-.road-browser { max-height:100%; }
-.road-search { display:flex; align-items:center; gap:5px; border-bottom:1px solid #6eb2d66e; background:#0516278c; padding:.45em .65em; }
+.road-browser { height:100%; }.road-results {flex:1;}
+.road-search { display:flex; align-items:center; gap:5px; border:1px solid var(--board-line); border-radius:8px; background:rgba(5,12,24,.65); padding:.4em .65em; }
 .road-search > span { color:#91d7f2; font-size:1.45em; }
 .road-search input { width:100%; outline:none; border:0; background:transparent; color:#eefaff; font:inherit; }
 .road-search input::placeholder { color:#a1bbc9; }
-.road-filters { display:flex; flex-wrap:wrap; gap:.22em; margin:.7em 0; }
-.road-filters button,.monitor-back,.monitor-mobile-tools button { background:#223c4d9c; color:#d0e3ee; font-size:.82em; padding:.35em .50em; border-radius:3px; }
-.road-filters button[aria-pressed="true"],.monitor-mobile-tools button[aria-pressed="true"] { color:#b2efff; background:#205570; box-shadow:inset 0 -1px #75d9ef; }
+.road-filters { display:flex; flex-wrap:wrap; gap:.36em; margin:.7em 0; }
+.road-filters button,.monitor-back,.monitor-mobile-tools button { background:rgba(8,16,32,.55); color:#b7c9e6; font-size:.84em; padding:.3em .65em; border:1px solid rgba(150,190,255,.22); border-radius:99px; }
+.road-filters button[aria-pressed="true"],.monitor-mobile-tools button[aria-pressed="true"] { color:#eaf7ff; background:rgba(76,201,255,.14); border-color:#4cc9ffcc; box-shadow:0 0 10px rgba(76,201,255,.18); }
 .monitor-column-title,.monitor-pagination,.monitor-grid-list button,.water-sites button,.monitor-facts div,.monitor-bars span,.corridor-list button,.monitor-trend > div { display:flex; align-items:center; justify-content:space-between; gap:.45em; }
 .monitor-column-title { margin:.25em 0; }
 .road-results,.water-sites,.monitor-grid-list { min-height:0; overflow:auto; overscroll-behavior:contain; scrollbar-color:#617f9070 transparent; scrollbar-width:thin; }
 .road-row,.water-sites button,.monitor-grid-list button,.corridor-list button { width:100%; min-width:0; text-align:left; padding:.63em .15em; border-bottom:1px solid #bed8ea1d; }
-.road-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:.65em; align-items:center; }
+.road-row { display:grid; grid-template-columns:6px minmax(0,1fr) auto auto; gap:.65em; align-items:center; }
 .road-row > i,.monitor-breakdown li i,.monitor-keys i { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--ink); }
 .road-row > span,.water-sites button > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.road-row small,.water-sites small { display:block; color:#a1b6c5; }
+.road-row small,.water-sites small { display:block; color:#9eb2cc; }.road-row > small {font-size:.78em;}
 .road-row b { color:#d7edfa; }
 .monitor-panel button[aria-pressed="true"]:not(.road-filters button),.monitor-panel :is(.road-row,.water-sites button,.monitor-grid-list button,.corridor-list button):enabled:hover { background:#36729449; }
 .monitor-pagination { padding-top:.66em; font-size:.85em; color:#b1cddc; }
@@ -86,12 +89,23 @@
 .corridor-list button { justify-content:initial; }.corridor-list button span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .corridor-list b {white-space:nowrap;}.corridor-list em,.monitor-grid-list em {font-weight:400;}
 .monitor-demo { position:absolute; bottom:14px; left:calc(var(--local-gutter) + 70px); padding:.2em .55em; border-radius:2px; background:#071623ba; color:#c0d3dd; font-size:.75em; }
-.monitor-dock {position:absolute;inset-inline:calc(var(--atlas-inset) + 6px);bottom:clamp(10px,2svh,24px);display:flex;align-items:stretch;justify-content:center;gap:6px;pointer-events:auto;}
-.monitor-playback { display:flex; align-items:center; gap:.7em;
-  padding:.7em 1em; color:#dceffc; pointer-events:auto; background:#0a1c2ce0; border-top:1px solid #79a8c07a; white-space:nowrap; }
-.monitor-playback label { font-size:.9em; }.monitor-playback b {margin-left:.3em;color:#9cecff;}
-.monitor-playback input { width:clamp(65px,9vw,180px); accent-color:#56c9ec; cursor:pointer; }
-.monitor-playback button { color:#a5dff0; font-size:.84em; }.monitor-playback button:disabled {opacity:.6;}
+.monitor-dock {
+  position:absolute; left:calc(var(--atlas-inset) + var(--local-gutter)); right:calc(var(--atlas-inset) + var(--local-gutter));
+  bottom:var(--local-gutter); display:flex; align-items:stretch; gap:8px; pointer-events:auto;
+}
+.monitor-playback {
+  flex:1.15; min-width:0; display:grid; grid-template-columns:minmax(0,1fr) auto; align-content:center;
+  gap:4px 12px; padding:8px 12px; border-radius:10px; border:1px solid var(--board-line);
+  background:rgba(8,16,32,.76); backdrop-filter:blur(8px);
+}
+.monitor-playback label {grid-column:1/-1; display:flex; align-items:baseline; justify-content:space-between; color:#b7c9e6; font-size:.88em;}
+.monitor-playback b {color:#f4f8ff; font:600 1.2em Bahnschrift,"Segoe UI",sans-serif;}
+.monitor-playback input {width:100%; min-width:0; height:24px; accent-color:#4cc9ff; cursor:pointer;}
+.monitor-playback .road-time-reset {
+  min-width:54px; padding:4px 12px; border:1px solid rgba(150,190,255,.36);
+  border-radius:999px; color:#e4f3ff; background:rgba(76,201,255,.12); font-size:.86em;
+}
+.monitor-playback .road-time-reset:hover {border-color:#4cc9ff;}
 .monitor-keys { display:flex; align-items:center; gap:.4em; color:#c3d8e6; font-size:.8em; }
 .monitor-keys i {background:#65dafc;}.monitor-keys i:nth-of-type(2) {background:#ffc383;margin-left:.6em;}
 .monitor-table { width:100%; border-collapse:collapse; text-align:right; }
@@ -117,26 +131,126 @@
   .monitor-kpis >div {max-width:8rem;}.monitor-kpis b {font-size:clamp(19px,4.2vw,28px);}
   .monitor-wing {display:none; width:min(254px,calc(100% - 26px));top:94px;bottom:90px;z-index:3;}
   .monitor-overlay[data-panel="left"] .monitor-left,.monitor-overlay[data-panel="right"] .monitor-right {display:flex;}
-  .monitor-panel,.monitor-right .monitor-panel {--glass:linear-gradient(110deg,#071627f5,#102538ec);}
+  .monitor-panel {--board-glass:linear-gradient(180deg,#0a1428f2,#060c18ed);}
   .monitor-mobile-tools {position:absolute;top:66px;left:14px;display:flex;gap:.4em;pointer-events:auto;}
   .monitor-mobile-tools button {background:#0b2335e3;font-size:.85em;}
-  .monitor-dock {bottom:53px;left:14px;right:auto;}.monitor-corridors {display:none!important;}.monitor-demo {bottom:14px;}
+  .monitor-dock {bottom:68px;left:14px;right:14px;}.monitor-corridors {display:none!important;}.monitor-demo {bottom:14px;}
 }
 
 .monitor-map-layout:has(.atlas-status) .monitor-demo { visibility:hidden; }
 .monitor-loading-scope { position:absolute; top:18%; left:50%; transform:translateX(-50%); background:#061827e8; padding:.4rem .8rem; font-size:.8rem; color:#d6e9f3; }
 
-.monitor-corridors {display:flex;align-items:stretch;min-width:0;background:#0b1c2be3;border-top:1px solid #79a8c07a;}
-.monitor-road-tile {min-width:0;display:grid;align-content:center;text-align:left;padding:.48em .8em;border-inline-start:1px solid #6b8e9e40;}
-.monitor-road-tile > span {max-width:8em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88em;}
-.monitor-road-tile b {font-size:1.05em;white-space:nowrap;}.monitor-road-tile em,.monitor-road-tile small {font-size:.73em;font-style:normal;}.monitor-road-tile small {color:#b2c6d0;}
-.monitor-road-tile[aria-pressed="true"],.monitor-road-tile:hover {background:#234354;}
-.monitor-arrow {padding:0 .45em;color:#b2cfdb;}
-@media(min-width:741px) and (max-width:1250px) {
-  .monitor-playback {display:grid;grid-template-columns:1fr auto;gap:.1rem .3rem;padding:.4em .6em;}
-  .monitor-playback label {grid-column:1/-1;}.monitor-playback input {width:68px;}
-  .monitor-road-tile {padding:.4em .55em;}
+.monitor-corridors {display:flex;flex:1.55;align-items:stretch;min-width:0;gap:5px;}
+.monitor-road-tile {
+  min-width:0;flex:1;display:grid;align-content:center;text-align:left;padding:6px 8px;
+  background:rgba(8,16,32,.72);border:1px solid var(--board-line);border-radius:9px;backdrop-filter:blur(8px);
 }
-@media(min-width:741px) and (max-width:900px) {
+.monitor-road-tile > span {overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88em;}
+.monitor-road-tile b {font:600 1.08em Bahnschrift,"Segoe UI",sans-serif;white-space:nowrap;}
+.monitor-road-tile em,.monitor-road-tile small {font-size:.76em;font-style:normal;}.monitor-road-tile small {color:#a6bbce;}
+.monitor-road-tile[aria-pressed="true"],.monitor-road-tile:hover {background:#142d43;border-color:#4cc9ffb3;}
+.monitor-arrow {padding:0 4px;color:#b2cfdb;}
+@media(min-width:741px) and (max-width:1060px) {
+  .monitor-dock {flex-direction:column;gap:4px;}
+  .monitor-playback {grid-template-columns:auto minmax(0,1fr) auto;align-items:center;}
+  .monitor-playback label {grid-column:auto;gap:.5em;}
+  .monitor-corridors {max-height:49px;}
+}
+@media(min-width:741px) and (max-width:880px) {
   .monitor-corridors {display:none;}
 }
+
+.road-detail-board { display:flex; flex-direction:column; height:100%; min-height:0; }
+.road-sheet-scroll { min-height:0; overflow:auto; scrollbar-width:thin; scrollbar-color:#6279a559 transparent; }
+.road-sheet-scroll section + section { margin-top:clamp(13px,2vh,24px); }
+.road-sheet-scroll h4 { display:flex; align-items:center; gap:6px; font-size:1.02em; font-weight:650; margin:0 0 .65em; }
+.road-sheet-scroll h4::before { content:""; width:3px; height:10px; border-radius:2px; background:#a79bff; }
+.road-sheet-scroll h4 small { margin-left:auto; color:#a2afd1; font-size:.75em; font-weight:400; }
+.road-sheet-access { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+.road-sheet-access > div { display:grid; justify-items:center; padding:7px 1px; border:1px solid #a0aaff2b;
+  border-radius:8px; background:rgba(8,14,32,.42); text-align:center; }
+.road-sheet-access svg { width:21px; height:21px; color:#c4b6ff; }
+.road-sheet-access strong,.road-sheet-facts dd { color:#f4f4ff; font:600 clamp(17px,1.35vw,23px)/1.3 Bahnschrift,"Segoe UI",sans-serif; }
+.road-sheet-access span,.road-sheet-facts dt { color:#9bafce; font-size:.83em; }
+.road-sheet-scroll .monitor-trend stop:first-child { stop-color:#efe8ff; }
+.road-sheet-scroll .monitor-trend stop:last-child { stop-color:#7367ff; stop-opacity:.34; }
+.road-sheet-table { display:grid; gap:7px; }
+.road-sheet-table > * { display:grid; grid-template-columns:2.6em minmax(12px,1fr) minmax(4.6em,1.35fr) auto; align-items:center; gap:6px; text-align:left; }
+.road-sheet-table button { font-size:.89em; }
+.road-sheet-table > * > :last-child { text-align:right; }
+.road-sheet-table button > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.road-sheet-table button > i,.reservoir-meter { display:block; height:5px; background:#b8c6ff20; border-radius:99px; overflow:hidden; }
+.road-sheet-table button em,.reservoir-meter em { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#6a5af8,#d5cbff); }
+.road-sheet-head { color:#9cafd0; font-size:.82em; }
+.road-sheet-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); margin:0; border:1px solid #a0aaff2b; border-radius:8px; overflow:hidden; }
+.road-sheet-facts > div { padding:7px 8px; border-bottom:1px solid #a0aaff20; }
+.road-sheet-facts > div:nth-child(odd) { border-right:1px solid #a0aaff20; }
+.road-sheet-facts > div:nth-last-child(-n+2) { border-bottom:none; }
+.road-sheet-facts dd { margin:2px 0 0; }
+.road-focus-heading { display:flex; align-items:center; justify-content:space-between; gap:5px; margin-bottom:.7em; }
+.road-focus-heading small,.road-focus small { color:#b6c3df; font-size:.84em; }
+.road-focus-heading h3 { font-size:1.22em; margin:.15em 0; }
+.road-risk-top,.grid-split { display:grid; grid-template-columns:1fr 1.25fr; align-items:center; gap:4px; }
+.road-risk-top .road-focus { display:grid; gap:0; }
+.road-risk-top .road-focus b { font:600 3.25em/1 Bahnschrift,"Segoe UI",sans-serif; }
+.road-risk-top .monitor-radar,.grid-split .monitor-radar { height:clamp(75px,12svh,135px); }
+.road-risk dt { color:#a7bbd6; }
+.road-risk dl > div { padding:4px 0; border-bottom:1px solid #8cbeff22; }
+.monitoring-stage[data-page="grid"] .monitor-wing {
+  border:1px solid var(--board-line); border-radius:12px; background:var(--board-glass); backdrop-filter:blur(10px); gap:0;
+}
+.monitoring-stage[data-page="grid"] .monitor-panel {
+  flex:0 0 auto; background:transparent; border:0; border-radius:0; backdrop-filter:none; box-shadow:none;
+  padding:clamp(8px,.8vw,13px) clamp(10px,.95vw,16px);
+}
+.monitoring-stage[data-page="grid"] .monitor-grow { flex:1 1 10em; min-height:7em; }
+.monitor-gauge { width:100%; max-width:114px; min-height:63px; aspect-ratio:1.5; position:relative; display:grid;
+  align-content:center; justify-items:center; }
+.monitor-gauge::before { content:""; position:absolute; width:75%; aspect-ratio:1; top:6%; border-radius:50%;
+  background:conic-gradient(from 230deg,#6482ff,#48d5ff var(--score),#496281 0); clip-path:polygon(0 0,100% 0,100% 73%,50% 61%,0 73%);
+  mask:radial-gradient(farthest-side,transparent 76%,#000 78%); }
+.monitor-gauge strong { z-index:1; padding-top:15%; color:#d9f5ff; font:600 1.75em/1.15 Bahnschrift,"Segoe UI",sans-serif; }
+.monitor-gauge span { color:#a8bdd9; font-size:.8em; }
+.grid-ratings { list-style:none; margin:0; padding:0; font-size:.83em; }
+.grid-ratings li { display:flex; justify-content:space-between; gap:4px; padding:2px 0; }
+.grid-ratings b { color:#7fe7ce; }
+.water-picker { width:100%; margin:0 0 6px; padding:5px 6px; border:1px solid var(--board-line); border-radius:6px; color:#d2e3f7; background:#101c30; }
+.water-sites button { display:grid; grid-template-columns:1.8em minmax(0,1fr) auto; align-items:center; }
+.reservoir-rank { width:1.6em; height:1.6em; display:grid; place-items:center; border-radius:50%;
+  font-style:normal; font-size:.85em; background:#4cc9ff24; color:#bfe9ff; }
+.reservoir-meter { margin-top:4px; height:3px; }.reservoir-meter em { background:linear-gradient(90deg,#2f7bff,#4cc9ff); }
+.water-kpis.monitor-kpis { position:static; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 6px; text-shadow:none; text-align:left; }
+.water-kpis.monitor-kpis > div { display:grid; grid-template-columns:25px minmax(0,1fr); gap:1px 4px; width:100%;
+  max-width:none; align-items:center; justify-items:start; }
+.water-kpis i { width:24px; aspect-ratio:1; grid-row:span 2; border-radius:50%;
+  background:conic-gradient(var(--ink) 74%,#7891a53d 0); mask:radial-gradient(farthest-side,transparent 64%,#000 67%); }
+.water-kpis.monitor-kpis b { font-size:clamp(15px,1.15vw,21px); letter-spacing:0; }
+.water-kpis.monitor-kpis b small { font-size:.57em; }
+.water-kpis.monitor-kpis span { color:#a7bad5; letter-spacing:0; font-size:.83em; }
+.water-file-intro { position:absolute; top:6%; left:5%; color:#f0f6ff; text-shadow:0 2px 10px #050a15; }
+.water-file-intro > small { color:#9cddff; font-size:.93em; letter-spacing:.14em; }
+.water-file-intro h2 {margin:.15em 0;font-size:clamp(25px,2.2vw,40px);}
+.water-file-intro p {margin:.5em 0 .9em;}
+.water-file-intro button,.water-history {pointer-events:auto;}
+.water-history { position:absolute; left:5%; right:5%; bottom:12%; display:grid; grid-template-columns:clamp(78px,8vw,120px) minmax(0,1fr); gap:12px; }
+.water-metrics { display:grid; gap:6px; align-content:center; }
+.water-metrics button { border:1px solid #96c4e641; padding:7px 8px; border-radius:7px; color:#d4e5f7; background:#08101cbd; }
+.water-metrics button[aria-pressed="true"] { border-color:#3ee0c5; background:#123940ed; }
+.water-history-chart { padding:10px 15px; background:var(--board-glass); border:1px solid var(--board-line); border-radius:10px; }
+.water-history-chart h3 { margin:0 0 5px; font-size:1.1em; }.water-history-chart small { color:#a8c5d7; }
+.water-history-chart svg {height:clamp(70px,18svh,200px);}
+.monitor-overlay:has(.water-file) .monitor-mobile-tools { display:none; }
+@media (max-width:740px) {
+  .monitoring-stage[data-page="waters"] .monitor-mobile-tools { top:10px; }
+  .monitoring-stage[data-page="waters"] .monitor-wing { top:43px; }
+  .water-history { left:10px; right:10px; bottom:76px; gap:5px; grid-template-columns:64px minmax(0,1fr); }
+}
+@media (prefers-reduced-motion:no-preference) {
+  .water-file-intro,.water-history { animation:water-file-in .35s ease-out; }
+  @keyframes water-file-in {from {opacity:0; transform:translateY(6px);} to {opacity:1; transform:translateY(0);}}
+}
+.road-query-line { display:flex; gap:6px; min-width:0; }
+.road-query-line .road-search { flex:1; min-width:0; }
+.road-query-line .road-search input { min-width:0; font-size:.91em; }
+.road-query-line select { width:36%; min-width:5.7em; padding:3px; background:#101b2c; border:1px solid var(--board-line);
+  border-radius:8px; color:#c2d5ea; font-size:.87em; cursor:pointer; }
