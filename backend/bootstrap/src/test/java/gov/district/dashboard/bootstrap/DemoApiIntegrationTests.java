@@ -103,6 +103,99 @@ class DemoApiIntegrationTests {
     }
 
     @Test
+    void hotlineAggregatesReconcileAcrossDistrictTownAndVillage() throws Exception {
+        try (var browser = new Browser()) {
+            JsonNode district = browser.get("/hotline/overview", ApiCode.OK);
+            assertThat(district.path("quality").asString()).isEqualTo("SIMULATED");
+            assertThat(district.path("month").asString()).isEqualTo("2026-10");
+            assertThat(district.path("snapshotOn").asString()).isEqualTo("2026-10-24");
+            assertThat(district.path("trend").size()).isEqualTo(10);
+            assertThat(district.path("areas").size()).isEqualTo(13);
+            JsonNode totals = district.path("totals");
+            assertThat(totals.path("received").asInt()).isEqualTo(2460);
+            assertThat(totals.path("closed").asInt()).isEqualTo(2381);
+            assertThat(totals.path("due").asInt()).isEqualTo(44);
+            assertThat(totals.path("late").asInt()).isEqualTo(35);
+            assertThat(totals.path("unassigned").asInt()).isEqualTo(25);
+
+            int townTotal = 0;
+            for (JsonNode area : district.path("areas")) {
+                townTotal += area.path("received").asInt();
+            }
+            assertThat(townTotal).isEqualTo(totals.path("received").asInt());
+            JsonNode town = browser.get("/hotline/overview?areaId=datai", ApiCode.OK);
+            JsonNode village = browser.get("/hotline/overview?areaId=datai-qianjuntai", ApiCode.OK);
+            JsonNode neighbour = browser.get("/hotline/overview?areaId=datai-muchengjian", ApiCode.OK);
+            assertThat(village.path("area").path("parentId").asString()).isEqualTo("datai");
+            assertThat(village.path("areas").size()).isZero();
+            assertThat(town.path("totals").path("received").asInt()).isEqualTo(66)
+                    .isEqualTo(village.path("totals").path("received").asInt()
+                            + neighbour.path("totals").path("received").asInt());
+
+            JsonNode analysis = browser.get("/hotline/analysis?areaId=datai-qianjuntai", ApiCode.OK);
+            assertThat(analysis.path("totals")).isEqualTo(village.path("totals"));
+            assertThat(ids(analysis.path("findings")))
+                    .containsExactly("top-category", "month-change", "deadline-watch", "dispatch-watch");
+            JsonNode semantics = browser.get("/hotline/semantics", ApiCode.OK);
+            assertThat(ids(semantics.path("metrics"))).contains("received", "closedRate", "receivedMoM");
+            List<String> ticketColumns = new ArrayList<>();
+            for (JsonNode field : semantics.path("fields")) {
+                if (field.path("table").asString().equals("hotline_ticket")) {
+                    ticketColumns.add(field.path("column").asString());
+                    if (field.path("column").asString().equals("area_id")) {
+                        assertThat(field.path("reference").path("table").asString()).isEqualTo("hotline_area");
+                    }
+                    if (field.path("column").asString().equals("ticket_status")) {
+                        assertThat(field.path("allowedValues").size()).isEqualTo(3);
+                    }
+                }
+            }
+            assertThat(ticketColumns).containsExactly("ticket_id", "month_start", "area_id", "town_id", "category_id",
+                    "ticket_status", "attention_lane", "title", "opened_on", "assigned_on", "processed_on", "closed_on",
+                    "elapsed_days", "note");
+        }
+    }
+
+    @Test
+    void hotlinePagesFilterAndExposeRecordedWorkflow() throws Exception {
+        try (var browser = new Browser()) {
+            String query = "/hotline/tickets?areaId=datai&month=2026-10&lane=late&size=1";
+            JsonNode first = browser.get(query, ApiCode.OK);
+            JsonNode second = browser.get(query + "&page=1", ApiCode.OK);
+            JsonNode end = browser.get(query + "&page=2", ApiCode.OK);
+            assertThat(first.path("total").asInt()).isEqualTo(2);
+            assertThat(first.path("items").size()).isEqualTo(1);
+            assertThat(second.path("total").asInt()).isEqualTo(2);
+            assertThat(end.path("items").size()).isZero();
+            JsonNode ticket = first.path("items").get(0);
+            assertThat(ticket.path("elapsedDays").asInt()).isGreaterThanOrEqualTo(7);
+            assertThat(ticket.path("townId").asString()).isEqualTo("datai");
+            assertThat(ticket.path("id").asString()).isNotEqualTo(second.path("items").get(0).path("id").asString());
+            String detailsPath = "/hotline/tickets/" + ticket.path("id").asString();
+            JsonNode detail = browser.get(detailsPath + "?areaId=datai&month=2026-10", ApiCode.OK);
+            assertThat(detail.path("title").asString()).isEqualTo(ticket.path("title").asString());
+            assertThat(browser.get(detailsPath, ApiCode.OK)).isEqualTo(detail);
+            browser.get(detailsPath + "?areaId=zhaitang&month=2026-10", ApiCode.NOT_FOUND);
+            browser.get(detailsPath + "?areaId=datai&month=2026-09", ApiCode.NOT_FOUND);
+            assertThat(detail.path("steps").size()).isEqualTo(4);
+            assertThat(detail.path("steps").get(0).path("on").asString()).isEqualTo(ticket.path("openedOn").asString());
+            assertThat(detail.path("steps").get(3).path("state").asString()).isEqualTo("pending");
+            JsonNode byCategory = browser.get("/hotline/tickets?category=" + ticket.path("categoryId").asString(),
+                    ApiCode.OK);
+            for (JsonNode item : byCategory.path("items")) {
+                assertThat(item.path("categoryId")).isEqualTo(ticket.path("categoryId"));
+            }
+            browser.get("/hotline/tickets?size=101", ApiCode.INVALID_REQUEST);
+            browser.get("/hotline/tickets?page=-1", ApiCode.INVALID_REQUEST);
+            browser.get("/hotline/tickets?lane=unknown", ApiCode.INVALID_REQUEST);
+            browser.get("/hotline/tickets?category=unknown", ApiCode.INVALID_REQUEST);
+            browser.get("/hotline/overview?month=2026-11", ApiCode.INVALID_REQUEST);
+            browser.get("/hotline/overview?areaId=unlisted", ApiCode.NOT_FOUND);
+            browser.get("/hotline/tickets/HL-202610-99999", ApiCode.NOT_FOUND);
+        }
+    }
+
+    @Test
     void requiresCsrfHeaderAndDataAdminBeforeAcceptingCsv() throws Exception {
         try (var browser = new Browser()) {
             browser.uploadCsv(null, ApiCode.CSRF_INVALID);
