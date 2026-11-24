@@ -241,7 +241,6 @@
   min-width: 0;
   min-height: 0;
 }
-.map-panel[data-map="true"] .map-plot { margin-top: 4rem; border-radius: 0 0 11px 11px; }
 .map-wait { min-height: 280px; display: grid; place-items: center; color: var(--text-secondary); }
 .region-picker { position: relative; }
 .region-picker > summary { list-style: none; gap: .48em; }
@@ -329,5 +328,4 @@
   .map-actions { gap: .18em; max-width: 64%; }
   .map-actions :is(.level-up, summary) { padding-inline: .38em; }
   .map-directory { right: -2rem; }
-  .map-panel[data-map="true"] .map-plot { margin-top: 5rem; }
 }

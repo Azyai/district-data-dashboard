@@ -7,10 +7,6 @@ import { pageLayout } from './layout-check.mjs'
 const baseUrl = process.env.E2E_BASE_URL || 'http://127.0.0.1:5173'
 const browserPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
 const evidence = process.env.E2E_ARTIFACTS
-const verifyLiveBasemap = process.env.VERIFY_LIVE_BASEMAP === '1'
-const basemapOrigin = 'https://tiles.openfreemap.org'
-const elevationOrigin = 'https://elevation-tiles-prod.s3.amazonaws.com'
-const imageryPath = '/maps/mentougou-sentinel-2-20261008.webp'
 const mapLayoutAnchors = ['.map-panel']
 const browser = await chromium.launch({
   executablePath: browserPath,
@@ -37,7 +33,9 @@ async function waitForArea(page, name) {
   const area = page.getByRole('navigation', { name: '区域层级' })
   await area.locator('[aria-current="page"]').filter({ hasText: name }).waitFor()
   await page.getByRole('heading', { name: name + '模型' }).waitFor()
-  await page.locator('.district-local-model[data-model-ready="ready"] canvas').waitFor()
+  const route = new URL(page.url()).pathname
+  const areaId = route === '/' ? 'mentougou' : decodeURIComponent(route.split('/').at(-1))
+  await page.locator(`.district-local-model[data-model-ready="ready"][data-model-scope=${JSON.stringify(areaId)}] canvas`).waitFor()
 }
 
 async function verifyLocalModel(page) {
@@ -48,41 +46,10 @@ async function verifyLocalModel(page) {
   assert.equal(await model.getAttribute('data-view'), '2d')
   await model.getByRole('button', { name: '3D', exact: true }).click()
   assert.equal(await model.getAttribute('data-view'), '3d')
+  await model.getByRole('button', { name: '放大模型', exact: true }).click()
+  await model.getByRole('button', { name: '复位视角', exact: true }).click()
   assert.deepEqual(await mapLayout(page), initialLayout)
-}
-
-async function verifyDistrictMap(page) {
-  await page.getByRole('button', { name: '行政地图' }).click()
-  const map = page.locator('.district-map')
-  const attribution = map.getByRole('link', { name: '© OpenStreetMap contributors' })
-  assert.equal(await attribution.getAttribute('href'), 'https://www.openstreetmap.org/copyright')
-  const layoutBeforeZoom = await mapLayout(page)
-  await map.getByRole('button', { name: '放大地图', exact: true }).click()
-  assert.equal(await map.getAttribute('data-zoomed'), 'true')
-  await map.getByRole('button', { name: '全域', exact: true }).click()
-  assert.equal(await map.getAttribute('data-zoomed'), 'false')
-  assert.deepEqual(await mapLayout(page), layoutBeforeZoom, 'Offline map zoom should preserve cockpit layout')
-  await verifyPanelLayout(page)
-  await page.getByRole('button', { name: '返回模型' }).click()
-  await waitForArea(page, '门头沟区')
-}
-
-async function verifyPanelLayout(page, { online = false } = {}) {
-  const layout = await page.evaluate(({ credits, controls }) => {
-    const bounds = (selector) => document.querySelector(selector).getBoundingClientRect().toJSON()
-    return {
-      stage: bounds('.map-panel'), map: bounds('.district-map-extent'),
-      credits: bounds(credits), controls: bounds(controls),
-    }
-  }, {
-    credits: online ? '.maplibregl-ctrl-attrib' : '.district-map-credit',
-    controls: online ? '.navigation-map-tools' : '.district-map-tools',
-  })
-  assert.ok(layout.stage.left <= layout.map.left && layout.stage.right >= layout.map.right,
-    'The map fits the stage')
-  const { credits, controls } = layout
-  assert.ok(credits.right <= controls.left || controls.right <= credits.left ||
-    credits.bottom <= controls.top || controls.bottom <= credits.top, 'Attribution and map controls do not cover each other')
+  assert.equal(await page.getByRole('button', { name: /行政地图|区域地图|行政区划/ }).count(), 0)
 }
 
 async function verifyRegionMenuLayout(page) {
@@ -96,192 +63,6 @@ async function verifyRegionMenuLayout(page) {
   await trigger.press('Escape')
   await menu.waitFor({ state: 'hidden' })
   assert.deepEqual(await pageLayout(page, mapLayoutAnchors), original)
-}
-
-function mapResponse(page, expectedOrigin, pathPattern) {
-  return page.waitForResponse(response => {
-    const { origin, pathname } = new URL(response.url())
-    return response.ok() && origin === expectedOrigin && pathPattern.test(pathname)
-  }, { timeout: 30_000 })
-}
-
-async function waitForCamera(page, { minZoom = 0, minPitch = 0, maxPitch = 85 } = {}) {
-  await page.waitForFunction(({ minZoom, maxPitch, minPitch }) => {
-    const state = document.querySelector('.navigation-map')?.dataset
-    const zoom = Number(state?.mapZoom)
-    const pitch = Number(state?.mapPitch)
-    return zoom >= minZoom && pitch <= maxPitch && pitch >= minPitch
-  }, { minZoom, minPitch, maxPitch })
-}
-
-async function verifyDistrictViewportMask(map) {
-  const mask = map.locator('canvas.district-viewport-mask[data-mask-ready="true"]')
-  await mask.waitFor()
-  const stats = await mask.evaluate(async canvas => {
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
-    const { width, height } = canvas
-    const pixels = canvas.getContext('2d').getImageData(0, 0, width, height).data
-    let inside = 0
-    let outside = 0
-    let feather = 0
-    let insideX = 0
-    let uniform = true
-    for (let y = 0; y < height; y += 4) {
-      for (let x = 0; x < width; x += 4) {
-        const pixel = (y * width + x) * 4
-        const alpha = pixels[pixel + 3]
-        if (alpha === 0) {
-          inside++
-          insideX += x
-        } else if (alpha === 255) {
-          outside++
-          uniform &&= pixels[pixel] === 14 && pixels[pixel + 1] === 29 && pixels[pixel + 2] === 48
-        } else {
-          feather++
-        }
-      }
-    }
-    return {
-      width, inside, outside, feather, uniform,
-      centerX: insideX / inside * canvas.clientWidth / width,
-      aligned: Math.abs(width / canvas.clientWidth - height / canvas.clientHeight) < .02,
-      decorative: canvas.getAttribute('aria-hidden') === 'true' && getComputedStyle(canvas).pointerEvents === 'none',
-    }
-  })
-  const samples = stats.inside + stats.outside + stats.feather
-  assert.ok(stats.inside > samples * .02, 'The official district interior remains visible')
-  assert.ok(stats.uniform && stats.outside > samples * .1, 'Far outside the district, the map is masked by solid navy')
-  assert.ok(stats.feather > 3 && stats.feather < samples * .2, 'The district border has a narrow opacity transition')
-  assert.ok(stats.aligned && stats.decorative, 'The viewport mask is aligned and does not intercept map interaction')
-  return stats
-}
-
-async function verifyOnlineDistrictMap(page) {
-  const appOrigin = new URL(baseUrl).origin
-  let imageryRequested = false
-  const matchesImagery = url => {
-    const { origin, pathname } = new URL(url)
-    return origin === appOrigin && pathname.endsWith(imageryPath)
-  }
-  page.on('request', request => { imageryRequested ||= matchesImagery(request.url()) })
-  await page.goto(baseUrl)
-  await waitForArea(page, '门头沟区')
-  await page.locator('.model-imagery-source').waitFor()
-  imageryRequested = false
-  const [styleResponse, tileResponse] = await Promise.all([
-    mapResponse(page, basemapOrigin, /^\/styles\//),
-    mapResponse(page, basemapOrigin, /\/\d+\/\d+\/\d+\.(pbf|mvt)$/),
-    page.getByRole('button', { name: '行政地图' }).click(),
-  ])
-  const style = await styleResponse.json()
-  assert.equal(style.version, 8)
-  assert.ok(style.layers.some(layer => layer['source-layer'] === 'building' && layer.type === 'fill-extrusion'),
-    'The online style supplies building extrusion data')
-  assert.ok((await tileResponse.body()).byteLength > 0, 'The online vector tile has data')
-
-  const map = page.locator('.navigation-map[data-map-ready="true"]')
-  const mode2D = map.getByRole('button', { name: '2D', exact: true })
-  const mode3D = map.getByRole('button', { name: '3D', exact: true })
-  const imagery = map.getByRole('button', { name: '卫星影像', exact: true })
-  const imageryCredit = map.getByRole('link', { name: 'Contains modified Copernicus Sentinel data 2026' })
-  await waitForCamera(page, { maxPitch: 0 })
-  await map.getByRole('link', { name: /OpenStreetMap/ }).waitFor()
-  await verifyPanelLayout(page, { online: true })
-  const startingZoom = Number(await map.getAttribute('data-map-zoom'))
-  const layout = await mapLayout(page)
-  assert.equal(await mode2D.getAttribute('aria-pressed'), 'true')
-  const flatMask = await verifyDistrictViewportMask(map)
-  await capture(page, 'cockpit-online-2d.png')
-
-  assert.equal(imageryRequested, false, 'The default map does not fetch the optional satellite image')
-  const [imageryResponse] = await Promise.all([
-    page.waitForResponse(response => response.ok() && matchesImagery(response.url())),
-    imagery.click(),
-  ])
-  assert.equal((await imageryResponse.body()).toString('ascii', 8, 12), 'WEBP')
-  assert.equal(await imagery.getAttribute('aria-pressed'), 'true')
-  await imageryCredit.waitFor()
-  await verifyPanelLayout(page, { online: true })
-  assert.deepEqual(await verifyDistrictViewportMask(map), flatMask, 'Satellite imagery stays inside the same district mask')
-  await capture(page, 'cockpit-online-satellite.png')
-  await imagery.click()
-  await imageryCredit.waitFor({ state: 'hidden' })
-
-  const frame = await map.locator('.district-map-frame').boundingBox()
-  const dragX = frame.x + frame.width * .45
-  const dragY = frame.y + frame.height * .36
-  await page.mouse.move(dragX, dragY)
-  await page.mouse.down()
-  await page.mouse.move(dragX + 65, dragY + 28, { steps: 10 })
-  await page.mouse.up()
-  const pannedMask = await verifyDistrictViewportMask(map)
-  assert.ok(pannedMask.centerX > flatMask.centerX + 25, 'The district mask follows map panning')
-  await map.getByRole('button', { name: '全域', exact: true }).click()
-
-  const [demResponse] = await Promise.all([
-    mapResponse(page, elevationOrigin, /^\/terrarium\/\d+\/\d+\/\d+\.png$/),
-    mode3D.click(),
-  ])
-  assert.equal((await demResponse.body()).subarray(1, 4).toString('ascii'), 'PNG', '3D loads real elevation tiles')
-  await map.and(page.locator('[data-map-mode="3d"]')).waitFor()
-  await waitForCamera(page, { minZoom: startingZoom - 1, minPitch: 30 })
-  assert.equal(await mode3D.getAttribute('aria-pressed'), 'true')
-  const pitchedMask = await verifyDistrictViewportMask(map)
-  assert.ok(Math.abs(pitchedMask.inside - flatMask.inside) > flatMask.inside / 12, 'The district mask follows the 3D projection')
-  await capture(page, 'cockpit-online-3d-overview.png')
-
-  const zoomIn = map.getByRole('button', { name: '放大地图', exact: true })
-  const beforeDetail = Number(await map.getAttribute('data-map-zoom'))
-  await Promise.all([
-    mapResponse(page, basemapOrigin, /\/14\/\d+\/\d+\.(pbf|mvt)$/).then(async response => {
-      assert.ok((await response.body()).byteLength > 0, 'The detailed 3D view requests vector data')
-    }),
-    (async () => {
-      const zoomSteps = Math.max(0, Math.ceil(14.05 - beforeDetail))
-      for (let step = 0; step < zoomSteps; step++) {
-        const currentZoom = Number(await map.getAttribute('data-map-zoom'))
-        await zoomIn.click()
-        await waitForCamera(page, { minZoom: currentZoom + 0.9, minPitch: 30 })
-      }
-      await waitForCamera(page, { minZoom: 14, minPitch: 30 })
-    })(),
-  ])
-  await capture(page, 'cockpit-online-3d-detail.png')
-
-  const detailZoom = Number(await map.getAttribute('data-map-zoom'))
-  await map.getByRole('button', { name: '缩小地图', exact: true }).click()
-  await page.waitForFunction(previous => {
-    const zoom = Number(document.querySelector('.navigation-map')?.getAttribute('data-map-zoom'))
-    return zoom < previous - 0.9
-  }, detailZoom)
-
-  await mode2D.click()
-  await map.and(page.locator('[data-map-mode="2d"]')).waitFor()
-  await waitForCamera(page, { maxPitch: 0 })
-  await map.getByRole('button', { name: '全域', exact: true }).click()
-  await page.waitForFunction(expected => {
-    const zoom = Number(document.querySelector('.navigation-map')?.getAttribute('data-map-zoom'))
-    return Math.abs(zoom - expected) <= 0.05
-  }, startingZoom)
-  assert.deepEqual(await mapLayout(page), layout, '2D/3D switching should preserve cockpit layout')
-  await assertNoHorizontalOverflow(page)
-  await page.setViewportSize({ width: 390, height: 844 })
-  await verifyPanelLayout(page, { online: true })
-  await assertNoHorizontalOverflow(page)
-  const mobileMask = await verifyDistrictViewportMask(map)
-  assert.ok(mobileMask.width < flatMask.width / 2, 'The mask backing canvas resizes with the viewport')
-  await capture(page, 'cockpit-online-mobile.png')
-  await imagery.click()
-  await imageryCredit.waitFor()
-  await verifyPanelLayout(page, { online: true })
-  await assertNoHorizontalOverflow(page)
-  await imagery.click()
-  await imageryCredit.waitFor({ state: 'hidden' })
-
-  await map.getByRole('button', { name: '大峪街道', exact: true }).press('Enter')
-  await page.waitForURL('**/areas/dayu')
-  await waitForArea(page, '大峪街道')
-  console.log('PASS live road, elevation and satellite imagery, district mask at 2D/3D and after pan/resize, zoom/reset and map pin drill-down')
 }
 
 async function verifyAs(page, name) {
@@ -298,21 +79,18 @@ try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
   page.setDefaultTimeout(15_000)
   page.on('pageerror', error => errors.push(error.message))
-  let blockedBasemapRequests = 0
-  await page.route(`${basemapOrigin}/**`, route => {
-    blockedBasemapRequests++
+  const externalMapRequests = []
+  await page.route(/^https:\/\/(?:tiles\.openfreemap\.org|elevation-tiles-prod\.s3\.amazonaws\.com)\//, route => {
+    externalMapRequests.push(route.request().url())
     return route.abort('failed')
   })
   await page.goto(baseUrl)
   await page.getByRole('heading', { name: '门头沟区数字驾驶舱' }).waitFor()
   await waitForArea(page, '门头沟区')
-  assert.equal(blockedBasemapRequests, 0, 'The homepage model does not contact the tile service')
   await page.getByRole('button', { name: '身份核验' }).waitFor()
   await assertNoHorizontalOverflow(page)
   await page.setViewportSize({ width: 1072, height: 893 })
   await verifyLocalModel(page)
-  await verifyDistrictMap(page)
-  assert.ok(blockedBasemapRequests > 0, 'Offline coverage should exercise an unavailable tile service')
   await verifyRegionMenuLayout(page)
   await page.setViewportSize({ width: 1440, height: 900 })
   await capture(page, 'cockpit-1440.png')
@@ -390,9 +168,9 @@ try {
   await waitForArea(page, '门头沟区')
   await assertNoHorizontalOverflow(page)
   await verifyLocalModel(page)
-  await verifyDistrictMap(page)
   await verifyRegionMenuLayout(page)
-  console.log('PASS offline district map, zoom/reset and stable panel layout at 1072px and 390px')
+  assert.deepEqual(externalMapRequests, [], 'District and regional models use local assets')
+  console.log('PASS local district model, 2D/3D, zoom/reset and stable panel layout at 1072px and 390px')
   await capture(page, 'cockpit-mobile.png')
   await verifyAs(page, /政务服务专项/)
   await page.waitForURL('**/play/public-services')
@@ -413,14 +191,6 @@ try {
   await page.getByRole('button', { name: '身份核验' }).waitFor()
   assert.deepEqual(errors, [])
   console.log('PASS mobile dashboard, specialist routing, private project isolation, logout and no runtime errors')
-
-  if (verifyLiveBasemap) {
-    const onlinePage = await browser.newPage({ viewport: { width: 1440, height: 900 }, reducedMotion: 'reduce' })
-    onlinePage.setDefaultTimeout(15_000)
-    onlinePage.on('pageerror', error => errors.push(error.message))
-    await verifyOnlineDistrictMap(onlinePage)
-    assert.deepEqual(errors, [])
-  }
 } finally {
   await browser.close()
 }

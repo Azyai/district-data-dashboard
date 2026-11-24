@@ -12,8 +12,6 @@ import './cockpit.css'
 
 const AreaIssuesDialog = lazy(() => import('./AreaIssuesDialog'))
 const LocalDistrictModel = lazy(() => import('./LocalDistrictModel'))
-const NavigationMap = lazy(() => import('./NavigationMap'))
-const TerrainView = lazy(() => import('./TerrainView'))
 const VoiceAssistant = lazy(() => import('../assistant/VoiceAssistant').then(module => ({ default: module.VoiceAssistant })))
 const district = 'mentougou'
 const areaRefreshMs = 60_000
@@ -92,7 +90,9 @@ function Masthead({ identityControl, topicControl, onAsk }: {
         <h1>门头沟区数字驾驶舱</h1>
       </div>
       <nav className="cockpit-actions" aria-label="驾驶舱工具">
-        <Link to="/admin" className="cockpit-admin-link"><CockpitIcon name="grid" />数据管理</Link>
+        <a href="/admin" target="_blank" rel="noopener noreferrer" title="在新标签页打开数据管理" className="cockpit-admin-link">
+          <CockpitIcon name="grid" />数据管理
+        </a>
         {identityControl}
         {topicControl}
         {onAsk && <button type="button" className="cockpit-ai-link" aria-haspopup="dialog" onClick={onAsk}>
@@ -126,20 +126,21 @@ function AreaBar({ area }: { area: CockpitArea }) {
   )
 }
 
-function RegionModel({ area, onSelectArea, onOpenTwin, onInspect }: {
+function RegionModel({ area, viewMode, onViewModeChange, onSelectArea, onOpenTwin, onInspect }: {
   area: CockpitArea
+  viewMode: '2d' | '3d'
+  onViewModeChange: (mode: '2d' | '3d') => void
   onSelectArea: (areaId: string) => void
   onOpenTwin: (id: TwinId) => void
   onInspect: () => void
 }) {
-  const [showMap, setShowMap] = useState(false)
   const parent = area.breadcrumbs.at(-2)
   const isDistrict = area.level === 'district'
   return (
-    <section className="map-panel" aria-labelledby="area-model" data-map={showMap}>
+    <section className="map-panel" aria-labelledby="area-model">
       <div className="map-toolbar">
         <div className="map-heading">
-          <h2 id="area-model"><CockpitIcon name="layers" />{area.name}{showMap ? '地图' : '模型'}</h2>
+          <h2 id="area-model"><CockpitIcon name="layers" />{area.name}模型</h2>
           {area.children.length > 0 && <span className="map-count">
             {area.children.length} 个{isDistrict ? '镇街' : '村社'}
           </span>}
@@ -161,18 +162,13 @@ function RegionModel({ area, onSelectArea, onOpenTwin, onInspect }: {
               </nav>
             </details>
           )}
-          <button type="button" className="level-up" aria-pressed={showMap} onClick={() => setShowMap(current => !current)}>
-            {showMap ? '返回模型' : isDistrict ? '行政地图' : '区域地图'}
-          </button>
         </div>
       </div>
       <div className="map-plot">
         <div className="district-map-extent">
           <Suspense fallback={<div className="map-wait" role="status">正在加载本地模型</div>}>
-            {showMap ? isDistrict ? <NavigationMap areas={area.children} onSelectArea={onSelectArea} /> : (
-              <TerrainView key={area.id} areaId={area.id} areaName={area.name} level={area.level} areas={area.children}
-                onSelectArea={onSelectArea} />
-            ) : <LocalDistrictModel area={area} onSelectArea={onSelectArea} onOpenTwin={onOpenTwin} />}
+        <LocalDistrictModel area={area} viewMode={viewMode} onViewModeChange={onViewModeChange}
+          onSelectArea={onSelectArea} onOpenTwin={onOpenTwin} />
           </Suspense>
         </div>
       </div>
@@ -192,18 +188,19 @@ export default function Cockpit({ identityControl, topicControl, onTopicQuestion
   const navigate = useNavigate()
   const client = useQueryClient()
   const [overlay, setOverlay] = useState<'assistant' | 'issues' | null>(
-    () => location.hash === '#voice-assistant' ? 'assistant' : null,
+    () => location.hash === '#voice-assistant' ? 'assistant' : location.hash === '#area-issues' ? 'issues' : null,
   )
   const [assistantOpened, setAssistantOpened] = useState(() => location.hash === '#voice-assistant')
-  const [issuesOpened, setIssuesOpened] = useState(false)
+  const [issuesOpened, setIssuesOpened] = useState(() => location.hash === '#area-issues')
   const [highlightedSignal, setHighlightedSignal] = useState<string>()
+  const [viewMode, setViewMode] = useState<'2d' | '3d'>('3d')
   const heading = useRef<HTMLDivElement>(null)
   const lastArea = useRef(areaId)
   const zone = useQuery({ ...areaQuery(areaId), refetchInterval: areaRefreshMs })
   const area = zone.data
 
   useEffect(() => {
-    if (location.hash === '#voice-assistant') {
+    if (location.hash === '#voice-assistant' || location.hash === '#area-issues') {
       void navigate({ pathname: location.pathname, search: location.search }, { replace: true })
     }
   }, [location.hash, location.pathname, location.search, navigate])
@@ -292,7 +289,8 @@ export default function Cockpit({ identityControl, topicControl, onTopicQuestion
             <div ref={heading} className="area-focus" tabIndex={-1} aria-label={area.name}><AreaBar area={area} /></div>
 
             <div className="cockpit-main">
-              <RegionModel area={area} onInspect={openIssues} onSelectArea={id => { void navigate(areaPath(id)) }}
+              <RegionModel area={area} viewMode={viewMode} onViewModeChange={setViewMode}
+                onInspect={openIssues} onSelectArea={id => { void navigate(areaPath(id)) }}
                 onOpenTwin={id => { void navigate(twinPath(id), { state: { backArea: area.id } }) }} />
             </div>
           </>
