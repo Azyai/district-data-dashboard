@@ -32,7 +32,7 @@ public final class DemoCockpitService {
     private static final List<String> CATEGORIES = List.of("市容环境", "道路交通", "公共设施", "社区治理", "其他");
     private static final List<Integer> CATEGORY_PERCENTAGES = List.of(32, 23, 19, 16, 10);
     private static final String GOVERNANCE_EVENTS = "governance-events";
-    static final List<BaselineMetric> BASELINE = List.of(
+    private static final List<BaselineMetric> BASELINE = List.of(
             new BaselineMetric(GOVERNANCE_EVENTS, "治理事件受理", "件", DailyTotals::events),
             new BaselineMetric("completion-rate", "事件办结率", "%",
                     total -> percentage(total.closedEvents(), total.events())),
@@ -100,7 +100,7 @@ public final class DemoCockpitService {
         return new ChildArea(area.id(), area.name(), area.level(), area.x(), area.z());
     }
 
-    record BaselineMetric(String id, String label, String unit, ToDoubleFunction<DailyTotals> measure) {
+    private record BaselineMetric(String id, String label, String unit, ToDoubleFunction<DailyTotals> measure) {
         Metric read(List<DailyTotals> week) {
             List<BigDecimal> series = week.stream().mapToDouble(measure).mapToObj(BigDecimal::valueOf).toList();
             BigDecimal latest = series.getLast();
