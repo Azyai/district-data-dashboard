@@ -13,3 +13,9 @@
   border: 0;
   max-width: none;
 }
+.scope-surface { width: 100%; height: 100%; }
+.scope-feedback { position: absolute; inset: 0; display: grid; place-content: center; color: #deebff; text-align: center; }
+.scope-feedback p { margin: 0; }
+.scope-feedback-pending p, .scope-feedback-pending > div { background: #111b2efa; border: 1px solid #435371; border-radius: .5rem; padding: .55rem .9rem; }
+.scope-feedback small { display: block; color: #a9bad0; margin-top: .1rem; }
+.scope-feedback :is(button,a) { margin: .35rem; color: #9ad8fa; cursor: pointer; }

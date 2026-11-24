@@ -3,17 +3,18 @@ import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router'
 import type { CockpitArea } from '../../api/client'
 import { economyFor, populationFor, townIdOf, towns } from './screenData'
-import { screens, type ScreenId } from './screenCatalog'
+import { screens } from './screenCatalog'
 import referenceCss from './reference/reference.css?inline'
 import './core-screens.css'
 
 export type CoreScreenProps = {
-  screen: Exclude<ScreenId, 'overview'>
+  screen: 'population' | 'governance' | 'economy'
   area: CockpitArea
   onAreaChange: (id: string) => void
 }
 
 type ReferenceView = {
+  updateScope: (next: ReturnType<typeof sceneContext>, render: () => void) => void
   markup: () => string
   effect?: () => () => void
   onButton?: (target: HTMLButtonElement, render: (focus?: string) => void) => void
@@ -84,15 +85,16 @@ function Scene({ doc, createView, area, onAreaChange }: SceneProps & { createVie
   const [failed, setFailed] = useState(false)
   const { search, hash } = useLocation()
   const section = new URLSearchParams(search).get('section') ?? hash.substring(1)
+  const sync = useRef<(next: ReturnType<typeof sceneContext>) => void>(() => {})
   const changeArea = useRef(onAreaChange)
   useLayoutEffect(() => { changeArea.current = onAreaChange }, [onAreaChange])
   useLayoutEffect(() => {
     const content = mount.current!
     const dialog = doc.querySelector<HTMLDialogElement>('#details')!
-    const context = sceneContext(doc, area, id => changeArea.current(id), section)
     let stopEffect: (() => void) | undefined
-    let view: ReferenceView
+    let view: ReferenceView | undefined
     function render(focus?: string) {
+      if (!view) return
       stopEffect?.()
       content.innerHTML = view.markup()
       stopEffect = view.effect?.()
@@ -100,21 +102,26 @@ function Scene({ doc, createView, area, onAreaChange }: SceneProps & { createVie
     }
     function onClick(event: MouseEvent) {
       const target = (event.target as Element).closest<HTMLButtonElement>('button')
-      if (!target) return
+      if (!target || !view) return
       if (target.dataset.analysis) view.insights?.[target.dataset.analysis]?.()
       else if (target.dataset.project !== undefined) view.onProject?.(Number(target.dataset.project))
       else if (content.contains(target)) view.onButton?.(target, render)
     }
     function onChange(event: Event) {
       const field = (event.target as HTMLElement).dataset.insightField
-      if (field) view.onField?.(field)
+      if (field) view?.onField?.(field)
     }
-    try {
-      view = createView(context)
-      render()
-    } catch {
-      setFailed(true)
-      return
+    sync.current = context => {
+      try {
+        dialog.close()
+        if (view) view.updateScope(context, render)
+        else {
+          view = createView(context)
+          render()
+        }
+      } catch {
+        setFailed(true)
+      }
     }
     doc.addEventListener('click', onClick)
     doc.addEventListener('change', onChange)
@@ -125,6 +132,9 @@ function Scene({ doc, createView, area, onAreaChange }: SceneProps & { createVie
       doc.removeEventListener('change', onChange)
       content.replaceChildren()
     }
+  }, [createView, doc])
+  useLayoutEffect(() => {
+    sync.current(sceneContext(doc, area, id => changeArea.current(id), section))
   }, [area, createView, doc, section])
   return failed ? <FrameMessage failed /> : <div className="reference-artwork" ref={mount} />
 }
