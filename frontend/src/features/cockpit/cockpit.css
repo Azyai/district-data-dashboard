@@ -1,18 +1,14 @@
 .cockpit {
   --page-ground: #080f1c;
-  --panel-ground: #0d192d;
-  --panel-line: #283e61;
   --panel-accent: #88defa;
   --text-main: #eef7ff;
   --text-secondary: #a7bedb;
-  --amber: #ffcf91;
   --local-gutter: clamp(1rem, 2.2vw, 4.5rem);
-  --panel-gap: clamp(.8rem, 1.25vw, 2rem);
   --cockpit-font-size: 15px;
   min-height: 100svh;
   color: var(--text-main);
   background:
-    radial-gradient(ellipse 68% 54% at 50% -.5%, #254e8473 0%, #152844 31%, transparent 72%),
+    radial-gradient(ellipse 68% 54% at 50% -.5%, #2a445e70 0%, #172537 31%, transparent 72%),
     var(--page-ground);
   font-size: var(--cockpit-font-size);
 }
@@ -86,7 +82,7 @@
 .brand-symbol i:nth-child(3) { height: 65%; opacity: .83; }
 
 .cockpit-actions { justify-content: flex-end; flex-wrap: wrap; gap: .55em; }
-.cockpit-ai-link, .cockpit-admin-link, .level-up, .region-picker > summary, .issue-link,
+.cockpit-ai-link, .cockpit-admin-link, .cockpit-topic-link, .level-up, .region-picker > summary,
 .cockpit-actions .identity-button.ant-btn {
   display: inline-flex;
   min-height: 2.85em;
@@ -120,25 +116,26 @@
 .cockpit-admin-link:hover { color: var(--text-main); background: #172943; border-color: #36547e; }
 .cockpit-admin-link .cockpit-icon { color: #a6bff3; }
 
-.cockpit-actions .identity-button.ant-btn, .level-up, .region-picker > summary, .issue-link {
+.cockpit-actions .identity-button.ant-btn, .cockpit-topic-link, .level-up, .region-picker > summary {
   color: var(--text-main);
   border: 1px solid #3a5479;
   background: #142641;
   box-shadow: inset 0 1px #ffffff0e;
 }
 
-.cockpit-actions .identity-button.ant-btn:hover, .level-up:hover, .region-picker > summary:hover, .issue-link:hover,
+.cockpit-actions .identity-button.ant-btn:hover, .cockpit-topic-link:hover,
+.cockpit-topic-link[aria-expanded="true"], .level-up:hover, .region-picker > summary:hover,
 .region-picker[open] > summary {
   color: var(--panel-accent);
   border-color: #6c9bc7;
   background: #1a3457;
 }
 
-.cockpit-actions button:active, .level-up:active, .region-picker > summary:active, .issue-link:active {
+.cockpit-actions button:active, .level-up:active, .region-picker > summary:active {
   box-shadow: inset 0 2px 5px #03091475;
 }
 
-.cockpit-body { width: min(100%, 256rem); margin-inline: auto; padding-inline: var(--local-gutter); padding-bottom: 1.5em; }
+.cockpit-body { width: min(100%, 256rem); margin-inline: auto; padding-inline: var(--local-gutter); padding-bottom: .6em; }
 .area-focus { scroll-margin-top: 1rem; }
 .area-focus:focus { outline: none; }
 .area-bar {
@@ -182,211 +179,71 @@
 .data-status::before { content: ""; width: .45em; height: .45em; flex: 0 0 auto; border-radius: 50%; background: #a3bfff; }
 .update-label { margin-left: .24em; }
 
-.cockpit-main {
-  --rail-left: clamp(11.5rem, 19%, calc(18 * var(--cockpit-font-size)));
-  --rail-right: clamp(14rem, 24%, calc(20 * var(--cockpit-font-size)));
-  position: relative;
-  isolation: isolate;
-  display: grid;
-  grid-template-columns: var(--rail-left) minmax(0, 1fr) var(--rail-right);
-  grid-template-rows: auto minmax(0, 1fr);
-}
 
-.key-metrics, .map-panel, .signals-panel, .supporting-metrics, .cockpit-trend, .distribution-panel {
-  min-width: 0;
-  border: 1px solid var(--panel-line);
-  border-radius: 12px;
-  background: var(--panel-ground);
-  box-shadow: 0 9px 27px #03071330;
-}
-
-.cockpit-rail {
-  z-index: 2;
-  grid-row: 2;
-  align-self: start;
-  display: grid;
-  gap: var(--panel-gap);
-  min-width: 0;
-  margin: .9em .65em;
-}
-.cockpit-primary { grid-column: 1; margin-inline-start: .9em; --chart-flyout-width: min(18rem, calc(var(--rail-left) - 2.45em)); }
-.cockpit-brief { grid-column: 3; margin-inline-end: .9em; --chart-flyout-width: min(18rem, calc(var(--rail-right) - 2.45em)); }
-.cockpit-rail > section {
-  border-color: #355478;
-  background: linear-gradient(150deg, #142741f7, #0a1628f3 73%);
-  box-shadow: 0 .65em 1.6em #030b19a1, inset 0 1px #acdcff1b;
-  backdrop-filter: blur(9px);
-}
-
-.key-metrics {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.metrics-heading {
-  display: flex;
-  align-items: center;
-  gap: .48em;
-  color: #f0f6ff;
-  font-size: 1.02em;
-  line-height: 1.2;
-  font-weight: 720;
-  margin: 0;
-  padding: 1em 1.03em .48em;
-}
-.metrics-heading .cockpit-icon { color: var(--panel-accent); }
-
-.cockpit-metrics { display: grid; margin: 0; min-width: 0; }
-.key-metrics .cockpit-metrics { flex: 1; grid-auto-rows: minmax(min-content, 1fr); }
-.cockpit-metric {
-  --metric-tone: #79d9f5;
-  --metric-wash: #75d5f113;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: end;
-  align-content: center;
-  gap: .37em;
-  min-width: 0;
-}
-
-.cockpit-metric[data-metric="service-cases"] { --metric-tone: #a7bdff; --metric-wash: #a7bdff13; }
-.cockpit-metric[data-metric="air-quality-rate"] { --metric-tone: #8fefdc; --metric-wash: #8fefdc12; }
-.cockpit-metric[data-metric="active-alerts"] { --metric-tone: var(--amber); --metric-wash: #ffcf9114; }
-.key-metrics .cockpit-metric {
-  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
-  align-items: baseline;
-  min-height: 5.05em;
-  gap: .35em .4em;
-  padding: .52em 1.02em .52em;
-  background: radial-gradient(ellipse at -14% 53%, var(--metric-wash), transparent 84%);
-}
-
-.key-metrics .cockpit-metric + .cockpit-metric { border-top: 1px solid var(--panel-line); }
-.key-metrics .cockpit-metric dt, .key-metrics .metric-missing { grid-column: 1 / -1; }
-.key-metrics .metric-delta { justify-self: end; text-align: end; }
-.cockpit-metric dt {
-  display: flex;
-  align-items: center;
-  gap: .51em;
-  overflow-wrap: anywhere;
-  color: var(--text-secondary);
-  font-size: .88em;
-  font-weight: 625;
-  line-height: 1.25;
-}
-
-.metric-symbol {
-  display: grid;
-  width: 1.73em;
-  height: 1.73em;
-  flex: 0 0 auto;
-  place-items: center;
-  color: var(--metric-tone);
-  background: var(--metric-wash);
-  border: 1px solid color-mix(in srgb, var(--metric-tone) 38%, #19253d);
-  border-radius: 6px;
-}
-
-.metric-symbol .cockpit-icon { width: 1.08em; height: 1.08em; }
-.cockpit-metric dd { margin: 0; min-width: 0; }
-.metric-reading { display: flex; align-items: baseline; flex-wrap: wrap; gap: .38em; }
-.metric-reading strong {
-  overflow-wrap: anywhere;
-  font-family: "Bahnschrift", "Segoe UI", system-ui, sans-serif;
-  font-weight: 665;
-  font-size: 2.78em;
-  line-height: .99;
-  letter-spacing: -.032em;
-  font-variant-numeric: tabular-nums;
-}
-
-.metric-reading span { color: var(--text-secondary); font-size: .8em; }
-.key-metrics .metric-reading strong { font-size: 2.51em; }
-.key-metrics .cockpit-metric[data-metric="active-alerts"] .metric-reading strong { color: var(--amber); }
-.metric-delta { color: var(--metric-tone); font-variant-numeric: tabular-nums; font-size: .76em; line-height: 1.23; }
-.metric-delta[data-flat="true"] { color: var(--text-secondary); }
-.metric-missing { padding-block: .25em; color: var(--text-secondary); font-size: .83em; line-height: 1.3; }
-
+.cockpit-main { position: relative; isolation: isolate; }
 .map-panel {
   position: relative;
   display: grid;
-  grid-column: 1 / -1;
-  grid-row: 1 / 3;
-  grid-template-rows: subgrid;
-  min-height: max(39em, calc(100svh - 9.65em));
-  border-color: #395b8a;
-  background: #0a1728;
-  box-shadow: 0 12px 30px #03071152;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: max(35rem, calc(100svh - 9.05em));
+  border: 1px solid #405666;
+  border-radius: 12px;
+  background: #0a171e;
+  box-shadow: 0 12px 38px #02060e63;
 }
-
-.map-panel::before {
-  position: absolute;
-  z-index: 1;
-  top: -1px;
-  left: 1em;
-  right: 1em;
-  height: 1px;
-  content: "";
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, #78d8f5 38%, #747cf0 67%, transparent);
-}
-
 .map-toolbar {
-  position: relative;
-  z-index: 4;
+  position: absolute;
+  z-index: 7;
+  inset: .95rem 1.05rem auto;
   display: flex;
-  min-height: 3.75em;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: .7em;
-  padding: .56em 1em;
-  border-bottom: 1px solid #324c70;
-  border-radius: 11px 11px 0 0;
-  background: linear-gradient(100deg, #192f4a, #101c30 75%);
+  gap: .55em 1.05em;
+  pointer-events: none;
 }
-
-.map-heading { display: flex; align-items: baseline; flex-wrap: wrap; column-gap: .72em; min-width: 0; }
-.map-toolbar h2, .brief-heading, .trend-heading h2 {
+.map-heading {
+  display: flex;
+  min-height: 2.85em;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .18em .7em;
+  padding: .4em .74em;
+  border: 1px solid #567280;
+  border-radius: 7px;
+  background: #0a171ee8;
+  box-shadow: 0 4px 18px #050d13a8;
+}
+.map-toolbar h2 {
   display: inline-flex;
   align-items: center;
   gap: .48em;
-  font-size: 1.05em;
-  font-weight: 730;
+  font-size: .93em;
+  font-weight: 720;
   line-height: 1.24;
 }
-
-.map-toolbar h2 .cockpit-icon, .brief-heading .cockpit-icon, .trend-heading h2 .cockpit-icon { color: var(--panel-accent); }
-.map-count { color: var(--text-secondary); font-size: .73em; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.map-actions { display: flex; align-items: center; justify-content: end; gap: .42em; }
+.map-toolbar h2 .cockpit-icon { color: #acdbeb; }
+.map-count { color: #b7cbd4; font-size: .76em; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.map-actions { display: flex; align-items: center; justify-content: end; flex-wrap: wrap; gap: .42em; pointer-events: auto; }
 .map-actions .cockpit-icon { color: #a3e5fb; }
+.map-actions :is(.level-up, summary) { background: #0e202bea; border-color: #4d6b7a; box-shadow: 0 3px 12px #050d1366; }
 .map-plot {
+  position: relative;
   display: grid;
-  grid-template: minmax(0, 1fr) / var(--rail-left) minmax(0, 1fr) var(--rail-right);
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-  border-radius: 0 0 11px 11px;
-  background:
-    radial-gradient(ellipse at 50% 44%, #162f4b, #0b182c 64%, #081423),
-    #0b182c;
+  border-radius: inherit;
+  background: #0c1c24;
 }
-
 .district-map-extent {
-  grid-column: 2;
   display: grid;
   grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
 }
-
-.map-panel[data-district="true"] .district-map-extent {
-  grid-column: 1 / -1;
-  --district-map-inset-left: var(--rail-left);
-  --district-map-inset-right: var(--rail-right);
-}
-
+.map-panel[data-map="true"] .map-plot { margin-top: 4rem; border-radius: 0 0 11px 11px; }
 .map-wait { min-height: 280px; display: grid; place-items: center; color: var(--text-secondary); }
-.region-picker { position: relative; z-index: 7; }
+.region-picker { position: relative; }
 .region-picker > summary { list-style: none; gap: .48em; }
 .region-picker > summary::-webkit-details-marker { display: none; }
 .region-picker > summary::after {
@@ -398,7 +255,6 @@
   margin-left: .18em;
   transform: translateY(-.1em) rotate(45deg);
 }
-
 .region-picker[open] > summary::after { transform: translateY(.1em) rotate(225deg); }
 .map-directory {
   position: absolute;
@@ -413,202 +269,65 @@
   overscroll-behavior: contain;
   padding: .55em;
   border: 1px solid #587caa;
-  border-radius: 10px;
+  border-radius: 8px;
   color: var(--text-main);
-  background: #122340;
+  background: #122436;
   box-shadow: 0 .8em 1.9em #020713b0;
   scrollbar-color: #557ba6 #142640;
 }
-
 .map-directory a {
   display: flex;
   align-items: center;
   min-height: max(2.8em, 2.5rem);
   padding: .35em .6em;
-  border-radius: 6px;
+  border-radius: 5px;
   font-size: .88em;
   line-height: 1.28;
 }
-
 .map-directory a:hover, .map-directory a:focus-visible { color: #e7f9ff; background: #234269; }
 .map-directory a:focus-visible { outline-offset: -2px; }
-
-.brief-bar, .trend-heading { display: flex; align-items: center; justify-content: space-between; gap: .55em; }
-.attention-count {
-  color: var(--amber);
-  font-size: .74em;
-  font-weight: 620;
-  padding: .26em .57em;
-  border: 1px solid #815e42;
-  border-radius: 6px;
-  background: #362b29;
-  white-space: nowrap;
-}
-
-.signals-panel { padding: .85em .92em; }
-.signals { list-style: none; padding: 0; margin: .65em 0 .4em; max-height: 10em; overflow-y: auto; }
-.signals li + li { margin-top: .4em; }
-.signal-title {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
-  width: 100%;
-  min-height: max(2.9em, 2.5rem);
-  align-items: center;
-  gap: .52em;
-  padding: .45em .57em;
-  text-align: start;
-  color: var(--text-main);
-  border: 1px solid #4b4140;
-  border-radius: 7px;
-  background: linear-gradient(100deg, #332b2e, #1b263a);
-  font-size: .86em;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.signal-title:hover { color: #ffe5c4; border-color: #896b4f; }
-.signal-title time { color: var(--text-secondary); font-size: .91em; font-weight: 550; font-variant-numeric: tabular-nums; }
-.signal-dot { width: .45em; height: .45em; border-radius: 50%; background: var(--amber); }
-.signal-empty { padding-block: .74em .6em; color: var(--text-secondary); font-size: .84em; }
-.issue-link { color: var(--panel-accent); font-size: .81em; min-height: 2.6em; }
-.issue-link .cockpit-icon { width: 1.05em; height: 1.05em; }
-
-.supporting-metrics { padding: .82em .92em .45em; }
-.supporting-metrics .brief-heading { font-size: .96em; }
-.supporting-metrics .cockpit-metrics {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.cockpit-state {
+  display: flex;
+  flex-direction: column;
   align-items: start;
-  max-height: 15.5em;
-  overflow-y: auto;
-  scrollbar-color: #55769c transparent;
-  margin-top: .57em;
-  gap: .24em .7em;
+  min-height: 18rem;
+  gap: .8rem;
+  padding: 2em 0;
 }
-
-.supporting-metrics .cockpit-metric { padding: .7em 0 .66em; }
-.supporting-metrics .cockpit-metric:nth-child(n+3) { border-top: 1px solid #2a4161; }
-.supporting-metrics .metric-reading strong { font-size: 1.58em; letter-spacing: -.02em; }
-.supporting-metrics .metric-delta { font-size: .72em; }
-.supporting-metrics dt { font-size: .79em; }
-
-.cockpit-trend {
-  display: flex;
-  flex-direction: column;
-  block-size: 15.55em;
-}
-
-.trend-heading { flex-wrap: wrap; padding: .76em .92em .35em; }
-.trend-heading h2 { font-size: .96em; }
-.trend-heading span {
-  color: var(--text-secondary);
-  font-size: .78em;
-  font-variant-numeric: tabular-nums;
-  padding: .25em .54em;
-  border: 1px solid #3a5377;
-  border-radius: 6px;
-  background: #162745;
-  white-space: nowrap;
-}
-
-.cockpit-trend[data-empty="true"] { block-size: auto; }
-.trend-empty { padding: .5em 1.05em .9em; color: var(--text-secondary); font-size: .84em; }
-.distribution-panel {
-  display: flex;
-  flex-direction: column;
-  min-block-size: 17.7em;
-}
-.chart-panel-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: .65em;
-  padding: .78em .94em .38em;
-}
-.chart-panel-heading span { color: var(--text-secondary); font-size: .74em; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.chart-chooser {
-  display: flex;
-  flex-wrap: wrap;
-  gap: .28em;
-  width: fit-content;
-  margin: .14em .83em .21em;
-  padding: .23em;
-  border: 1px solid #314d72;
-  border-radius: 7px;
-  background: #0e1b30;
-}
-.chart-chooser button {
-  min-height: 1.84rem;
-  padding: .29em .61em;
-  border: 1px solid transparent;
-  border-radius: 5px;
-  color: #b4c9e7;
-  font-size: max(.75em, 11px);
-  line-height: 1.2;
-  cursor: pointer;
-}
-.chart-chooser button:hover { color: #dcf5ff; background: #183451; }
-.chart-chooser button[aria-pressed="true"] { color: #e0f5ff; border-color: #567eb0; background: #244366; }
-.chart-chooser button:focus-visible { outline-offset: 1px; }
-.cockpit-main :is(.distribution-panel, .cockpit-trend) .data-chart { flex: 1; min-height: 0; }
-.distribution-panel .data-chart-frame { min-height: 12.65em; }
-
-.cockpit-empty { padding: 1em; color: var(--text-secondary); }
-.cockpit-state { display: flex; flex-direction: column; align-items: start; min-height: 18rem; gap: .8rem; padding: 2em 0; }
 .cockpit-state p { color: var(--text-secondary); }
 
 @media (min-width: 100rem) {
   .cockpit { --cockpit-font-size: clamp(16px, .86vw, 31px); }
 }
-
-@media (max-width: 57rem) {
-  .cockpit-main { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: auto; gap: var(--panel-gap); }
-  .map-panel { grid-row: auto; grid-template-rows: auto minmax(0, 1fr); min-height: clamp(23.5rem, 54svh, 38rem); }
-  .map-plot { grid-template-columns: minmax(0, 1fr); }
-  .district-map-extent { grid-column: 1; }
-  .map-panel[data-district="true"] .district-map-extent {
-    --district-map-inset-left: 0px;
-    --district-map-inset-right: 0px;
-  }
-  .cockpit-rail { grid-row: auto; margin: 0; }
-  .cockpit-brief { grid-column: 2; }
-  .cockpit-primary, .cockpit-brief { --chart-flyout-width: min(19rem, calc(100vw - 3rem)); }
-}
-
 @media (max-width: 56rem) {
   .cockpit { --cockpit-font-size: 14px; }
   .masthead-name h1 { font-size: 1.78em; }
-  .map-count { display: none; }
 }
-
 @media (max-width: 46rem) {
-  .cockpit-masthead { flex-wrap: wrap; gap: .7em; padding-block: .85em; }
+  .cockpit-masthead { flex-wrap: wrap; gap: .6em; padding-block: .75em; }
   .masthead-name { width: 100%; }
-  .masthead-name h1 { font-size: 1.53em; text-wrap: initial; }
+  .masthead-name h1 { font-size: 1.53em; }
   .cockpit-actions { justify-content: flex-start; }
-  .area-bar { min-height: 3.25em; gap: .45em; }
-  .area-meta { gap: .46em; }
-  .cockpit-main { grid-template-columns: minmax(0, 1fr); }
-  .cockpit-rail { grid-column: 1; }
-  .key-metrics .cockpit-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .key-metrics .cockpit-metric { grid-template-columns: minmax(0, 1fr); min-height: 5.35em; }
-  .key-metrics .metric-delta { justify-self: start; text-align: start; }
-  .key-metrics .cockpit-metric:nth-child(-n+2) { border-top: 0; }
-  .key-metrics .cockpit-metric:nth-child(odd) { border-left: 0; }
-  .key-metrics .cockpit-metric:nth-child(n+3) { border-top: 1px solid var(--panel-line); }
-  .map-panel { min-height: 24rem; }
-  .map-toolbar { padding-inline: .8em; }
-  .map-plot { min-height: 18rem; }
-  .supporting-metrics .cockpit-metrics { max-height: none; }
-  .supporting-metrics .cockpit-metric { padding-block: .55em; }
+  .area-bar { min-height: 3.25em; gap: .35em; }
+  .area-meta { gap: .42em; }
+  .map-panel { min-height: max(29rem, calc(100svh - 12rem)); }
+  .map-toolbar { inset: .65rem .6rem auto; }
+  .map-heading { padding-inline: .5em; align-self: flex-start; }
+  .map-count { display: none; }
+  .map-actions { gap: .26em; }
+  .map-actions :is(.level-up, summary) { padding-inline: .54em; }
+  .map-actions .cockpit-icon { display: none; }
 }
-
 @media (pointer: coarse) {
-  .cockpit-brand, .cockpit-ai-link, .cockpit-admin-link, .level-up,
-  .region-picker > summary, .map-directory a, .signal-title, .issue-link,
-  .cockpit-actions .identity-button.ant-btn, .chart-chooser button { min-height: 44px; }
+  .cockpit-brand, .cockpit-ai-link, .cockpit-admin-link, .cockpit-topic-link, .level-up,
+  .region-picker > summary, .map-directory a,
+  .cockpit-actions .identity-button.ant-btn { min-height: 44px; }
   .cockpit-brand { min-width: 44px; }
 }
-
-@media (max-width: 23rem) {
-  .map-panel { min-height: 21.5rem; }
+@media (max-width: 25rem) {
+  .cockpit { --local-gutter: .7rem; }
+  .map-actions { gap: .18em; max-width: 64%; }
+  .map-actions :is(.level-up, summary) { padding-inline: .38em; }
+  .map-directory { right: -2rem; }
+  .map-panel[data-map="true"] .map-plot { margin-top: 5rem; }
 }
