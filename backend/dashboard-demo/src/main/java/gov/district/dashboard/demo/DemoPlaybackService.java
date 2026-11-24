@@ -44,7 +44,30 @@ public final class DemoPlaybackService {
                             ranking("service-category-volume", "热门事项类型", "件", "ring"))),
             "services-snapshot-1", "SERVICE_VIEWER");
 
-    private static final List<Project> PROJECTS = List.of(CITY, SERVICES);
+    private static final List<Project> PUBLIC_TOPICS = List.of(
+            topic("population", "人口专题", "查看常住人口规模、年龄结构与近期变化。",
+                    topicKpi("resident-total", "常住人口", "人", 180),
+                    topicKpi("working-age-rate", "劳动年龄人口占比", "%", 426),
+                    topicKpi("older-rate", "65 岁及以上人口占比", "%", 672),
+                    topicChart("age-structure", "年龄结构", "人", "network", 550, 180, 820, 720),
+                    topicTrend("population-trend", "近 6 个月常住人口", "人", "line"),
+                    topicChart("household-structure", "家庭户规模分布", "户", "ring", 1442, 545, 430, 355)),
+            topic("hotline", "接诉即办", "查看诉求受理、办理进度与高频事项。",
+                    topicKpi("requests-total", "诉求受理", "件", 180),
+                    topicKpi("resolved-rate", "诉求办结率", "%", 426),
+                    topicKpi("pending-requests", "待办理诉求", "件", 672),
+                    topicChart("requests-by-type", "高频诉求", "件", "network", 550, 180, 820, 720),
+                    topicTrend("requests-trend", "近 7 日受理量", "件", "bar"),
+                    topicChart("requests-status", "办理进度", "件", "ring", 1442, 545, 430, 355)),
+            topic("water", "水务专题", "查看供水情况、监测达标情况与供水结构。",
+                    topicKpi("daily-water", "日供水量", "万立方米", 180),
+                    topicKpi("water-compliance", "出厂水检测达标率", "%", 426),
+                    topicKpi("active-stations", "在线监测站", "座", 672),
+                    topicChart("water-network-quality", "监测点达标率", "%", "radar", 550, 180, 820, 720),
+                    topicTrend("water-trend", "近 7 日供水量", "万立方米", "line"),
+                    topicChart("water-mix", "供水用途分布", "万立方米", "bar", 1442, 545, 430, 355)));
+    private static final List<Project> PROJECTS = java.util.stream.Stream.concat(
+            java.util.stream.Stream.of(CITY, SERVICES), PUBLIC_TOPICS.stream()).toList();
 
     private final DemoObservationMapper observations;
     private final DashboardReleaseService releases;
@@ -68,9 +91,21 @@ public final class DemoPlaybackService {
         return liveProject(visibleProject(viewer, projectId)).manifest();
     }
 
+    public Manifest publicManifest(String projectId) {
+        return liveProject(publicTopic(projectId)).manifest();
+    }
+
+    public BatchQueryResult publicSnapshot(String projectId, String releaseId) {
+        Project active = liveProject(publicTopic(projectId));
+        return queryRelease(active, releaseId, active.manifest().components().stream().map(Component::id).toList());
+    }
+
     public BatchQueryResult query(CurrentIdentity viewer, String projectId, String releaseId,
                                   List<String> componentIds) {
-        Project project = liveProject(visibleProject(viewer, projectId));
+        return queryRelease(liveProject(visibleProject(viewer, projectId)), releaseId, componentIds);
+    }
+
+    private BatchQueryResult queryRelease(Project project, String releaseId, List<String> componentIds) {
         if (!project.manifest().releaseId().equals(releaseId)) {
             throw new ApiFailure(ApiCode.RELEASE_CONFLICT);
         }
@@ -133,7 +168,15 @@ public final class DemoPlaybackService {
     }
 
     private static Project project(String projectId) {
-        return PROJECTS.stream()
+        return findProject(PROJECTS, projectId);
+    }
+
+    private static Project publicTopic(String projectId) {
+        return findProject(PUBLIC_TOPICS, projectId);
+    }
+
+    private static Project findProject(List<Project> projects, String projectId) {
+        return projects.stream()
                 .filter(project -> project.manifest().projectId().equals(projectId))
                 .findFirst()
                 .orElseThrow(() -> new ApiFailure(ApiCode.PROJECT_NOT_FOUND));
@@ -169,6 +212,24 @@ public final class DemoPlaybackService {
 
     private static Component component(String metricId, String title, String type, String unit, Geometry geometry) {
         return new Component(metricId, title, type, metricId, unit, geometry);
+    }
+
+    private static Project topic(String id, String title, String description, Component... components) {
+        return new Project(new Manifest(1, id, id + "-release-1", title, description, id, CANVAS,
+                List.of(components)), id + "-snapshot-1", "DISTRICT_VIEWER");
+    }
+
+    private static Component topicKpi(String id, String title, String unit, int y) {
+        return component(id, title, "kpi", unit, new Geometry(48, y, 430, 170, 2));
+    }
+
+    private static Component topicTrend(String id, String title, String unit, String style) {
+        return new Component(id, title, "trend", id, unit, new Geometry(1442, 180, 430, 315, 2), style);
+    }
+
+    private static Component topicChart(String id, String title, String unit, String style,
+                                        int x, int y, int width, int height) {
+        return new Component(id, title, "ranking", id, unit, new Geometry(x, y, width, height, 2), style);
     }
 
     private record Project(Manifest manifest, String snapshotId, String requiredRole) {
