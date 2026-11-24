@@ -1,22 +1,23 @@
 import { skipToken, useQuery } from '@tanstack/react-query'
-import { Modal, Spin } from 'antd'
+import { Spin } from 'antd'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router'
 import { ApiError, dashboardApi, type ComponentData, type Manifest } from '../../api/client'
 import { useMicrophone } from '../assistant/useMicrophone'
 import { interpretCockpitIntent } from '../assistant/intent'
-import { ScreenCanvas } from '../playback/ScreenCanvas'
+import { ScreenComponentContent } from '../playback/ScreenCanvas'
 import { analyzeTopic } from './topicInsight'
-import { asksForInsight, matchTopics, topicFor, topics, type TopicId } from './topicCatalog'
+import { asksForInsight, matchTopics, topicFor, topicPath, topics, type TopicId } from './topicCatalog'
 import './topics.css'
 
 const formatDate = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeZone: 'Asia/Shanghai' })
 const activateByVoice = /^(?:请|帮我)?(?:打开|切换|看|查看|显示|进入)/
-const closeByVoice = /^(?:请|帮我)?(?:返回|回到|关闭)(?:首页|总览|地图|专题|驾驶舱)[。！]?$/u
+const closeByVoice = /^(?:请|帮我)?(?:返回|回到|关闭)(首页|总览|地图|专题|驾驶舱|工作台)[。！]?$/u
 
 type TopicProps = {
   topicId: TopicId
   initialQuestion: string
-  onClose: () => void
+  onNavigate: (path: string) => void
   onSelect: (id: TopicId, question?: string) => void
 }
 
@@ -25,7 +26,7 @@ function topicTimestamp(value: string) {
   return Number.isNaN(date.getTime()) ? '时间待更新' : formatDate.format(date)
 }
 
-function TopicConversation({ manifest, snapshot, initialQuestion, onClose, onSelect }: TopicProps & {
+function TopicConversation({ manifest, snapshot, initialQuestion, onNavigate, onSelect }: TopicProps & {
   manifest: Manifest
   snapshot: ComponentData
 }) {
@@ -56,14 +57,19 @@ function TopicConversation({ manifest, snapshot, initialQuestion, onClose, onSel
     if (!text) return
     if (microphone.active) microphone.cancel()
     stopReading()
-    if (closeByVoice.test(text)) return onClose()
+    const departure = closeByVoice.exec(text)?.[1]
+    if (departure) return onNavigate(departure === '工作台' || departure === '专题' ? '/workbench' : '/')
     if (!locations.data) {
-      setNotice(locations.isError ? '区域目录暂不可用，请关闭专题后重试。' : '区域目录加载中，请稍候。')
+      setNotice(locations.isError ? '区域目录暂不可用，请稍后重试。' : '区域目录加载中，请稍候。')
       return
     }
     const scope = interpretCockpitIntent(text, 'mentougou', locations.data, command => matchTopics(command).length > 0)
     if (scope.kind === 'clarify' && scope.reason !== 'missing-navigation-target') {
       setNotice(scope.message)
+      return
+    }
+    if (scope.kind === 'navigate' || scope.kind === 'problems') {
+      onNavigate('/data/areas/' + encodeURIComponent(scope.areaId) + (scope.kind === 'problems' ? '#area-issues' : ''))
       return
     }
     if ('areaId' in scope && scope.areaId !== 'mentougou') {
@@ -111,7 +117,7 @@ function TopicConversation({ manifest, snapshot, initialQuestion, onClose, onSel
       {insight && (
         <section className="topic-insight" aria-label="专题分析">
           <header>
-            <h3>专题分析</h3>
+            <h2>专题分析</h2>
             <button type="button" onClick={() => { setRequest(''); setNotice(''); stopReading() }}>收起分析</button>
           </header>
           <p role="status">{insight.text}</p>
@@ -141,11 +147,11 @@ function TopicConversation({ manifest, snapshot, initialQuestion, onClose, onSel
 }
 
 function TopicContent(props: TopicProps) {
-  const { topicId, onSelect } = props
+  const { topicId } = props
   const manifestQuery = useQuery({
     queryKey: ['public-topic-manifest', topicId],
     queryFn: ({ signal }) => dashboardApi.topicManifest(topicId, signal),
-    refetchInterval: 10_000,
+    staleTime: 60_000,
   })
   const manifest = manifestQuery.data
   const releaseId = manifest?.releaseId
@@ -157,13 +163,8 @@ function TopicContent(props: TopicProps) {
   const error = manifestQuery.error ?? snapshotQuery.error
   return (
     <div className="topic-stage" data-topic={topicId}>
-      <div className="topic-nav">
-        <nav aria-label="切换专题">
-          {topics.map(topic => (
-            <button key={topic.id} type="button" aria-current={topic.id === topicId ? 'page' : undefined}
-              onClick={() => onSelect(topic.id)}>{topic.title}</button>
-          ))}
-        </nav>
+      <div className="topic-section-heading">
+        <h1 id="topic-title" tabIndex={-1}>{topicFor(topicId)?.title}</h1>
         <p>门头沟区全区 <span>模拟数据</span>{snapshot && <time dateTime={snapshot.updatedAt}>{topicTimestamp(snapshot.updatedAt)}</time>}</p>
       </div>
       {error ? (
@@ -176,7 +177,7 @@ function TopicContent(props: TopicProps) {
         </div>
       ) : manifest && snapshot ? (
         <>
-          <ScreenCanvas manifest={manifest} snapshot={snapshot} />
+          <TopicReadings manifest={manifest} snapshot={snapshot} />
           <TopicConversation key={topicId + ':' + props.initialQuestion} {...props} manifest={manifest} snapshot={snapshot} />
         </>
       ) : <div className="topic-state" aria-live="polite" aria-busy="true"><Spin /><span>正在读取专题</span></div>}
@@ -184,12 +185,55 @@ function TopicContent(props: TopicProps) {
   )
 }
 
-export default function TopicDialog(props: TopicProps) {
-  const title = topicFor(props.topicId)?.title
+function TopicReadings({ manifest, snapshot }: { manifest: Manifest; snapshot: ComponentData }) {
+  const values = new Map(snapshot.results.map(result => [result.componentId, result]))
+  const summaries = manifest.components.filter(component => component.type === 'kpi')
+  const charts = manifest.components.filter(component => component.type !== 'kpi')
+  return <>
+    <section className="topic-summaries" aria-label="核心指标">
+      {summaries.map(component => (
+        <article className="screen-component" key={component.id} data-kind="kpi">
+          <ScreenComponentContent component={component} data={values.get(component.id)} />
+        </article>
+      ))}
+    </section>
+    <section className="topic-charts" aria-label="趋势和结构">
+      {charts.map((component, index) => (
+        <article className="screen-component" key={component.id} data-kind={component.type}>
+          <ScreenComponentContent component={component} data={values.get(component.id)} prominent={index === 0} />
+        </article>
+      ))}
+    </section>
+  </>
+}
+
+export default function TopicPage() {
+  const topic = topicFor(useParams().topicId ?? null)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const question: unknown = location.state?.topicQuestion
+
+  useEffect(() => {
+    document.getElementById('topic-title')?.focus({ preventScroll: true })
+    window.scrollTo(0, 0)
+  }, [topic])
+
+  if (!topic) return <main className="center-state">
+    <h1>专题不存在</h1><Link to="/workbench" className="action-link">返回工作台</Link>
+  </main>
+
   return (
-    <Modal title={title} open centered onCancel={props.onClose} footer={null} width="min(96vw, 108rem)"
-      destroyOnHidden className="topic-dialog" mask={{ closable: false }}>
-      <TopicContent {...props} />
-    </Modal>
+    <main className="topic-page" aria-labelledby="topic-title">
+      <header className="topic-header">
+        <Link className="topic-back" to="/workbench">‹ 工作台</Link>
+        <nav className="topic-nav" aria-label="切换专题">
+          {topics.map(entry => <NavLink key={entry.id} to={topicPath(entry.id)}>{entry.title}</NavLink>)}
+        </nav>
+        <Link className="topic-map-link" to="/">返回地图</Link>
+      </header>
+      <TopicContent key={topic.id} topicId={topic.id} initialQuestion={typeof question === 'string' ? question.slice(0, 160) : ''}
+        onNavigate={path => { void navigate(path) }}
+        onSelect={(id, nextQuestion) => { void navigate(topicPath(id), { state: { topicQuestion: nextQuestion } }) }} />
+    </main>
   )
 }

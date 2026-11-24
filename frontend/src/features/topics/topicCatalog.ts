@@ -6,6 +6,10 @@ export const topics = [
 
 export type TopicId = (typeof topics)[number]['id']
 
+export function topicPath(id: TopicId) {
+  return '/topics/' + id
+}
+
 export function topicFor(id: string | null) {
   return topics.find(topic => topic.id === id)
 }
