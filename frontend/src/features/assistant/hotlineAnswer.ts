@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/react-query'
+import type { CockpitArea } from '../../api/client'
 import { hotlineAnalysis, hotlineSemantics, normalizeHotlineMonth } from '../screens/hotlineApi'
-import type { AssistantReply } from './VoiceAssistant'
+import type { SnapshotAnswer } from './answer'
 
 const number = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 })
 
@@ -10,7 +11,7 @@ export async function queryHotlineAnswer(
   areaId: string,
   signal: AbortSignal,
   month?: string,
-): Promise<AssistantReply> {
+): Promise<{ answer: SnapshotAnswer; scope?: Pick<CockpitArea, 'id' | 'name' | 'updatedAt'> }> {
   signal.throwIfAborted()
   const namedMonth = question.match(/(?:(\d{4})\s*年\s*)?(\d{1,2})\s*月份?/)
   const selectedMonth = namedMonth

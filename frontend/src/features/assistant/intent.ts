@@ -148,7 +148,7 @@ export function interpretCockpitIntent(
   const text = normalize(question).replace(polite, '')
   const byId = new Map(locations.filter((item) => locationId.test(item.id)).map((item) => [item.id, item]))
   const current = byId.get(currentAreaId)
-  if (!text) return { kind: 'clarify', message: '请输入想查看的区域或问题。' }
+  if (!text) return { kind: 'clarify', message: '请说出想查看的区域或问题。' }
   if (!current) return { kind: 'clarify', message: '当前区域不可用，请先从区域目录选择。' }
   if (navigationNegated.test(text)) return { kind: 'clarify', message: '已保留当前区域。可继续查询本区域指标。' }
 
@@ -202,9 +202,12 @@ export function interpretCockpitIntent(
 }
 type ScreenTarget = { screen: ScreenId; name: RegExp }
 const screenTargets: readonly ScreenTarget[] = [
-  { screen: 'overview', name: /全区总览|全域总览|综合总览|总览|全域地图|卫星地图|地图/ },
+  { screen: 'overview', name: /路网监测|路网|道路监测|全区总览|全域总览|综合总览|总览|全域地图|卫星地图|地图/ },
+  { screen: 'grid', name: /网格治理|网格监测|网格/ },
+  { screen: 'waters', name: /水域态势|水域监测|水务专题|水务|水域/ },
+  { screen: 'diagnosis', name: /区域诊断|问题诊断|诊断/ },
   { screen: 'population', name: /(?:镇街|城镇|乡镇|街镇|街道|常住)(?:人口|人数)|人口专题|人口|人数/ },
-  { screen: 'governance', name: /基层治理|政务服务|接诉即办|既诉既办|即诉即办|即诉既办|既速既办|政务|治理专题|治理|热线/ },
+  { screen: 'governance', name: /基层治理|政务服务|接诉即办|既诉既办|即诉即办|即诉既办|既速既办|政务|(?<!网格)治理|热线/ },
   { screen: 'economy', name: /经济发展|经济运行|经济专题|经济/ },
 ]
 const homeTarget = /^(?:(?:全域|全区)(?:的?(?:数据|总览|概览|首页|地图|大屏))?|首页|主页|驾驶舱)(?:页面|页|吧)?$/
@@ -237,7 +240,7 @@ export function interpretScreenIntent(
   const instruction = removeMentions(text, names).replace(currentRef, '').replace(relativeRef, '').replace(opening, '')
   const target = targets[0]
   if (targets.length > 1 && opening.test(text) && !analytical.test(text)) {
-    return { kind: 'clarify', message: '请指定一个页面。可以打开全区总览、镇街人口、基层治理或经济发展。' }
+    return { kind: 'clarify', message: '听到多个主题，请说出要打开的一个页面。' }
   }
 
   const topical = (residual: string) => hotlineDomain.test(residual) || thirdPartyTopic.test(residual)

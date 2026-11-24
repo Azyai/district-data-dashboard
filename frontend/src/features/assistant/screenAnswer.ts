@@ -5,7 +5,6 @@ import {
 } from '../screens/screenData'
 import type { SnapshotAnswer } from './answer'
 
-export const screenSnapshotTime = '2026-10-31T18:00:00+08:00'
 const populationWords = /人口|年龄|老龄|老年|儿童|未成年|劳动年龄|人数|多少人|60\s*岁/
 const economyWords = /经济|生产总值|GDP|投资|消费品|零售|产业|企业|项目/i
 const currentScreenQuestion = /分析|概况|概览|情况|怎么样|问题|关注|风险|异常|数据/
