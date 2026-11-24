@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AttributionControl, LngLatBounds, Map as MapLibreMap, Marker, ScaleControl } from 'maplibre-gl'
 import type { PaddingOptions, RasterDEMSourceSpecification, StyleSpecification } from 'maplibre-gl'
@@ -7,6 +7,8 @@ import { styleCockpitBasemap } from './cockpit-map-style'
 import DistrictMap from './DistrictMap'
 import { attachDistrictViewportMask } from './district-viewport-mask'
 import './navigation-map.css'
+
+const LocalDistrictModel = lazy(() => import('./LocalDistrictModel'))
 
 type Position = [number, number]
 type Town = { id: string; name: string }
@@ -176,6 +178,7 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
   const [district, setDistrict] = useState<District>()
   const [phase, setPhase] = useState<MapPhase>('loading')
   const [mode, setMode] = useState<MapMode>('2d')
+  const [localModel, setLocalModel] = useState(false)
   const [imagery, setImagery] = useState(false)
   const [camera, setCamera] = useState<Camera>({ pitch: 0, zoom: 0 })
   const [terrainNotice, setTerrainNotice] = useState(false)
@@ -403,18 +406,18 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
   }
 
   return (
-    <div className="navigation-map" ref={root} data-map-mode={mode}
+    <div className="navigation-map" ref={root} data-map-mode={mode} data-local-model={localModel}
       data-map-ready={phase === 'ready' ? 'true' : phase} data-map-zoom={camera.zoom} data-map-pitch={camera.pitch}>
       <div ref={frame} className="district-map-frame" aria-hidden="true" />
-      <div ref={mount} className="navigation-map-surface" hidden={phase === 'fallback'} />
-      {phase === 'loading' && <div className="navigation-map-status" role="status">正在加载门头沟区底图</div>}
-      {phase === 'fallback' && (
+      <div ref={mount} className="navigation-map-surface" hidden={phase === 'fallback'} inert={localModel} />
+      {phase === 'loading' && !localModel && <div className="navigation-map-status" role="status">正在加载门头沟区底图</div>}
+      {phase === 'fallback' && !localModel && (
         <div className="navigation-map-fallback">
           <DistrictMap areas={areas} onSelectArea={onSelectArea} fallback={fallback} />
           <p className="navigation-map-status navigation-map-status-fallback" role="status">在线底图暂不可用，已切换本地地图</p>
         </div>
       )}
-      {phase === 'ready' && (
+      {phase === 'ready' && !localModel && (
         <>
           <div className="navigation-map-tools" aria-label="地图操作">
             <button type="button" aria-label="卫星影像" aria-pressed={imagery} onClick={toggleImagery}>影像</button>
@@ -430,6 +433,13 @@ export default function NavigationMap({ areas, onSelectArea, fallback }: Props) 
           </div>
           {terrainNotice && <p className="navigation-map-status navigation-map-status-fallback" role="status">高程暂不可用，已保留三维视角</p>}
         </>
+      )}
+      <button className="navigation-map-model-toggle" type="button" aria-pressed={localModel}
+        onClick={() => setLocalModel(current => !current)}>{localModel ? '返回地图' : '本地模型'}</button>
+      {localModel && (
+        <Suspense fallback={<p className="navigation-map-status" role="status">正在加载本地三维模型</p>}>
+          <LocalDistrictModel />
+        </Suspense>
       )}
     </div>
   )
