@@ -215,7 +215,7 @@ export function MetricCatalog() {
   return (
     <div className="admin-page">
       <header className="admin-page-heading">
-        <div><h1>指标目录</h1><p>管理统计口径和版本。发布后的版本供驾驶舱使用。</p></div>
+        <div><h1>指标目录</h1><p>管理统计口径和版本。发布后的版本可在区域数据页和问数中查看。</p></div>
         <Button type="primary" icon={<AdminIcon name="add" />} onClick={() => setEditor('new')} disabled={!sources.data} aria-haspopup="dialog">新增指标</Button>
       </header>
       {feedbackHolder}
@@ -290,7 +290,7 @@ export function MetricCatalog() {
           onOk={() => publish.mutate(confirmation)} confirmLoading={publish.isPending}
           keyboard={!publish.isPending} mask={{ closable: !publish.isPending }}
           onCancel={() => { if (!publish.isPending) setConfirmation(null) }}>
-          <p>发布「{confirmation.draft.label}」，驾驶舱将使用该统计口径。</p>
+          <p>发布「{confirmation.draft.label}」后，区域数据页和问数将使用该统计口径。</p>
           <AdminError error={publish.error} />
         </Modal>
       )}

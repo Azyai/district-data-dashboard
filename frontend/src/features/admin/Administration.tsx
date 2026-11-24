@@ -1,14 +1,10 @@
 import { Button, Spin } from 'antd'
-import { lazy, Suspense } from 'react'
-import { Link, Navigate, NavLink, Route, Routes } from 'react-router'
+import { Navigate, NavLink, Route, Routes } from 'react-router'
 import type { SessionState } from '../session/Session'
 import { AdminIcon } from './AdminParts'
 import { MetricCatalog } from './MetricCatalog'
 import { SourceDirectory } from './SourceDirectory'
 import './admin.css'
-
-const DraftEditor = lazy(() => import('../designer/DraftEditor'))
-const CockpitSettings = lazy(() => import('./CockpitSettings'))
 
 export default function Administration({ session }: { session: SessionState }) {
   const authorized = session.identity?.roles.includes('DATA_ADMIN')
@@ -21,7 +17,6 @@ export default function Administration({ session }: { session: SessionState }) {
           <span>数据管理</span>
         </NavLink>
         <div className="admin-top-actions">
-          <Link className="admin-return" to="/review"><AdminIcon name="shield" />发布审核</Link>
           {authorized && <Button onClick={session.signOut} loading={session.busy}>退出管理</Button>}
         </div>
       </header>
@@ -33,8 +28,6 @@ export default function Administration({ session }: { session: SessionState }) {
             <nav className="admin-nav" aria-label="数据管理功能">
               <NavLink to="/admin/sources"><AdminIcon name="source" />数据来源</NavLink>
               <NavLink to="/admin/metrics"><AdminIcon name="chart" />指标目录</NavLink>
-              <NavLink to="/admin/dashboards"><AdminIcon name="layout" />大屏编排</NavLink>
-              <NavLink to="/admin/cockpit"><AdminIcon name="settings" />驾驶舱侧栏</NavLink>
             </nav>
             <span className="admin-environment">演示环境</span>
           </aside>
@@ -44,14 +37,6 @@ export default function Administration({ session }: { session: SessionState }) {
               <Route index element={<Navigate to="sources" replace />} />
               <Route path="sources" element={<SourceDirectory />} />
               <Route path="metrics" element={<MetricCatalog />} />
-              <Route path="cockpit" element={<Suspense fallback={<p className="muted" role="status">正在加载侧栏配置</p>}>
-                <CockpitSettings />
-              </Suspense>} />
-              <Route path="dashboards" element={
-                <Suspense fallback={<p className="muted" role="status">正在加载大屏编排</p>}>
-                  <DraftEditor />
-                </Suspense>
-              } />
               <Route path="*" element={<Navigate to="/admin/sources" replace />} />
             </Routes>
           </main>
