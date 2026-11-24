@@ -1,8 +1,8 @@
 import { skipToken, useQuery } from '@tanstack/react-query'
 import { Map as MapLibreMap, Marker } from 'maplibre-gl'
-import type { GeoJSONSource } from 'maplibre-gl'
+import type { GeoJSONSource, MapMouseEvent } from 'maplibre-gl'
 import type * as GeoJSON from 'geojson'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { CockpitArea, CockpitDirectory } from '../../api/client'
 import { createAtlasScale } from './atlasScale'
@@ -32,9 +32,81 @@ const empty = (): GeoJSON.FeatureCollection => ({ type: 'FeatureCollection', fea
 const twinPoint: Coordinates = [116.122, 39.901]
 const districtBox: [Coordinates, Coordinates] = [[districtBounds.west, districtBounds.south], [districtBounds.east, districtBounds.north]]
 const initialPitch = 35
+const orbitThreshold = 4
 
 function readCamera(map: MapLibreMap) {
   return { zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch() }
+}
+
+function bindOrbitDrag(map: MapLibreMap) {
+  const canvas = map.getCanvas()
+  const doc = canvas.ownerDocument
+  let drag: { id: number; x: number; y: number; bearing: number; pitch: number; moved: boolean } | undefined
+  let ignoreClick = false
+
+  function start(event: PointerEvent) {
+    ignoreClick = false
+    if (event.pointerType !== 'mouse' || event.button !== 0 || !event.isPrimary
+      || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey) return
+    drag = { id: event.pointerId, x: event.clientX, y: event.clientY,
+      bearing: map.getBearing(), pitch: map.getPitch(), moved: false }
+  }
+
+  function preventPan(event: MapMouseEvent) {
+    // Reserve primary drags for orbiting. MapLibre still handles Shift-drag, touch and zoom.
+    if (drag && event.originalEvent.button === 0 && event.originalEvent.target === canvas) event.preventDefault()
+  }
+
+  function track(event: PointerEvent) {
+    if (!drag || drag.id !== event.pointerId) return
+    const x = event.clientX - drag.x
+    const y = event.clientY - drag.y
+    if (!drag.moved) {
+      if (Math.hypot(x, y) < orbitThreshold) return
+      drag.moved = true
+      ignoreClick = true
+      canvas.setPointerCapture(event.pointerId)
+      canvas.setAttribute('data-orbiting', '')
+    }
+    map.jumpTo({ bearing: drag.bearing + .36 * x, pitch: drag.pitch - .27 * y })
+  }
+
+  function finish(event?: PointerEvent) {
+    if (!drag || (event && drag.id !== event.pointerId)) return
+    const { id } = drag
+    drag = undefined
+    canvas.removeAttribute('data-orbiting')
+    if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id)
+  }
+
+  function suppressClick(event: MouseEvent) {
+    // A drag can end where it started, so the final displacement cannot distinguish it from a click.
+    if (!ignoreClick || !event.detail) return
+    ignoreClick = false
+    event.preventDefault()
+    event.stopPropagation()
+  }
+
+  const cancel = () => finish()
+  map.on('mousedown', preventPan)
+  canvas.addEventListener('pointerdown', start)
+  doc.addEventListener('pointermove', track)
+  doc.addEventListener('pointerup', finish)
+  doc.addEventListener('pointercancel', finish)
+  canvas.addEventListener('lostpointercapture', finish)
+  canvas.addEventListener('click', suppressClick, true)
+  doc.defaultView?.addEventListener('blur', cancel)
+  return () => {
+    finish()
+    map.off('mousedown', preventPan)
+    canvas.removeEventListener('pointerdown', start)
+    doc.removeEventListener('pointermove', track)
+    doc.removeEventListener('pointerup', finish)
+    doc.removeEventListener('pointercancel', finish)
+    canvas.removeEventListener('lostpointercapture', finish)
+    canvas.removeEventListener('click', suppressClick, true)
+    doc.defaultView?.removeEventListener('blur', cancel)
+  }
 }
 
 function mapPlaces(areas: Array<{ id: string; name: string }>, boundaries?: GeoBoundary[]): Pin[] {
@@ -67,6 +139,7 @@ function AreaPin({ map, pin, children }: { map: MapLibreMap; pin: Pin; children:
 export default function TiandituMap({ area, directory, viewMode, onViewModeChange, onSelectArea, onOpenTwin }: Props) {
   const host = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLDivElement>(null)
+  const navigationHint = useId()
   const [map, setMap] = useState<MapLibreMap>()
   const [graphicsError, setGraphicsError] = useState(false)
   const [basemap, setBasemap] = useState<Basemap>(token ? 'connecting' : 'offline')
@@ -110,7 +183,7 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     try {
       instance = new MapLibreMap({ container: host.current, style: atlasStyle(atlas.data.data), center: [115.80, 40],
         zoom: 9.2, minZoom: 7.5, maxZoom: 18, maxBounds: [[114.45, 39.2], [117.15, 40.82]],
-        maxPitch: 65, renderWorldCopies: false, attributionControl: false, trackResize: false, maxTileCacheSize: 72,
+        maxPitch: 65, clickTolerance: orbitThreshold, renderWorldCopies: false, attributionControl: false, trackResize: false, maxTileCacheSize: 72,
         canvasContextAttributes: { antialias: true }, pixelRatio: Math.min(2, window.devicePixelRatio || 1) })
     } catch {
       setGraphicsError(true)
@@ -129,7 +202,7 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
       return place && place.id !== areaId && place.id !== townId ? place : undefined
     }
     instance.on('mousemove', event => {
-      if (!instance.isMoving()) instance.getCanvas().style.cursor = placeAt([event.lngLat.lng, event.lngLat.lat]) ? 'pointer' : ''
+      if (!instance.isMoving()) instance.getCanvas().toggleAttribute('data-area-hover', Boolean(placeAt([event.lngLat.lng, event.lngLat.lat])))
     })
     instance.on('click', event => {
       if ((event.originalEvent.target as Element | null)?.closest('button, a')) return
@@ -152,11 +225,23 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     }
     currentView.current = viewMode
     if (!map) return
+    const canvas = map.getCanvas()
     map.setTerrain(viewMode === '3d' ? { source: 'elevation', exaggeration: 1.35 } : null)
     map.jumpTo(viewMode === '3d' ? last3dPose.current : { pitch: 0, bearing: 0 })
-    if (viewMode === '3d') { map.dragRotate.enable(); map.touchZoomRotate.enableRotation(); map.touchPitch.enable() }
-    else { map.dragRotate.disable(); map.touchZoomRotate.disableRotation(); map.touchPitch.disable() }
-  }, [map, viewMode])
+    if (viewMode === '3d') {
+      canvas.setAttribute('aria-describedby', navigationHint)
+      map.boxZoom.disable()
+      map.dragRotate.enable()
+      map.touchZoomRotate.enableRotation()
+      map.touchPitch.enable()
+      return bindOrbitDrag(map)
+    }
+    canvas.removeAttribute('aria-describedby')
+    map.boxZoom.enable()
+    map.dragRotate.disable()
+    map.touchZoomRotate.disableRotation()
+    map.touchPitch.disable()
+  }, [map, viewMode, navigationHint])
 
   useEffect(() => {
     if (!map || !frame.current || (!district && !town) || (area.level === 'village' && villages.isPending)) return
@@ -205,11 +290,12 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
     data-map-ready={failed ? 'unavailable' : map && scope ? 'ready' : 'loading'} data-map-scope={scope}
     aria-label={area.name + '区域地图'}>
     <div className="atlas-render" ref={host} />
+    {viewMode === '3d' && <p className="atlas-gesture-hint" id={navigationHint}>左键拖动旋转和俯仰，按住 Shift 拖动平移。键盘可用 Shift 加方向键调整视角。</p>}
     <div className="atlas-camera-frame" ref={frame} aria-hidden="true" />
     {failed && <div className="atlas-static"><img src={reliefUrl} alt="门头沟区地形概览" />
       <p role="status">{graphicsError ? '浏览器图形加速不可用' : '区界数据暂不可用'}</p></div>}
     {map && pins.map(pin => <AreaPin key={pin.id} map={map} pin={pin}>
-      {pin.id === 'population' ? <a className="atlas-population" href="/workbench?topic=population"
+      {pin.id === 'population' ? <a className="atlas-population" href="/topics/population"
         target="_blank" rel="noopener noreferrer" aria-label="查看全区人口专题">
         <span className="atlas-pin-dot" /><span className="atlas-callout"><small>全区常住人口</small>
           <strong>39.2 <em>万人</em></strong></span></a>
@@ -225,8 +311,6 @@ export default function TiandituMap({ area, directory, viewMode, onViewModeChang
       {basemap === 'unavailable' && <button onClick={() => setAttempt(value => value + 1)}>重连</button>}
       {pendingBoundary && <span>当前显示镇街范围</span>}
     </div>}
-    {map && <MapGlobeControl view={viewMode} onViewChange={onViewModeChange} onReset={() => reset.current()}
-      attribution={basemap === 'online' ? <a href="https://map.tianditu.gov.cn/" target="_blank" rel="noreferrer">© 天地图</a> : undefined}
-      orientation={{ bearing: camera.bearing, pitch: camera.pitch, onChange: pose => { map.jumpTo(pose) } }} />}
+    {map && <MapGlobeControl view={viewMode} onViewChange={onViewModeChange} onReset={() => reset.current()} />}
   </section>
 }
