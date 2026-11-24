@@ -1,15 +1,19 @@
-import { closeSync, mkdirSync, openSync, readSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Matrix4, Quaternion, Vector3 } from 'three'
 import { MeshoptSimplifier } from 'three/addons/libs/meshopt_simplifier.module.js'
 
 const modelDirectory = new URL('../../docs/地图模型/', import.meta.url)
-const targetFile = fileURLToPath(new URL('../public/maps/local-model/mentougou.glb', import.meta.url))
+const outputDirectory = new URL('../public/maps/local-model/', import.meta.url)
 const sources = [
   { file: '门头沟地形.glb', name: 'terrain', triangles: 74_000, error: .001, keepBoundary: true },
   { file: '路网.glb', name: 'roads', triangles: 45_000, error: .0015, keepBoundary: false },
   { file: '水域.glb', name: 'water', triangles: 16_000, error: .0015, keepBoundary: false },
+]
+const landmarks = [
+  { file: '天街和京西智谷.glb', node: '天街', name: 'landmark', output: 'tianjie.glb', triangles: 70_000, error: .012 },
+  { file: '天街和京西智谷.glb', node: '京西智谷', name: 'landmark', output: 'jingxi.glb', triangles: 70_000, error: .012 },
 ]
 
 function readBytes(fd, start, size) {
@@ -18,7 +22,7 @@ function readBytes(fd, start, size) {
   return buffer
 }
 
-function readGlb(file) {
+function readGlb(file, nodeName) {
   const fd = openSync(new URL(file, modelDirectory), 'r')
   try {
     const header = readBytes(fd, 0, 20)
@@ -28,21 +32,23 @@ function readGlb(file) {
     const entries = JSON.parse(readBytes(fd, 20, jsonSize).toString())
     const binStart = 28 + jsonSize
     const parts = []
-    const collect = (index, parent) => {
+    const collect = (index, parent, selected) => {
       const node = entries.nodes[index]
+      const retain = selected || node.name === nodeName
       const local = node.matrix
         ? new Matrix4().fromArray(node.matrix)
         : new Matrix4().compose(new Vector3().fromArray(node.translation ?? [0, 0, 0]),
           new Quaternion().fromArray(node.rotation ?? [0, 0, 0, 1]),
           new Vector3().fromArray(node.scale ?? [1, 1, 1]))
       const transform = parent.clone().multiply(local)
-      for (const primitive of entries.meshes[node.mesh]?.primitives ?? []) {
+      for (const primitive of (retain ? entries.meshes[node.mesh]?.primitives : undefined) ?? []) {
         if ((primitive.mode ?? 4) !== 4) throw new Error(`${file} 包含不支持的网格拓扑`)
         parts.push({ transform, positionId: primitive.attributes.POSITION, indexId: primitive.indices })
       }
-      for (const child of node.children ?? []) collect(child, transform)
+      for (const child of node.children ?? []) collect(child, transform, retain)
     }
-    for (const node of entries.scenes[entries.scene ?? 0].nodes) collect(node, new Matrix4())
+    for (const node of entries.scenes[entries.scene ?? 0].nodes) collect(node, new Matrix4(), !nodeName)
+    if (!parts.length) throw new Error(`${file} 中找不到有效模型 ${nodeName ?? ''}`)
     const vertices = parts.reduce((sum, { positionId }) => sum + entries.accessors[positionId].count, 0)
     const indexCount = parts.reduce((sum, { indexId }) => sum + entries.accessors[indexId].count, 0)
     const positions = new Float32Array(vertices * 3)
@@ -81,7 +87,7 @@ function readGlb(file) {
 }
 
 function simplify(source) {
-  const { positions, indices } = readGlb(source.file)
+  const { positions, indices } = readGlb(source.file, source.node)
   const weld = MeshoptSimplifier.generatePositionRemap(positions, 3)
   for (let i = 0; i < indices.length; i++) indices[i] = weld[indices[i]]
   const [reduced] = MeshoptSimplifier.simplify(indices, positions, 3, source.triangles * 3,
@@ -94,11 +100,11 @@ function simplify(source) {
     compact.set(positions.subarray(i * 3, i * 3 + 3), vertex * 3)
   }
   if (reduced.length === 0) throw new Error(`${source.file} 未生成有效网格`)
-  console.info(`${source.file} ${indices.length / 3} → ${reduced.length / 3} 个三角面`)
+  console.info(`${source.node ?? source.file} ${indices.length / 3} → ${reduced.length / 3} 个三角面`)
   return { name: source.name, positions: compact, indices: vertexCount <= 65_536 ? Uint16Array.from(reduced) : reduced }
 }
 
-function packGlb(meshes) {
+function packGlb(meshes, sources) {
   const gltf = {
     asset: { version: '2.0', generator: 'district-dashboard terrain LOD', extras: { source: sources.map(item => item.file) } },
     extensionsUsed: ['KHR_mesh_quantization'],
@@ -159,15 +165,25 @@ function packGlb(meshes) {
   return Buffer.concat([header, metadata, padding, binHeader, ...binary])
 }
 
-await MeshoptSimplifier.ready
-const buffer = packGlb(sources.map(simplify))
-if (buffer.length > 4_500_000) throw new Error(`简化后的模型超过 4.5 MB 预算（${buffer.length} 字节）`)
-mkdirSync(dirname(targetFile), { recursive: true })
-const temp = `${targetFile}.${process.pid}.tmp`
-try {
-  writeFileSync(temp, buffer)
-  renameSync(temp, targetFile)
-} finally {
-  rmSync(temp, { force: true })
+function writeModel(filename, items, budget) {
+  const targetFile = fileURLToPath(new URL(filename, outputDirectory))
+  const buffer = packGlb(items.map(simplify), items)
+  if (buffer.length > budget) throw new Error(`${filename} 超过模型预算（${buffer.length} 字节）`)
+  if (existsSync(targetFile) && readFileSync(targetFile).equals(buffer)) {
+    console.info(`已是最新：${targetFile}`)
+    return
+  }
+  mkdirSync(dirname(targetFile), { recursive: true })
+  const temp = `${targetFile}.${process.pid}.tmp`
+  try {
+    writeFileSync(temp, buffer)
+    renameSync(temp, targetFile)
+  } finally {
+    rmSync(temp, { force: true })
+  }
+  console.info(`已生成 ${targetFile}（${(buffer.length / 1_000_000).toFixed(2)} MB）`)
 }
-console.info(`已生成 ${targetFile}（${(buffer.length / 1_000_000).toFixed(2)} MB）`)
+
+await MeshoptSimplifier.ready
+writeModel('mentougou.glb', sources, 4_500_000)
+for (const landmark of landmarks) writeModel(landmark.output, [landmark], 8_000_000)
