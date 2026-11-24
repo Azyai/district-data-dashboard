@@ -53,10 +53,6 @@
   isolation: isolate;
   min-height: clamp(27rem, 69svh, 78rem);
   overflow: hidden;
-  border: 1px solid var(--twin-edge);
-  border-radius: 12px;
-  background: #0d1e2e;
-  box-shadow: 0 12px 45px #020b1b64;
 }
 .twin-context { padding: clamp(.9rem, 1.55vw, 1.35rem); border: 1px solid var(--twin-edge); border-radius: 10px; background: #0c1b2b; }
 .twin-context h2 { font-size: 1.1rem; font-weight: 720; }

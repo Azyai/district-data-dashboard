@@ -1,8 +1,8 @@
 
 .district-local-model {
-  --map-control-ink: #d5e9f9;
-  --map-control-line: #476c7b;
-  --map-control-background: #112a34;
+  --map-control-ink: #d7e8fa;
+  --map-control-line: #365474;
+  --map-control-background: #101f35;
   --map-control-shadow: 0 3px 12px #03091754;
   position: absolute;
   z-index: 4;
@@ -10,16 +10,31 @@
   container-type: inline-size;
   overflow: hidden;
   background:
-    radial-gradient(ellipse at 51% 49%, #24403e7d, transparent 64%),
-    linear-gradient(155deg, #14232a, #0b171e 76%);
+    radial-gradient(ellipse 76% 55% at 50% 59%, #172e4b 0%, #0d1c33 50%, transparent 100%),
+    #080f1e;
+}
+
+.district-local-model::before {
+  position: absolute;
+  inset: 28% -18% -18%;
+  content: "";
+  background:
+    linear-gradient(#6a96c820 1px, transparent 1px),
+    linear-gradient(90deg, #6a96c820 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(ellipse at 50% 46%, #000 10%, transparent 68%);
+  transform: perspective(650px) rotateX(43deg);
+  transform-origin: center 55%;
+  pointer-events: none;
 }
 
 .district-local-model-canvas {
   position: absolute;
-  inset: 76px var(--district-map-inset-right, 0px) 66px var(--district-map-inset-left, 0px);
+  inset: 52px 0 50px;
 }
 
 .district-local-model[data-twin="true"] .district-local-model-canvas { top: 22px; }
+.district-local-model[data-view="2d"]::before { inset: 0; transform: none; opacity: .55; }
 .district-local-model-canvas canvas {
   width: 100%;
   height: 100%;
@@ -64,19 +79,19 @@
 .model-population .model-beacon {
   width: 16px;
   height: 16px;
-  background: #f5d3a8;
-  border-color: #fff4cf;
-  box-shadow: 0 0 0 8px #ffcf7b45, 0 0 32px #ffae5d;
+  background: #b5dfff;
+  border-color: #f2f8ff;
+  box-shadow: 0 0 0 7px #7ec7ff4a, 0 0 24px #628bff;
 }
-.model-population .model-beacon::after { inset: -15px; border-color: #ffc7869c; }
+.model-population .model-beacon::after { inset: -14px; border-color: #9dbbff9c; }
 .model-twin-point .model-beacon { box-shadow: 0 0 0 7px #71ddf844, 0 0 22px #5cd7f8; }
 
 .model-callout, .model-place-name, .model-twin-label {
   position: absolute;
-  border: 1px solid #5b899a;
-  color: #edf9fe;
-  background: #0a1a22ee;
-  box-shadow: 0 6px 20px #040c11aa;
+  border: 1px solid #5b83aa;
+  color: #edf8ff;
+  background: #0d1b30ee;
+  box-shadow: 0 6px 20px #060b17aa;
   white-space: nowrap;
 }
 .model-callout {
@@ -85,9 +100,9 @@
   min-width: 10.8rem;
   display: block;
   padding: .72rem .85rem .62rem;
-  border-color: #8e7967;
+  border-color: #6383b5;
   border-radius: 5px;
-  background: linear-gradient(140deg, #222522f5, #0c1a22ee 75%);
+  background: linear-gradient(145deg, #17294ce8, #0d1a31f5 77%);
   pointer-events: auto;
 }
 .model-callout::after {
@@ -96,22 +111,22 @@
   height: 1px;
   left: 100%;
   top: 100%;
-  background: #ddbb8a;
+  background: #98c7f4;
   transform: rotate(43deg);
   transform-origin: left center;
   content: "";
 }
-.model-callout span { display: block; font-size: .86rem; color: #e6dacb; font-weight: 680; }
-.model-callout p { margin: .18rem 0; color: #f8f4eb; font-size: .9rem; font-weight: 630; }
+.model-callout span { display: block; font-size: .86rem; color: #d9e8fb; font-weight: 680; }
+.model-callout p { margin: .18rem 0; color: #edf6ff; font-size: .9rem; font-weight: 630; }
 .model-callout strong {
   margin-inline-end: .15em;
-  color: #ffe8c7;
+  color: #f1f7ff;
   font: 670 clamp(2rem, 3.35vw, 4.1rem)/1 "Bahnschrift", "Segoe UI", sans-serif;
   font-variant-numeric: tabular-nums;
   letter-spacing: -.032em;
 }
-.model-callout small { color: #c2b9ae; font-size: .71rem; }
-.model-callout:hover { border-color: #ffdcac; }
+.model-callout small { color: #b6cbeb; font-size: .71rem; }
+.model-callout:hover { border-color: #9bcdf8; }
 .model-place { cursor: pointer; }
 .model-place[data-featured="false"] .model-beacon { width: 7px; height: 7px; }
 .model-place[data-featured="false"] .model-beacon::after { inset: -5px; }
@@ -126,7 +141,7 @@
   line-height: 1.14;
   font-weight: 660;
 }
-.model-place:hover .model-place-name { color: #f9fdff; border-color: #a6e1f0; background: #143b4d; }
+.model-place:hover .model-place-name { color: #f9fdff; border-color: #a6d8f0; background: #193451; }
 .model-twin-label {
   right: calc(50% + 19px);
   top: calc(50% + 12px);
@@ -153,32 +168,42 @@
   font-weight: 660;
   cursor: pointer;
 }
-.model-twin-label button + button { border-left: 1px solid #36586a; }
-.model-twin-label button:hover { background: #143b4d; color: #b2f3ff; }
+.model-twin-label button + button { border-left: 1px solid #375373; }
+.model-twin-label button:hover { background: #193451; color: #b2e8ff; }
 
 .district-local-model-key {
   position: absolute;
-  bottom: 38px;
-  left: calc(var(--district-map-inset-left, 0px) + 15px);
-  display: flex;
-  gap: .75rem;
+  z-index: 5;
+  top: var(--map-rail-top, 1rem);
+  right: var(--local-gutter, 15px);
+  display: grid;
+  gap: .2rem;
+  min-width: 6.1rem;
   margin: 0;
-  padding: 0;
-  color: #bdd6e3;
-  font-size: .75rem;
+  padding: .05rem .15rem .15rem .8rem;
+  border-inline-start: 1px solid #41648a;
+  color: #c7d9ef;
+  font-size: .81rem;
   list-style: none;
 }
-.district-local-model-key li { display: flex; align-items: center; gap: 5px; }
-.district-local-model-key button { padding: .2rem .04rem; cursor: pointer; }
+.district-local-model-key::before {
+  content: attr(aria-label) / "";
+  padding-bottom: .22rem;
+  color: #d9e9fb;
+  font-size: .92rem;
+  font-weight: 680;
+}
+.district-local-model-key li { display: flex; align-items: center; gap: .44rem; }
+.district-local-model-key button { min-height: 1.55rem; padding: .12rem .12rem; cursor: pointer; }
 .district-local-model-key button:hover { color: #f0f9ff; }
-.district-local-model-key li::before { width: 7px; height: 7px; border-radius: 2px; background: #809b80; content: ""; }
-.district-local-model-key [data-surface="roads"]::before { background: #c3be8e; }
-.district-local-model-key [data-surface="water"]::before { background: #49b6e3; }
+.district-local-model-key li::before { width: .46rem; height: .46rem; border-radius: 2px; background: #9caebf; content: ""; }
+.district-local-model-key [data-surface="roads"]::before { background: #c4b895; }
+.district-local-model-key [data-surface="water"]::before { background: #50bbec; }
 .model-imagery-source {
   position: absolute;
-  bottom: 15px;
-  left: calc(var(--district-map-inset-left, 0px) + 15px);
-  color: #b1cbdc;
+  bottom: 19px;
+  left: var(--local-gutter, 15px);
+  color: #afc3dc;
   font-size: .67rem;
   text-underline-offset: 2px;
 }
@@ -187,7 +212,7 @@
 .district-local-landmarks, .district-local-model-detail {
   position: absolute;
   z-index: 5;
-  left: calc(var(--district-map-inset-left, 0px) + 15px);
+  left: var(--local-gutter, 15px);
   display: flex;
   gap: .45rem;
   color: #c8e1f3;
@@ -200,15 +225,15 @@
   border: 1px solid #426c8a;
   border-radius: 6px;
   color: #e0f0ff;
-  background: #123040;
+  background: #142943;
   cursor: pointer;
 }
 .district-local-landmarks button:hover, .district-local-model-detail button:hover { background: #24597d; }
 .district-local-model :is(a, button, select):focus-visible { outline: 2px solid #9ee7f9; outline-offset: 2px; }
 .local-model-tools {
   position: absolute;
-  right: calc(var(--district-map-inset-right, 0px) + 14px);
-  bottom: 13px;
+  right: var(--local-gutter, 14px);
+  bottom: 16px;
   z-index: 5;
   display: flex;
   align-items: center;
@@ -237,21 +262,21 @@
 }
 .local-model-tools button + button { border-left: 1px solid var(--map-control-line); }
 .local-model-tools button:hover { background: #244c70; }
-.local-model-tools button[aria-pressed="true"] { color: #eaf8ff; background: #20679a; }
+.local-model-tools button[aria-pressed="true"] { color: #eef7ff; background: #255285; }
 .local-model-tools button:focus-visible { outline-offset: -3px; }
-.local-model-zoom-hint { margin-inline-end: .25rem; color: #b3cbd9; }
+.local-model-zoom-hint { margin-inline-end: .25rem; color: #b8cce5; }
 
 @media (hover: none) {
   .local-model-zoom-hint { display: none; }
 }
 .model-region-note {
   position: absolute;
-  left: 15px;
+  left: var(--local-gutter, 15px);
   bottom: 69px;
   margin: 0;
   padding: .35rem .6rem;
   color: #ccdeef;
-  background: #0d202adf;
+  background: #101d34eb;
   border-radius: 5px;
   font-size: .75rem;
 }
@@ -278,8 +303,8 @@
   pointer-events: none;
 }
 
-@container (max-width: 610px) {
-  .district-local-model-canvas { inset: 85px 0 100px; }
+@container (max-width: 46rem) {
+  .district-local-model-canvas { inset: 63px 0 93px; }
   .local-model-tools { right: 10px; bottom: 9px; gap: 3px; }
   .local-model-tools button { padding-inline: .35rem; }
   .model-region-note { left: 12px; bottom: 105px; }
@@ -289,8 +314,15 @@
   .model-place-name { font-size: .64rem; padding: .2rem .35rem; }
   .model-twin-label { right: calc(50% + 14px); top: calc(50% + 15px); }
   .model-twin-label button { padding-inline: .28rem; font-size: .68rem; }
-  .district-local-model-key { bottom: 76px; left: 12px; }
-  .model-imagery-source { bottom: 55px; left: 12px; }
+  .district-local-model-key {
+    inset: auto auto 69px 12px;
+    display: flex;
+    gap: .78rem;
+    padding: 0;
+    border: 0;
+  }
+  .district-local-model-key::before { display: none; }
+  .model-imagery-source { bottom: 52px; left: 12px; }
   .district-local-landmarks { left: 12px; bottom: 106px; }
   .district-local-model-detail { left: 12px; bottom: 106px; }
   .district-local-model:has(.district-local-landmarks) .district-local-model-detail { bottom: 154px; }
