@@ -85,13 +85,28 @@ public class DashboardDraftService {
                     || title.isEmpty() || title.codePointCount(0, title.length()) > 100
                     || approved == null || !approved.type().equals(component.type())
                     || !approved.unit().equals(component.unit())
+                    || !allowsChartStyle(component.type(), component.chartStyle())
                     || !fits(component.geometry(), template.canvas())) {
                 throw invalid();
             }
             layout.add(new Component(component.id(), title, approved.type(), approved.metricId(), approved.unit(),
-                    component.geometry()));
+                    component.geometry(), component.chartStyle()));
         }
         return List.copyOf(layout);
+    }
+
+    private static boolean allowsChartStyle(String type, String style) {
+        if (style == null) {
+            return true;
+        }
+        return switch (type) {
+            case "trend" -> style.equals("line") || style.equals("bar");
+            case "ranking" -> switch (style) {
+                case "bar", "radar", "network", "ring" -> true;
+                default -> false;
+            };
+            default -> false;
+        };
     }
 
     private static boolean fits(Geometry geometry, Canvas canvas) {

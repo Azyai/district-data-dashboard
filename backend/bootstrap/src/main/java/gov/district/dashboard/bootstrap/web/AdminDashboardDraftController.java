@@ -70,13 +70,15 @@ class AdminDashboardDraftController {
         List<Component> components = new ArrayList<>(input.size());
         for (JsonNode item : input) {
             JsonNode geometry = item.path("geometry");
-            if (!item.isObject() || item.size() != 6 || !geometry.isObject() || geometry.size() != 5) {
+            boolean hasStyle = item.has("chartStyle");
+            if (!item.isObject() || item.size() != (hasStyle ? 7 : 6) || !geometry.isObject() || geometry.size() != 5) {
                 throw invalid();
             }
             components.add(new Component(text(item, "id"), text(item, "title"), text(item, "type"),
                     text(item, "metricId"), text(item, "unit"),
                     new Geometry(integer(geometry, "x"), integer(geometry, "y"), integer(geometry, "width"),
-                            integer(geometry, "height"), integer(geometry, "z"))));
+                            integer(geometry, "height"), integer(geometry, "z")),
+                    hasStyle ? text(item, "chartStyle") : null));
         }
         return components;
     }

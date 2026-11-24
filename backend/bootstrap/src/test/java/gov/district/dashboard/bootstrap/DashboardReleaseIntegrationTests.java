@@ -16,6 +16,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.test.context.ActiveProfiles;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -61,6 +62,14 @@ class DashboardReleaseIntegrationTests {
             ObjectNode second = layout(baseline, "published-second", "第二次送审");
             ObjectNode third = layout(baseline, "published-third", "第三次送审");
 
+            var firstCard = (ObjectNode) first.path("components").get(0);
+            firstCard.put("chartStyle", "network");
+            author.save(first, 0, ApiCode.INVALID_REQUEST);
+            firstCard.remove("chartStyle");
+
+            addCategoryChart(second, baseline, "radar");
+            addCategoryChart(third, baseline, "ring");
+
             assertThat(author.save(first, 0).path("revision").asInt()).isEqualTo(1);
 
             HttpRequest submitFirst = author.postRequest(RELEASES, submission(1));
@@ -104,6 +113,7 @@ class DashboardReleaseIntegrationTests {
             String publishedId = published.path("releaseId").asString();
             assertThat(publishedId).isNotBlank().isNotEqualTo(baselineId);
             assertThat(published.path("components")).isEqualTo(second.path("components"));
+            assertThat(published.path("components").get(1).path("chartStyle").asString()).isEqualTo("radar");
             viewer.post(QUERY, batch(baselineId, "accepted-events"), ApiCode.RELEASE_CONFLICT);
             JsonNode publishedBatch = viewer.post(QUERY, batch(publishedId, "published-second"), ApiCode.OK);
             assertThat(publishedBatch.path("releaseId").asString()).isEqualTo(publishedId);
@@ -142,6 +152,12 @@ class DashboardReleaseIntegrationTests {
         var draft = JSON.createObjectNode();
         draft.putArray("components").add(component);
         return draft;
+    }
+
+    private static void addCategoryChart(ObjectNode draft, JsonNode baseline, String chartStyle) {
+        var category = (ObjectNode) baseline.path("components").get(4).deepCopy();
+        category.put("chartStyle", chartStyle);
+        ((ArrayNode) draft.path("components")).add(category);
     }
 
     private static ObjectNode submission(int revision) {
@@ -190,9 +206,13 @@ class DashboardReleaseIntegrationTests {
         }
 
         private JsonNode save(JsonNode payload, int revision) throws Exception {
+            return save(payload, revision, ApiCode.OK);
+        }
+
+        private JsonNode save(JsonNode payload, int revision, ApiCode expected) throws Exception {
             var request = mutation(DRAFT).header("If-Match", "\"" + revision + "\"")
                     .PUT(HttpRequest.BodyPublishers.ofString(payload.toString())).build();
-            return send(request, ApiCode.OK);
+            return send(request, expected);
         }
 
         private HttpRequest.Builder mutation(String path) throws Exception {
