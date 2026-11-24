@@ -50,15 +50,25 @@ export function radarCeiling(maximum: number) {
   return Number.isFinite(ceiling) ? Math.max(ceiling, maximum) : maximum
 }
 
-function radar(points: ChartPoint[], unit: string, maximum: number, width: number, height: number): RadialOption {
+function radar(points: ChartPoint[], unit: string, maximum: number, width: number, height: number, prominent: boolean): RadialOption {
   const ceiling = radarCeiling(maximum)
+  const large = prominent && width >= 520
+  const readings = new Map(points.map(point => [point.label, formatChartValue(point.value, unit)]))
   return {
     radar: {
       indicator: points.map(point => ({ name: point.label, max: ceiling })),
       center: ['50%', '51%'],
       radius: Math.max(20, Math.min(width * .27, height * .35)),
-      axisName: { color: '#b9d0ef', fontSize: width < 320 ? 11 : 13, formatter: name => clipped(name ?? '', width) },
-      axisNameGap: width < 320 ? 6 : 10,
+      axisName: {
+        color: large ? '#c9e9fe' : '#b9d0ef',
+        fontSize: large ? 21 : width < 320 ? 11 : 13,
+        lineHeight: large ? 26 : undefined,
+        formatter: name => {
+          const label = clipped(name ?? '', width)
+          return large && name ? label + '\n' + (readings.get(name) ?? '') : label
+        },
+      },
+      axisNameGap: large ? 15 : width < 320 ? 6 : 10,
       splitNumber: 4,
       splitArea: { areaStyle: { color: ['#14294399', '#0a1a3866'] } },
       splitLine: { lineStyle: { color: '#385779' } },
@@ -71,8 +81,8 @@ function radar(points: ChartPoint[], unit: string, maximum: number, width: numbe
     series: {
       type: 'radar',
       symbol: 'circle',
-      symbolSize: 6,
-      lineStyle: { color: '#91ecff', width: 2, shadowBlur: 7, shadowColor: '#59c4ff88' },
+      symbolSize: large ? 10 : 6,
+      lineStyle: { color: '#91ecff', width: large ? 3 : 2, shadowBlur: large ? 13 : 7, shadowColor: '#59c4ff88' },
       itemStyle: { color: '#bbf7ff', borderWidth: 1, borderColor: '#346aad' },
       areaStyle: { color: '#579ce6', opacity: .32 },
       data: [{ value: points.map(point => point.value) }],
@@ -80,15 +90,20 @@ function radar(points: ChartPoint[], unit: string, maximum: number, width: numbe
   }
 }
 
-function network(points: ChartPoint[], unit: string, maximum: number, width: number, height: number, additive: boolean): RadialOption {
+function network(
+  points: ChartPoint[], unit: string, maximum: number, width: number, height: number, additive: boolean, prominent: boolean,
+): RadialOption {
   const sum = additive ? points.reduce((total, point) => total + point.value, 0) : NaN
   const aggregated = Number.isFinite(sum)
   const centerValue = aggregated ? sum : points.length
   const caption = aggregated ? '总计' : '观测'
   const centerUnit = aggregated ? unit : '项'
   const narrow = width < 325
+  const large = prominent && width >= 520
   const count = points.length
-  const centerSize = Math.max(39, Math.min(60, width * .2))
+  const showValues = large || (prominent && width >= 300 && count <= 6)
+  const horizontalInset = large ? Math.max(142, width * .19) : Math.max(showValues ? 70 : narrow ? 50 : 58, width * .15)
+  const centerSize = large ? Math.min(116, width * .17) : Math.max(39, Math.min(60, width * .2))
   const rx = width * .35
   const ry = height * .34
 
@@ -105,23 +120,24 @@ function network(points: ChartPoint[], unit: string, maximum: number, width: num
     series: {
       type: 'graph',
       layout: 'none',
-      left: Math.max(narrow ? 50 : 58, width * .15),
-      right: Math.max(narrow ? 50 : 58, width * .15),
+      left: horizontalInset,
+      right: horizontalInset,
       top: Math.max(24, height * .17),
       bottom: Math.max(24, height * .17),
       roam: false,
       cursor: 'default',
       symbol: 'circle',
-      label: { color: '#cadaf1', fontSize: narrow ? 10 : 13, fontWeight: 540 },
+      label: { color: '#cadaf1', fontSize: large ? 21 : narrow ? 10 : 13, fontWeight: 540 },
       emphasis: { focus: 'adjacency', scale: 1.08 },
       data: [
         {
           id: 'chart-hub', name: caption, value: centerValue, x: 0, y: 0, symbolSize: centerSize,
           itemStyle: {
-            color: '#1b396d', borderWidth: 1.65, borderColor: '#a0eaff', shadowColor: '#489bffbd', shadowBlur: 19,
+            color: '#1b396d', borderWidth: large ? 2.8 : 1.65, borderColor: '#a0eaff',
+            shadowColor: '#489bffbd', shadowBlur: large ? 34 : 19,
           },
           label: {
-            show: true, position: 'inside', color: '#e7faff', lineHeight: narrow ? 13 : 15,
+            show: true, position: 'inside', color: '#e7faff', lineHeight: large ? 27 : narrow ? 13 : 15,
             fontWeight: 700, formatter: () => numbers.format(centerValue) + '\n' + caption,
           },
         },
@@ -137,9 +153,12 @@ function network(points: ChartPoint[], unit: string, maximum: number, width: num
             value: point.value,
             x: Math.cos(angle) * rx,
             y: Math.sin(angle) * ry,
-            symbolSize: (narrow ? 6 : 8) + ratio * (narrow ? 9 : 12),
-            itemStyle: { color: tone, shadowColor: tone, shadowBlur: 8, borderColor: '#d6f2ff', borderWidth: 1 },
-            label: { show: true, position, distance: 4, formatter: () => clipped(point.label, width) },
+            symbolSize: large ? 12 + ratio * 15 : (narrow ? 6 : 8) + ratio * (narrow ? 9 : 12),
+            itemStyle: { color: tone, shadowColor: tone, shadowBlur: large ? 13 : 8, borderColor: '#d6f2ff', borderWidth: 1 },
+            label: {
+              show: true, position, distance: large ? 8 : 4, lineHeight: large ? 26 : showValues ? 13 : undefined,
+              formatter: () => clipped(point.label, width) + (showValues ? '\n' + formatChartValue(point.value, unit) : ''),
+            },
           }
         }),
       ],
@@ -148,7 +167,7 @@ function network(points: ChartPoint[], unit: string, maximum: number, width: num
         target: 'chart-node-' + index,
         lineStyle: {
           color: tones[index % tones.length], opacity: .7,
-          width: maximum > 0 ? .8 + Math.sqrt(point.value / maximum) * 1.7 : .8,
+          width: maximum > 0 ? .8 + Math.sqrt(point.value / maximum) * (large ? 3 : 1.7) : .8,
           curveness: (index % 2 ? -.16 : .16),
         },
       })),
@@ -200,10 +219,11 @@ function ring(points: ChartPoint[], unit: string, width: number, height: number)
 
 export function radialPreset(
   style: RadialStyle, points: ChartPoint[], unit: string, maximum: number, width: number, height: number, additive: boolean,
+  prominent = false,
 ) {
   switch (style) {
-    case 'radar': return radar(points, unit, maximum, width, height)
-    case 'network': return network(points, unit, maximum, width, height, additive)
+    case 'radar': return radar(points, unit, maximum, width, height, prominent)
+    case 'network': return network(points, unit, maximum, width, height, additive, prominent)
     case 'ring': return ring(points, unit, width, height)
   }
 }

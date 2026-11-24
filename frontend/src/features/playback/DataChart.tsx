@@ -28,6 +28,7 @@ type DataChartProps = {
   variant?: ChartVariant
   additive?: boolean
   showData?: boolean
+  prominent?: boolean
 }
 
 const fontFamily = 'system-ui, "Microsoft YaHei", sans-serif'
@@ -153,9 +154,14 @@ function barSeries(points: Point[], narrow: boolean, showValues: boolean, labelS
   }
 }
 
-function standardChart(style: ChartVariant, kind: DataChartProps['kind'], points: Point[], width: number): CartesianOption {
+function standardChart(
+  style: ChartVariant, kind: DataChartProps['kind'], points: Point[], width: number, range: ReturnType<typeof pointRange>,
+): CartesianOption {
   const narrow = width < 480
   const labelSize = narrow ? 12 : Math.min(26, Math.max(18, Math.round(width / 76)))
+  const bar = style === 'bar'
+  const tightTrend = !bar && range.min < range.max
+  const valueLabelWidth = Math.max(axisNumber.format(range.min).length, axisNumber.format(range.max).length)
   const axisLabel = {
     color: axisInk,
     fontSize: labelSize,
@@ -163,6 +169,7 @@ function standardChart(style: ChartVariant, kind: DataChartProps['kind'], points
   }
   const valueAxis = {
     type: 'value' as const,
+    scale: tightTrend,
     splitNumber: narrow || width > 1250 ? 3 : 5,
     axisLabel: { ...axisLabel, formatter: (value: number) => axisNumber.format(value) },
     splitLine: { lineStyle: { color: guide, type: 'dashed' as const } },
@@ -174,7 +181,6 @@ function standardChart(style: ChartVariant, kind: DataChartProps['kind'], points
     axisLine: { lineStyle: { color: guide } },
     axisTick: { show: false },
   }
-  const bar = style === 'bar'
   const ranking = kind === 'ranking' && bar
   const showValues = ranking && points.length <= 8 && points.every(point => observedNumber.format(point.value).length <= 8)
   const labelWidth = ranking ? points.reduce((size, point) => Math.max(size, point.label.length), 0) : 0
@@ -183,7 +189,8 @@ function standardChart(style: ChartVariant, kind: DataChartProps['kind'], points
       top: 24,
       right: showValues ? (narrow ? 48 : 72) : (narrow ? 22 : 36),
       bottom: narrow ? 26 : 40,
-      left: ranking ? Math.min(Math.round(width * .33), Math.max(68, labelWidth * labelSize + 14)) : (narrow ? 44 : 65),
+      left: ranking ? Math.min(Math.round(width * .33), Math.max(68, labelWidth * labelSize + 14))
+        : Math.min(Math.round(width * .28), Math.max(narrow ? 44 : 65, Math.ceil(valueLabelWidth * labelSize * .64) + 14)),
     },
     xAxis: ranking ? valueAxis : categoryAxis,
     yAxis: ranking ? {
@@ -238,7 +245,9 @@ function DatasetDetails({ points, label, unit }: { points: Point[]; label: strin
   )
 }
 
-export default function DataChart({ kind, label, points, unit, compact = false, variant, additive = false, showData = false }: DataChartProps) {
+export default function DataChart({
+  kind, label, points, unit, compact = false, variant, additive = false, showData = false, prominent = false,
+}: DataChartProps) {
   const host = useRef<HTMLDivElement>(null)
   const observed = useMemo(() => points.filter(point => Number.isFinite(point.value)), [points])
   const range = useMemo(() => pointRange(observed), [observed])
@@ -266,9 +275,9 @@ export default function DataChart({ kind, label, points, unit, compact = false, 
       chart.resize({ width, height })
       if (widthChanged || radial) {
         const options: Options = isRadialStyle(style)
-          ? radialPreset(style, observed, unit, range.max, width, height, additive)
+          ? radialPreset(style, observed, unit, range.max, width, height, additive, prominent)
           : compact && kind === 'trend' ? compactTrend(observed, width, range, style === 'bar')
-            : standardChart(style, kind, observed, width)
+            : standardChart(style, kind, observed, width, range)
         chart.setOption({
           ...options,
           animation: false,
@@ -296,7 +305,7 @@ export default function DataChart({ kind, label, points, unit, compact = false, 
       observer.disconnect()
       chart?.dispose()
     }
-  }, [kind, observed, unit, compact, range, style, radial, additive])
+  }, [kind, observed, unit, compact, range, style, radial, additive, prominent])
 
   if (observed.length === 0) {
     return <p className="chart-fallback" role="status">{label}暂无数据</p>
