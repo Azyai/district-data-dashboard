@@ -6,13 +6,14 @@ import { useSearchParams } from 'react-router'
 import { ApiError } from '../../api/client'
 import { AdminError, AdminIcon, Field } from '../admin/AdminParts'
 import { ScreenCanvas, ScreenComponentContent } from '../playback/ScreenCanvas'
+import { chartStyleFor, chartStyleLabel, chartStyleOptions } from '../playback/chartStyles'
 import DashboardReleases from './DashboardReleases'
 import { designerApi } from './designerApi'
 import type { DraftWorkspace } from './designerApi'
 import {
-  cloneMaterial, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer,
+  alignComponents, cloneMaterial, componentBounds, maxComponents, moveGeometry, previewDraft, resizeGeometry, setLayer,
 } from './draftLayout'
-import type { Geometry, ScreenComponent } from './draftLayout'
+import type { Alignment, Geometry, ScreenComponent } from './draftLayout'
 import './designer.css'
 
 const projects = [
@@ -20,21 +21,39 @@ const projects = [
   { id: 'public-services', name: '政务服务' },
 ]
 
-const kindNames = { kpi: '关键指标', trend: '趋势', ranking: '排行' }
 const glyphs = {
   kpi: 'M4.5 5.5h11v9h-11zm3 3v3m2.5-3v3m2.5-3v3',
-  trend: 'M3 4v12h14M5.5 12l3.4-4.1 3.1 2.4L16.8 6',
-  ranking: 'M4 5h12m-12 5h9m-9 5h5',
+  line: 'M3 4v12h14M5.5 12l3.4-4.1 3.1 2.4L16.8 6',
+  bar: 'M3 4v12h14M6.5 12.5V9m3.5 3.5V6m3.5 6.5V7.5',
+  radar: 'm10 2 7.6 5.5-2.8 9H5.2L2.4 7.5 10 2zm0 0v8m7.6-2.5L10 10m4.8 6.5L10 10m-4.8 6.5L10 10M2.4 7.5 10 10',
+  network: 'm10 8-5-3m5 3 5-3m-5 3v7m0 0-5 1m5-1 5 1M3 5a2 2 0 1 0 4 0 2 2 0 1 0-4 0zm10 0a2 2 0 1 0 4 0 2 2 0 1 0-4 0z',
+  ring: 'M16.7 7.5a7.1 7.1 0 1 1-4.2-4.2m0 0v4.2h4.2',
   layers: 'm10 3 7 4-7 4-7-4 7-4zm-7 7 7 4 7-4m-14 4 7 4 7-4',
   undo: 'M6.5 4 3 7.5l3.5 3.5M3 7.5h8.5a5 5 0 0 1 0 10H9',
   redo: 'M13.5 4 17 7.5 13.5 11M17 7.5H8.5a5 5 0 0 0 0 10H11',
   preview: 'M3.5 4.5h13v11h-13zM8.5 8l3.5 2-3.5 2z',
   save: 'M4 3.5h10.5L16 5v11.5H4zm3 0v4h6v-4m-6 13v-5h6v5',
+  multi: 'M3 3h8v8H3zm8 4h6v10H7v-6',
+  left: 'M4 3v14m3-11h8v3H7zm0 6h5v3H7z',
+  center: 'M10 3v14m-5-11h10v3H5zm2 6h6v3H7z',
+  right: 'M16 3v14M5 6h8v3H5zm3 6h5v3H8z',
+  top: 'M3 4h14M6 7h3v8H6zm6 0h3v5h-3z',
+  middle: 'M3 10h14M6 5h3v10H6zm6 2h3v6h-3z',
+  bottom: 'M3 16h14M6 5h3v8H6zm6 3h3v5h-3z',
 } as const
+
+const alignmentTools: { id: Alignment; label: string }[] = [
+  { id: 'left', label: '左对齐' }, { id: 'center', label: '水平居中' }, { id: 'right', label: '右对齐' },
+  { id: 'top', label: '顶部对齐' }, { id: 'middle', label: '垂直居中' }, { id: 'bottom', label: '底部对齐' },
+]
 
 function DesignerGlyph({ name }: { name: keyof typeof glyphs }) {
   return <svg className="designer-glyph" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.45"
     strokeLinecap="round" strokeLinejoin="round" focusable="false" aria-hidden="true"><path d={glyphs[name]} /></svg>
+}
+
+function ComponentGlyph({ component }: { component: ScreenComponent }) {
+  return <DesignerGlyph name={chartStyleFor(component) ?? 'kpi'} />
 }
 
 const maxHistory = 50
@@ -111,7 +130,8 @@ function DraftBoard({ projectId, workspace, setProject }: {
   const queryClient = useQueryClient()
   const [base, setBase] = useState(workspace)
   const [history, setHistory] = useState(() => initialHistory(workspace.components))
-  const [selection, setSelection] = useState<string | undefined>(workspace.components[0]?.id)
+  const [selection, setSelection] = useState<string[]>(() => workspace.components.slice(0, 1).map(component => component.id))
+  const [multiSelect, setMultiSelect] = useState(false)
   const [preview, setPreview] = useState(false)
   const [showSaveError, setShowSaveError] = useState(false)
   const [zoom, setZoom] = useState('fit')
@@ -123,7 +143,11 @@ function DraftBoard({ projectId, workspace, setProject }: {
   const canvas = base.template.canvas
   const materials = base.template.components
   const components = history.present
-  const selected = components.find(component => component.id === selection)
+  const selectedIds = new Set(selection)
+  const selectedComponents = components.filter(component => selectedIds.has(component.id))
+  const selectedCount = selectedComponents.length
+  const selected = selectedCount === 1 ? selectedComponents[0] : undefined
+  const groupBounds = selectedCount > 1 ? componentBounds(selectedComponents) : null
   const dirty = JSON.stringify(components) !== JSON.stringify(base.components)
   const scale = zoom === 'fit' ? fitted : Number(zoom)
   const save = useMutation({
@@ -201,6 +225,18 @@ function DraftBoard({ projectId, workspace, setProject }: {
     updateComponent(id, component => ({ ...component, geometry }))
   }
 
+  function selectComponent(id: string, extend: boolean) {
+    setSelection(current => {
+      if (!extend) return [id]
+      return current.includes(id) ? current.filter(value => value !== id) : [...current, id]
+    })
+  }
+
+  function clearSelection() {
+    setSelection([])
+    setMultiSelect(false)
+  }
+
   function addMaterial(material: ScreenComponent, point?: { x: number; y: number }) {
     if (editingDisabled || components.length >= maxComponents) return
     const copy = cloneMaterial(material, components, canvas)
@@ -209,7 +245,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
       geometry: moveGeometry(copy.geometry, point.x - copy.geometry.x, point.y - copy.geometry.y, canvas),
     } : copy
     revise(current => [...current, added])
-    setSelection(added.id)
+    selectComponent(added.id, false)
   }
 
   function dropMaterial(event: DragEvent<HTMLDivElement>) {
@@ -227,8 +263,9 @@ function DraftBoard({ projectId, workspace, setProject }: {
 
   function beginPointer(event: PointerEvent<HTMLButtonElement>, component: ScreenComponent, action: PointerEdit['action']) {
     if (editingDisabled || event.button !== 0 || pointer.current) return
+    if (action === 'move' && (multiSelect || event.shiftKey)) return
     event.currentTarget.setPointerCapture(event.pointerId)
-    setSelection(component.id)
+    selectComponent(component.id, false)
     pointer.current = {
       id: event.pointerId,
       componentId: component.id,
@@ -270,6 +307,7 @@ function DraftBoard({ projectId, workspace, setProject }: {
         const delta = deltas[event.key as keyof typeof deltas]
         if (!delta) return
         event.preventDefault()
+        if (!selectedIds.has(component.id)) selectComponent(component.id, false)
         const transform = action === 'move' ? moveGeometry : resizeGeometry
         setGeometry(component.id, transform(component.geometry, delta[0], delta[1], canvas))
       },
@@ -308,7 +346,8 @@ function DraftBoard({ projectId, workspace, setProject }: {
       onSuccess: result => {
         setBase(result)
         setHistory(initialHistory(result.components))
-        setSelection(result.components[0]?.id)
+        setSelection(result.components.slice(0, 1).map(component => component.id))
+        setMultiSelect(false)
         queryClient.setQueryData(projectKey(projectId), result)
         save.reset()
         setConfirmation(undefined)
@@ -317,7 +356,12 @@ function DraftBoard({ projectId, workspace, setProject }: {
   }
 
   function canvasKeys(event: KeyboardEvent<HTMLElement>) {
-    if (editingDisabled || !event.ctrlKey && !event.metaKey) return
+    if (editingDisabled) return
+    if (event.key === 'Escape') {
+      clearSelection()
+      return
+    }
+    if (!event.ctrlKey && !event.metaKey) return
     const key = event.key.toLowerCase()
     if (key === 'z' || key === 'y') {
       event.preventDefault()
@@ -368,6 +412,27 @@ function DraftBoard({ projectId, workspace, setProject }: {
               </select>
             </div>
           </header>
+          <div className="designer-alignment">
+            <div className="designer-selection">
+              <Button size="small" autoInsertSpace={false} icon={<DesignerGlyph name="multi" />}
+                aria-pressed={multiSelect} title="开启后点击画布或图层逐个选择，也可按住 Shift 点击"
+                disabled={editingDisabled || !components.length} onClick={() => setMultiSelect(current => !current)}>
+                多选
+              </Button>
+              <span className="designer-selection-status" role="status">
+                {selectedCount ? '已选 ' + selectedCount + ' 个' : '未选择'}
+              </span>
+            </div>
+            <div className="designer-alignment-buttons" role="group" aria-label="组件对齐">
+              {alignmentTools.map(tool => (
+                <Button type="text" size="small" className="designer-align-button" key={tool.id} icon={<DesignerGlyph name={tool.id} />}
+                  aria-label={tool.label} title={tool.label} disabled={editingDisabled || selectedCount < 2}
+                  onClick={() => revise(current => alignComponents(current, selectedIds, tool.id, canvas))}>
+                  <span className="designer-align-label">{tool.label}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
           <div ref={viewport} className="designer-viewport" data-fit={zoom === 'fit'}>
             <div className="designer-canvas-size" style={{ width: canvas.width * scale, height: canvas.height * scale }}>
               <div className="designer-canvas" data-theme={base.template.theme}
@@ -378,16 +443,19 @@ function DraftBoard({ projectId, workspace, setProject }: {
                     event.dataTransfer.dropEffect = 'copy'
                   }
                 }}
-                onDrop={dropMaterial}>
+                onDrop={dropMaterial}
+                onClick={event => {
+                  if (event.target === event.currentTarget && !editingDisabled) clearSelection()
+                }}>
                 {components.map(component => {
                   const geometry = transient?.componentId === component.id ? transient.geometry : component.geometry
-                  const isSelected = selection === component.id
+                  const isSelected = selectedIds.has(component.id)
                   return (
                     <article key={component.id} className="designer-widget" data-selected={isSelected}
                       data-component-id={component.id} data-kind={component.type}
                       style={{
                         left: geometry.x, top: geometry.y, width: geometry.width, height: geometry.height,
-                        zIndex: isSelected ? 1001 : geometry.z,
+                        zIndex: selected?.id === component.id ? 1001 : geometry.z,
                         '--designer-handle-size': `${Math.round(34 / scale)}px`,
                         '--designer-outline-width': `${1.5 / scale}px`,
                         '--designer-handle-mark': `${8 / scale}px`,
@@ -395,21 +463,29 @@ function DraftBoard({ projectId, workspace, setProject }: {
                       <div className="designer-widget-content screen-component" data-kind={component.type} aria-hidden="true">
                         <ScreenComponentContent component={component} data={values.get(component.metricId)} />
                       </div>
-                      <button type="button" className="designer-widget-move" disabled={busy}
+                      <button type="button" className="designer-widget-move" disabled={editingDisabled}
                         aria-label={'移动 ' + component.title} aria-pressed={isSelected}
-                        onFocus={() => setSelection(component.id)} onClick={() => setSelection(component.id)}
+                        onClick={event => selectComponent(component.id, multiSelect || event.shiftKey)}
                         {...pointerControls(component, 'move')} />
-                      {isSelected && <button type="button" disabled={busy} className="designer-widget-resize"
+                      {selected?.id === component.id && <button type="button" disabled={editingDisabled} className="designer-widget-resize"
                         aria-label={'调整大小 ' + component.title} {...pointerControls(component, 'resize')} />}
                     </article>
                   )
                 })}
+                {groupBounds && (
+                  <div className="designer-group-outline" aria-hidden="true" style={{
+                    left: groupBounds.x, top: groupBounds.y, width: groupBounds.width, height: groupBounds.height,
+                    borderWidth: 1 / scale,
+                  }} />
+                )}
               </div>
             </div>
             {!components.length && <p className="designer-canvas-empty">画布为空。从组件库添加组件。</p>}
           </div>
           <footer className="designer-stage-status">
-            <span>{selected ? '拖动移动组件，方向键微调' : '从组件库添加或拖入组件'}</span>
+            <span>{selectedCount > 1 ? '以所选组件的外框对齐'
+              : selected ? '拖动移动，开启多选后逐个选择'
+                : components.length ? '点击组件或图层选择' : '从组件库添加或拖入组件'}</span>
             <output aria-label="实际缩放比例">{Math.round(scale * 100)}%</output>
           </footer>
         </section>
@@ -428,8 +504,8 @@ function DraftBoard({ projectId, workspace, setProject }: {
                     event.dataTransfer.effectAllowed = 'copy'
                     event.dataTransfer.setData(materialTransfer, material.id)
                   }}>
-                  <span className="designer-material-mark" data-kind={material.type}><DesignerGlyph name={material.type} /></span>
-                  <span className="designer-item-text">{material.title}<small>{kindNames[material.type]}</small></span>
+                  <span className="designer-material-mark" data-kind={material.type}><ComponentGlyph component={material} /></span>
+                  <span className="designer-item-text">{material.title}<small>{chartStyleLabel(material)}</small></span>
                   <span className="designer-item-add"><AdminIcon name="add" /></span>
                 </button>
               </li>
@@ -441,8 +517,9 @@ function DraftBoard({ projectId, workspace, setProject }: {
               {layers.map(component => (
                 <li key={component.id}>
                   <button type="button" className="designer-layer" aria-label={'组件 ' + component.title}
-                    aria-pressed={selection === component.id} disabled={busy} onClick={() => setSelection(component.id)}>
-                    <DesignerGlyph name={component.type} /><span className="designer-item-text">{component.title}</span>
+                    title={chartStyleLabel(component)} aria-pressed={selectedIds.has(component.id)} disabled={editingDisabled}
+                    onClick={event => selectComponent(component.id, multiSelect || event.shiftKey)}>
+                    <ComponentGlyph component={component} /><span className="designer-item-text">{component.title}</span>
                   </button>
                 </li>
               ))}
@@ -452,7 +529,8 @@ function DraftBoard({ projectId, workspace, setProject }: {
         <aside className="designer-inspector" aria-label="组件属性">
           <div className="designer-panel-title">
             <h2><AdminIcon name="settings" />组件属性</h2>
-            {selected && <span className="designer-kind" data-kind={selected.type}>{kindNames[selected.type]}</span>}
+            {selected && <span className="designer-kind" data-kind={selected.type}>{chartStyleLabel(selected)}</span>}
+            {selectedCount > 1 && <span className="designer-kind">已选 {selectedCount} 个</span>}
           </div>
           {selected ? (
             <Properties component={selected} materials={materials} disabled={busy} canvas={canvas}
@@ -461,8 +539,13 @@ function DraftBoard({ projectId, workspace, setProject }: {
               canLayer={components.length > 1}
               remove={() => {
                 revise(current => current.filter(component => component.id !== selected.id))
-                setSelection(undefined)
+                clearSelection()
               }} />
+          ) : selectedCount ? (
+            <div className="designer-group-details">
+              <p>使用画布工具栏对齐所选组件。</p>
+              <Button size="small" autoInsertSpace={false} onClick={clearSelection} disabled={editingDisabled}>清空选择</Button>
+            </div>
           ) : <p className="designer-empty">选择画布或图层中的组件。</p>}
         </aside>
       </div>
@@ -539,6 +622,7 @@ function Properties({ component, materials, disabled, canvas, update, layer, can
   const fields = [
     ['x', 'X 坐标'], ['y', 'Y 坐标'], ['width', '宽度'], ['height', '高度'],
   ] as const
+  const chartOptions = chartStyleOptions(component.type)
 
   function submitValue(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Enter') {
@@ -574,6 +658,16 @@ function Properties({ component, materials, disabled, canvas, update, layer, can
               .map(item => <option key={item.metricId} value={item.metricId}>{item.title}</option>)}
           </select>
         </Field>
+        {chartOptions.length > 0 && (
+          <Field label="图表类型">
+            <select value={chartStyleFor(component)} disabled={disabled} onChange={event => {
+              const chartStyle = chartOptions.find(option => option.value === event.currentTarget.value)?.value
+              if (chartStyle) update(current => ({ ...current, chartStyle }))
+            }}>
+              {chartOptions.map(option => <option value={option.value} key={option.value}>{option.label}</option>)}
+            </select>
+          </Field>
+        )}
       </section>
       <section className="designer-property-group designer-placement" aria-labelledby="designer-placement-title">
         <div className="designer-group-heading">

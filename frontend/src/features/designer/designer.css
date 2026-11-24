@@ -1,8 +1,8 @@
 .designer-page {
-  --design-surface: #101a2b;
-  --design-field: #0b1525;
-  --design-line: #273950;
-  --design-control: #39516d;
+  --design-surface: #0d1525;
+  --design-field: #080f1e;
+  --design-line: #263349;
+  --design-control: #3a4c69;
   --design-muted: #aabed9;
   --design-ink: #edf5ff;
   --design-accent: #91e1ff;
@@ -27,7 +27,7 @@
   border: 1px solid #48699c;
   border-radius: .72rem;
   color: var(--design-accent);
-  background: linear-gradient(145deg, #233c65, #121f37);
+  background: linear-gradient(145deg, #253b70, #151e38 76%);
   box-shadow: 0 .22rem .7rem #02061155;
 }
 
@@ -40,9 +40,9 @@
   min-width: 0;
   margin-block-end: .75rem;
   padding: .65rem .72rem;
-  border: 1px solid #2e4160;
+  border: 1px solid #354361;
   border-radius: .72rem;
-  background: linear-gradient(102deg, #182943, #101a2b 61%);
+  background: linear-gradient(112deg, #19233b, #121b2d 52%, #151c32);
 }
 
 .designer-project {
@@ -137,7 +137,7 @@
   background: var(--design-line);
   border: 1px solid var(--design-line);
   border-radius: .8rem;
-  box-shadow: 0 1.1rem 2.2rem #0308126b;
+  box-shadow: 0 1.1rem 2.5rem #02061091;
 }
 
 .designer-stage, .designer-materials, .designer-inspector {
@@ -167,7 +167,7 @@
   gap: .38rem .65rem;
   padding: .51rem .67rem;
   border-bottom: 1px solid var(--design-line);
-  background: #142135;
+  background: linear-gradient(110deg, #131d30, #172237);
 }
 
 .designer-stage-bar { border-radius: inherit; }
@@ -220,6 +220,46 @@
   background: #0e192b;
 }
 
+.designer-alignment {
+  display: flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: .36rem .7rem;
+  padding: .3rem .58rem;
+  border-bottom: 1px solid var(--design-line);
+  background: #0d1728;
+}
+
+.designer-selection { display: flex; align-items: center; gap: .6rem; }
+.designer-selection .ant-btn { gap: .34rem; white-space: nowrap; }
+.designer-selection .designer-glyph { color: #9ec5f0; }
+.designer-selection .ant-btn[aria-pressed="true"] {
+  border-color: #567ee4;
+  color: #eef3ff;
+  background: #273969;
+}
+.designer-selection .ant-btn[aria-pressed="true"] .designer-glyph { color: #b1dffb; }
+.designer-selection-status { color: var(--design-muted); font-size: .75rem; white-space: nowrap; }
+.designer-alignment-buttons {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: .02rem;
+}
+.designer-alignment-buttons .ant-btn {
+  min-width: 2rem;
+  padding-inline: .3rem;
+  color: #b1ccef;
+}
+.designer-alignment-buttons .ant-btn:disabled { color: #69809e; }
+.designer-alignment-buttons .ant-btn:not(:disabled):hover {
+  color: #c5f5ff;
+  background: #293b62;
+}
+.designer-alignment-buttons .designer-align-button:nth-child(4) { border-inline-start: 1px solid #2d3d5b; }
+.designer-align-label { display: none; }
+
 .designer-viewport {
   position: relative;
   display: block;
@@ -229,10 +269,12 @@
   padding: 1rem;
   overflow: auto;
   overscroll-behavior-inline: contain;
-  scrollbar-color: #56759a #0c1525;
+  scrollbar-color: #56759a #0a101e;
   background:
-    radial-gradient(circle, #547ba479 .7px, transparent 1px) center / 17px 17px,
-    radial-gradient(ellipse at 49% 57%, #192b45 0%, #0c1729 65%, #0a1322 100%);
+    radial-gradient(circle, #6b8cb46e .6px, transparent .88px) center / 18px 18px,
+    radial-gradient(ellipse at 27% 64%, #192c4d 0%, transparent 61%),
+    radial-gradient(ellipse at 72% 26%, #1e2250 0%, transparent 62%),
+    #07101c;
 }
 
 .designer-viewport[data-fit="true"] { display: grid; place-items: center; }
@@ -244,7 +286,7 @@
   gap: .6rem;
   padding: .35rem .67rem;
   border-top: 1px solid var(--design-line);
-  background: #101b2d;
+  background: #0c1727;
   color: var(--design-muted);
   font-size: .74rem;
 }
@@ -256,7 +298,7 @@
   margin-inline: auto;
   overflow: clip;
   border-radius: .34rem;
-  box-shadow: 0 .72rem 2.2rem #02050d9c, 0 0 0 1px #56779d;
+  box-shadow: 0 1rem 2.3rem #02050dbd, 0 0 0 1px #5578a6;
 }
 .designer-canvas {
   position: relative;
@@ -283,7 +325,7 @@
 }
 
 .designer-widget { position: absolute; outline: 0; user-select: none; }
-.designer-widget[data-selected="true"]::after, .designer-widget:focus-within::after {
+.designer-widget[data-selected="true"]::after, .designer-widget:has(:focus-visible)::after {
   position: absolute;
   z-index: 2;
   inset: 0;
@@ -292,7 +334,15 @@
   pointer-events: none;
   content: "";
 }
-.designer-widget:focus-within::after { border-color: #d1f3ff; }
+.designer-widget:has(:focus-visible)::after { border-color: #d1f3ff; }
+.designer-group-outline {
+  position: absolute;
+  z-index: 1002;
+  border-style: dashed;
+  border-color: #b8a5ff;
+  border-radius: 13px;
+  pointer-events: none;
+}
 .designer-widget-content { inset: 0; pointer-events: none; }
 .designer-widget-content.screen-component { border-width: 2px; }
 
@@ -414,6 +464,14 @@
 .designer-property-actions { display: flex; flex-wrap: wrap; gap: .34rem; padding: .64rem .67rem .75rem; }
 .designer-property-actions .ant-btn-dangerous:not(:disabled) { color: #ffb4ad; }
 .designer-empty { padding: .75rem .67rem; color: var(--design-muted); font-size: .81rem; line-height: 1.5; }
+.designer-group-details {
+  display: grid;
+  justify-items: start;
+  gap: .7rem;
+  padding: .85rem .67rem;
+  color: var(--design-muted);
+  font-size: .81rem;
+}
 
 .designer-dialog .ant-modal-container { border: 1px solid #3d5677; background: #101b2e; }
 .designer-dialog :is(.ant-modal-header, .ant-modal-footer) { background: transparent; }
@@ -454,6 +512,16 @@
   .designer-stage-label { column-gap: .36rem; }
   .designer-stage-controls { gap: .28rem; }
   .designer-stage-controls .ant-btn { padding-inline: .34rem; }
+  .designer-alignment { padding-inline: .48rem; }
+  .designer-alignment-buttons { width: 100%; }
+  .designer-alignment-buttons .designer-align-button {
+    display: inline-flex;
+    height: auto;
+    flex-direction: column;
+    gap: .13rem;
+    padding: .2rem 0;
+  }
+  .designer-align-label { display: block; font-size: .62rem; line-height: 1.2; }
   .designer-material-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -469,4 +537,5 @@
 @media (pointer: coarse) {
   .designer-page button:not(.designer-widget-move, .designer-widget-resize),
   .designer-page select, .designer-geometry input { min-height: 44px; }
+  .designer-alignment-buttons .ant-btn { min-width: 44px; }
 }
