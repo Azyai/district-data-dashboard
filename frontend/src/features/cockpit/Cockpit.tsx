@@ -13,7 +13,7 @@ const calendar = new Intl.DateTimeFormat('zh-CN', {
   year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Shanghai',
 })
 const clock = new Intl.DateTimeFormat('zh-CN', {
-  hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Shanghai',
+  hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Shanghai',
 })
 
 function areaPath(areaId: string) {
@@ -32,8 +32,14 @@ const directoryQuery = queryOptions({
   staleTime: 300_000,
 })
 
-function Masthead({ updatedAt }: { updatedAt?: string }) {
-  const timestamp = updatedAt ? Date.parse(updatedAt) : NaN
+function Masthead() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000)
+    return () => window.clearInterval(timer)
+  }, [])
+  const date = calendar.format(now)
+  const time = clock.format(now)
   return (
     <header className="cockpit-masthead">
       <Link to="/" className="cockpit-brand" aria-label="返回门头沟区全域" title="全区总览">
@@ -44,9 +50,9 @@ function Masthead({ updatedAt }: { updatedAt?: string }) {
         </svg>
       </Link>
       <h1>门头沟区数字驾驶舱</h1>
-      {Number.isFinite(timestamp) && <time className="masthead-time" dateTime={updatedAt} aria-label={'模拟数据更新于北京时间 ' + calendar.format(timestamp) + ' ' + clock.format(timestamp)}>
-        <span><small>模拟数据更新</small>{calendar.format(timestamp)}</span><strong>{clock.format(timestamp)}</strong>
-      </time>}
+      <time className="masthead-time" dateTime={now.toISOString()} aria-label={'北京时间 ' + date + ' ' + time}>
+        <span><small>北京时间</small>{date}</span><strong>{time}</strong>
+      </time>
     </header>
   )
 }
@@ -142,7 +148,7 @@ function RegionModel({ area, directory, directoryState, viewMode, onViewModeChan
           </div>
           <div className="map-actions">
             <RegionPicker key={area.id} area={area} directory={directory} directoryState={directoryState} />
-            {!isDistrict && <a className="level-up" href={'/workbench?area=' + encodeURIComponent(area.id) + '#area-issues'}
+            {!isDistrict && <a className="level-up" href={'/data/areas/' + encodeURIComponent(area.id) + '#area-issues'}
               target="_blank" rel="noopener noreferrer">区域数据 <span aria-hidden="true">↗</span></a>}
           </div>
         </div>
@@ -178,7 +184,7 @@ export default function Cockpit() {
 
   return (
     <div className="cockpit">
-      <Masthead updatedAt={area?.updatedAt} />
+      <Masthead />
       <main className="cockpit-body" aria-label="区域驾驶舱">
         {area ? (
           <div ref={heading} className="cockpit-main" tabIndex={-1} aria-label={area.name}

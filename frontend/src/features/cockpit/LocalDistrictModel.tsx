@@ -574,7 +574,7 @@ export default function LocalDistrictModel({ area, onSelectArea, onOpenTwin, sta
         {district && population && (
           <div className="model-population" style={{ left: population.x + '%', top: population.y + '%' }}>
             <span className="model-beacon" aria-hidden="true" />
-            <Link className="model-callout" to="/workbench?topic=population" target="_blank" rel="noopener noreferrer" aria-label="查看全区人口专题">
+            <Link className="model-callout" to="/topics/population" target="_blank" rel="noopener noreferrer" aria-label="查看全区人口专题">
               <span>门头沟区常住人口</span>
               <p><strong>{demoPopulation}</strong> 万人</p>
               <small>演示数据</small>
