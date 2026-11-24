@@ -4,9 +4,11 @@ import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { Link, useLocation, useMatch, useNavigate } from 'react-router'
 import { ApiError, dashboardApi, type CockpitArea, type CockpitDirectory } from '../../api/client'
 import { answerFromSnapshot } from '../assistant/answer'
-import { interpretCockpitIntent } from '../assistant/intent'
+import { interpretScreenIntent } from '../assistant/intent'
+import { queryHotlineAnswer } from '../assistant/hotlineAnswer'
+import { answerFromScreen, screenSnapshotTime } from '../assistant/screenAnswer'
+import { screenPath } from '../screens/screenCatalog'
 import type { AssistantReply } from '../assistant/VoiceAssistant'
-import { matchTopics } from '../topics/topicCatalog'
 import './workbench.css'
 
 const VoiceAssistant = lazy(() => import('../assistant/VoiceAssistant').then(module => ({ default: module.VoiceAssistant })))
@@ -167,7 +169,13 @@ export default function AreaWorkbench({ identityControl, topicControl, onTopicQu
 
     const locations = await client.fetchQuery(directoryQuery)
     ensureCurrentView()
-    const intent = interpretCockpitIntent(question, area.id, locations, text => matchTopics(text).length > 0)
+    const intent = interpretScreenIntent(question, area.id, locations)
+    if (intent.kind === 'home' || intent.kind === 'screen') {
+      setOverlay(null)
+      void navigate(intent.kind === 'home' ? '/' : screenPath(intent.screen, intent.areaId))
+      return null
+    }
+    if (intent.kind === 'hotline') return queryHotlineAnswer(client, question, intent.areaId, signal)
     if (intent.kind === 'clarify') {
       if (intent.reason === 'missing-navigation-target') {
         const reply = await onTopicQuestion(question, area, signal)
@@ -184,6 +192,8 @@ export default function AreaWorkbench({ identityControl, topicControl, onTopicQu
     const destination = sameArea ? area : await client.fetchQuery(areaQuery(intent.areaId))
     ensureCurrentView()
     if (intent.kind === 'ask') {
+      const screenAnswer = answerFromScreen(question, destination)
+      if (screenAnswer) return { answer: screenAnswer, scope: { ...destination, updatedAt: screenSnapshotTime } }
       const reply = await onTopicQuestion(intent.question, destination, signal)
       signal.throwIfAborted()
       if (reply !== undefined) {

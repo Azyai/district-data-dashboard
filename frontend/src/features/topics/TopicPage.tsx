@@ -1,10 +1,12 @@
-import { skipToken, useQuery } from '@tanstack/react-query'
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Spin } from 'antd'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useParams } from 'react-router'
 import { ApiError, dashboardApi, type ComponentData, type Manifest } from '../../api/client'
 import { useMicrophone } from '../assistant/useMicrophone'
-import { interpretCockpitIntent } from '../assistant/intent'
+import { queryHotlineAnswer } from '../assistant/hotlineAnswer'
+import { interpretScreenIntent } from '../assistant/intent'
+import { screenPath } from '../screens/screenCatalog'
 import { ScreenComponentContent } from '../playback/ScreenCanvas'
 import { analyzeTopic } from './topicInsight'
 import { asksForInsight, matchTopics, topicFor, topicPath, topics, type TopicId } from './topicCatalog'
@@ -33,6 +35,8 @@ function TopicConversation({ manifest, snapshot, initialQuestion, onNavigate, on
   const [input, setInput] = useState('')
   const [request, setRequest] = useState(initialQuestion)
   const [notice, setNotice] = useState('')
+  const client = useQueryClient()
+  const pending = useRef<AbortController>(null)
   const speech = useRef<SpeechSynthesisUtterance>(null)
   const microphone = useMicrophone()
   const locations = useQuery({
@@ -43,6 +47,7 @@ function TopicConversation({ manifest, snapshot, initialQuestion, onNavigate, on
   const topic = topicFor(manifest.projectId)
   const insight = request ? analyzeTopic(request, manifest, snapshot) : null
   useEffect(() => () => {
+    pending.current?.abort()
     if (speech.current) window.speechSynthesis.cancel()
   }, [])
 
@@ -52,9 +57,10 @@ function TopicConversation({ manifest, snapshot, initialQuestion, onNavigate, on
     speech.current = null
   }
 
-  function ask(question: string) {
+  async function ask(question: string) {
     const text = question.trim()
     if (!text) return
+    pending.current?.abort()
     if (microphone.active) microphone.cancel()
     stopReading()
     const departure = closeByVoice.exec(text)?.[1]
@@ -63,7 +69,22 @@ function TopicConversation({ manifest, snapshot, initialQuestion, onNavigate, on
       setNotice(locations.isError ? '区域目录暂不可用，请稍后重试。' : '区域目录加载中，请稍候。')
       return
     }
-    const scope = interpretCockpitIntent(text, 'mentougou', locations.data, command => matchTopics(command).length > 0)
+    const scope = interpretScreenIntent(text, 'mentougou', locations.data)
+    if (scope.kind === 'home') return onNavigate('/')
+    if (scope.kind === 'screen') return onNavigate(screenPath(scope.screen, scope.areaId))
+    if (scope.kind === 'hotline') {
+      const controller = new AbortController()
+      pending.current = controller
+      setRequest('')
+      setNotice('正在查询接诉即办工单…')
+      try {
+        const reply = await queryHotlineAnswer(client, text, scope.areaId, controller.signal)
+        if (!controller.signal.aborted) setNotice(reply.answer.text)
+      } catch {
+        if (!controller.signal.aborted) setNotice('暂时无法查询接诉即办工单，请重试。')
+      }
+      return
+    }
     if (scope.kind === 'clarify' && scope.reason !== 'missing-navigation-target') {
       setNotice(scope.message)
       return
