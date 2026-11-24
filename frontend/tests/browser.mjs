@@ -79,31 +79,26 @@ async function verifyDistrictMap(page) {
   const choose = async name => {
     if (await tool.getAttribute('aria-expanded') === 'false') await tool.click()
     await panel.getByRole('button', { name, exact: true }).click()
-    if (name !== '3D') await panel.waitFor({ state: 'hidden' })
+    await panel.waitFor({ state: 'hidden' })
   }
   const zoom = () => map.evaluate(node => Number(node.dataset.zoom))
   for (const mode of ['2D', '3D']) {
     await choose(mode)
     await page.waitForFunction(view => document.querySelector('.tianditu-map')?.dataset.view === view, mode.toLowerCase())
     if (mode === '3D') {
-      await panel.getByRole('button', { name: '向右旋转' }).click()
-      await panel.getByRole('button', { name: '增大俯仰' }).click()
-      await page.waitForFunction(() => {
-        const data = document.querySelector('.tianditu-map')?.dataset
-        return Number(data?.bearing) === 15 && Number(data?.pitch) === 45
-      })
-      await panel.getByRole('button', { name: '朝向正北' }).click()
-      await page.waitForFunction(() => Number(document.querySelector('.tianditu-map')?.dataset.bearing) === 0)
-      await tool.press('Escape')
       const anchor = await freeMapPoint(map)
+      const initial = await map.evaluate(el => ({ bearing: Number(el.dataset.bearing), pitch: Number(el.dataset.pitch) }))
       await page.mouse.move(anchor.x, anchor.y)
-      await page.mouse.down({ button: 'right' })
-      await page.mouse.move(anchor.x + 45, anchor.y + 25, { steps: 6 })
-      await page.mouse.up({ button: 'right' })
-      await page.waitForFunction(() => {
+      await page.mouse.down()
+      await page.mouse.move(anchor.x + 45, anchor.y - 25, { steps: 6 })
+      await page.waitForFunction(({ bearing, pitch }) => {
         const data = document.querySelector('.tianditu-map')?.dataset
-        return Math.abs(Number(data?.bearing)) > 1 && Math.abs(Number(data?.pitch) - 45) > 1
-      })
+        return Math.abs(Number(data?.bearing) - bearing) > 1 && Math.abs(Number(data?.pitch) - pitch) > 1
+      }, initial)
+      await page.mouse.up()
+      await tool.click()
+      assert.equal(await panel.getByRole('button').count(), 3)
+      assert.equal(await panel.getByText(/天地图/).count(), 0)
     }
     await choose('复位视角')
     const start = await zoom()
@@ -118,6 +113,7 @@ async function verifyDistrictMap(page) {
     await choose('复位视角')
     await page.waitForFunction(expected => Math.abs(Number(document.querySelector('.tianditu-map')?.dataset.zoom) - expected) < .05, start)
   }
+  await choose('2D')
   const datai = map.locator('.atlas-place[data-place="datai"]')
   const original = await datai.boundingBox()
   assert(original)
@@ -224,7 +220,11 @@ try {
   await waitForArea(page, '门头沟区')
   assert.equal(await page.locator('.cockpit-masthead').getByRole('button').count(), 0)
   assert.equal(await page.getByRole('link', { name: '数据管理', exact: true }).count(), 0)
-  await page.locator('.cockpit-masthead time[datetime]').waitFor()
+  const clock = page.locator('.cockpit-masthead time[datetime]')
+  await clock.waitFor()
+  const initialClock = await clock.getAttribute('datetime')
+  assert(Math.abs(Date.parse(initialClock) - Date.now()) < 5_000, 'The masthead shows current time')
+  await page.waitForFunction(previous => document.querySelector('.masthead-time')?.dateTime !== previous, initialClock)
   assert.equal(await page.locator('.area-bar, .model-imagery-source, .atlas-credit').count(), 0)
   await assertNoHorizontalOverflow(page)
   await page.setViewportSize({ width: 1106, height: 893 })
@@ -319,7 +319,7 @@ try {
   await manualIssues.waitFor({ state: 'hidden' })
 
   await ask('我想要看大台街道的数据')
-  await workbench.waitForURL('**/workbench?area=datai')
+  await workbench.waitForURL('**/data/areas/datai')
   await workbench.getByRole('heading', { name: '大台街道', exact: true }).waitFor()
   await assistant.waitFor({ state: 'hidden' })
   await ask('大台有哪些问题')
@@ -332,7 +332,7 @@ try {
 
   await workbench.getByRole('link', { name: '门头沟区', exact: true }).click()
   await ask('大台街道的办结率是多少？')
-  await workbench.waitForURL('**/workbench?area=datai')
+  await workbench.waitForURL('**/data/areas/datai')
   await assistant.getByRole('log', { name: '问数记录' }).getByText(/大台街道当前快照的.*办结率/).waitFor()
   await capture(workbench, 'assistant-cross-area.png')
   await assistant.getByRole('link', { name: '返回门头沟区', exact: true }).click()
