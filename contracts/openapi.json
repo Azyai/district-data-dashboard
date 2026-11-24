@@ -39,6 +39,10 @@
     {
       "name": "metrics",
       "description": "指标版本和发布"
+    },
+    {
+      "name": "hotline",
+      "description": "接诉即办工单、区域汇总、固定分析与指标口径（仅演示模式）"
     }
   ],
   "paths": {
@@ -1678,6 +1682,385 @@
           }
         }
       }
+    },
+    "/api/v1/hotline/overview": {
+      "get": {
+        "operationId": "getHotlineOverview",
+        "summary": "查询接诉即办区域概览",
+        "description": "按区、镇街或村社聚合。趋势包含全部已发布的演示月份。",
+        "tags": [
+          "hotline"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HotlineAreaId"
+          },
+          {
+            "$ref": "#/components/parameters/HotlineMonth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HotlineOverview"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/hotline/tickets": {
+      "get": {
+        "operationId": "getHotlineTickets",
+        "summary": "分页查询合成工单",
+        "description": "按受理日期与工单编号倒序排列。",
+        "tags": [
+          "hotline"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HotlineAreaId"
+          },
+          {
+            "$ref": "#/components/parameters/HotlineMonth"
+          },
+          {
+            "name": "lane",
+            "in": "query",
+            "description": "办理时限分类",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "open",
+                "due",
+                "late",
+                "closed"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "诉求类别",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "all",
+                "property",
+                "utilities",
+                "sanitation",
+                "traffic",
+                "other"
+              ],
+              "default": "all"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000,
+              "default": 0
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HotlineTicketPage"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/hotline/tickets/{id}": {
+      "get": {
+        "operationId": "getHotlineTicket",
+        "summary": "查看合成工单与办理流程",
+        "description": "可按当前区域与月份约束详情。工单超出所选范围时返回未找到。",
+        "tags": [
+          "hotline"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^HL-[0-9]{6}-[0-9]{5}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/HotlineAreaId"
+          },
+          {
+            "name": "month",
+            "in": "query",
+            "description": "限定工单所属统计月份，省略时按编号查询。",
+            "schema": {
+              "type": "string",
+              "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HotlineTicketDetail"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/hotline/analysis": {
+      "get": {
+        "operationId": "getHotlineAnalysis",
+        "summary": "读取接诉即办固定口径分析",
+        "description": "返回高频诉求、受理量环比、办理时限和工单派发情况。",
+        "tags": [
+          "hotline"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/HotlineAreaId"
+          },
+          {
+            "$ref": "#/components/parameters/HotlineMonth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HotlineAnalysis"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Http400"
+          },
+          "404": {
+            "$ref": "#/components/responses/Http404"
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        }
+      }
+    },
+    "/api/v1/hotline/semantics": {
+      "get": {
+        "operationId": "getHotlineSemantics",
+        "summary": "读取接诉即办指标语义",
+        "tags": [
+          "hotline"
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "请求成功",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "0"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/HotlineSemantics"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message",
+                    "data"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "$ref": "#/components/responses/Http500"
+          }
+        },
+        "description": "返回指标解释、工单事实表字段及关联维度的字段类型、含义、键和枚举。"
+      }
     }
   },
   "components": {
@@ -1727,6 +2110,26 @@
           "maxLength": 120
         },
         "description": "安全重试的操作标识"
+      },
+      "HotlineAreaId": {
+        "name": "areaId",
+        "in": "query",
+        "description": "区、镇街或村社的区域 ID",
+        "schema": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$",
+          "default": "mentougou"
+        }
+      },
+      "HotlineMonth": {
+        "name": "month",
+        "in": "query",
+        "description": "目前的演示数据覆盖 2026 年 1–10 月",
+        "schema": {
+          "type": "string",
+          "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$",
+          "default": "2026-10"
+        }
       }
     },
     "securitySchemes": {
@@ -3003,6 +3406,745 @@
             "pattern": "^[a-z][a-z0-9-]{0,63}$"
           }
         },
+        "additionalProperties": false
+      },
+      "HotlineArea": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CockpitLevel"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "level",
+          "parentId"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineThresholds": {
+        "type": "object",
+        "properties": {
+          "dueDays": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "lateDays": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "dueDays",
+          "lateDays"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineTotals": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assigned": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "closed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "open": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "due": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "late": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unassigned": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "processing": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "closedRate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "received",
+          "assigned",
+          "closed",
+          "open",
+          "due",
+          "late",
+          "unassigned",
+          "processing",
+          "closedRate"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineAreaTotals": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/CockpitLevel"
+          },
+          "received": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assigned": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "closed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "open": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "due": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "late": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unassigned": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "processing": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "closedRate": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "level",
+          "received",
+          "assigned",
+          "closed",
+          "open",
+          "due",
+          "late",
+          "unassigned",
+          "processing",
+          "closedRate"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineCategory": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "property",
+              "utilities",
+              "sanitation",
+              "traffic",
+              "other"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "count"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineTrendPoint": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$"
+          },
+          "received": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "month",
+          "received"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineOverview": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/HotlineArea"
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "SIMULATED"
+            ]
+          },
+          "snapshotOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/HotlineThresholds"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/HotlineTotals"
+          },
+          "trend": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineTrendPoint"
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineCategory"
+            }
+          },
+          "areas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineAreaTotals"
+            }
+          }
+        },
+        "required": [
+          "area",
+          "month",
+          "quality",
+          "snapshotOn",
+          "thresholds",
+          "totals",
+          "trend",
+          "categories",
+          "areas"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineTicket": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^HL-[0-9]{6}-[0-9]{5}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "areaId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "areaName": {
+            "type": "string"
+          },
+          "townId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "townName": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "enum": [
+              "property",
+              "utilities",
+              "sanitation",
+              "traffic",
+              "other"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "closed"
+            ]
+          },
+          "lane": {
+            "type": "string",
+            "enum": [
+              "open",
+              "due",
+              "late",
+              "closed"
+            ]
+          },
+          "elapsedDays": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "openedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "areaId",
+          "areaName",
+          "townId",
+          "townName",
+          "categoryId",
+          "category",
+          "status",
+          "lane",
+          "elapsedDays",
+          "openedOn",
+          "note"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineTicketPage": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/HotlineArea"
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$"
+          },
+          "page": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineTicket"
+            }
+          }
+        },
+        "required": [
+          "area",
+          "month",
+          "page",
+          "size",
+          "total",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineStep": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "enum": [
+              "受理",
+              "派单",
+              "办理",
+              "反馈"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "active",
+              "done"
+            ]
+          },
+          "on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          }
+        },
+        "required": [
+          "label",
+          "state",
+          "on"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineTicketDetail": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^HL-[0-9]{6}-[0-9]{5}$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "areaId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "areaName": {
+            "type": "string"
+          },
+          "townId": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+          },
+          "townName": {
+            "type": "string"
+          },
+          "categoryId": {
+            "type": "string",
+            "enum": [
+              "property",
+              "utilities",
+              "sanitation",
+              "traffic",
+              "other"
+            ]
+          },
+          "category": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "processing",
+              "closed"
+            ]
+          },
+          "lane": {
+            "type": "string",
+            "enum": [
+              "open",
+              "due",
+              "late",
+              "closed"
+            ]
+          },
+          "elapsedDays": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "openedOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "note": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineStep"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "areaId",
+          "areaName",
+          "townId",
+          "townName",
+          "categoryId",
+          "category",
+          "status",
+          "lane",
+          "elapsedDays",
+          "openedOn",
+          "note",
+          "steps"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineFinding": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": [
+              "top-category",
+              "month-change",
+              "deadline-watch",
+              "dispatch-watch"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "metricId": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "unit": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "summary",
+          "metricId",
+          "value",
+          "unit"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineAnalysis": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "$ref": "#/components/schemas/HotlineArea"
+          },
+          "month": {
+            "type": "string",
+            "pattern": "^20[0-9]{2}-(0[1-9]|1[0-2])$"
+          },
+          "quality": {
+            "type": "string",
+            "enum": [
+              "SIMULATED"
+            ]
+          },
+          "snapshotOn": {
+            "type": "string",
+            "format": "date"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/HotlineTotals"
+          },
+          "findings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineFinding"
+            }
+          }
+        },
+        "required": [
+          "area",
+          "month",
+          "quality",
+          "snapshotOn",
+          "totals",
+          "findings"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineMetric": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "dimensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "description",
+          "unit",
+          "dimensions"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineSemantics": {
+        "type": "object",
+        "properties": {
+          "dataset": {
+            "type": "string",
+            "enum": [
+              "hotline"
+            ]
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineMetric"
+            }
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HotlineField"
+            }
+          }
+        },
+        "required": [
+          "dataset",
+          "metrics",
+          "fields"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineFieldReference": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "enum": [
+              "hotline_area",
+              "hotline_category",
+              "hotline_snapshot"
+            ]
+          },
+          "column": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "column"
+        ],
+        "additionalProperties": false
+      },
+      "HotlineField": {
+        "type": "object",
+        "properties": {
+          "table": {
+            "type": "string",
+            "enum": [
+              "hotline_ticket",
+              "hotline_area",
+              "hotline_category",
+              "hotline_snapshot"
+            ]
+          },
+          "column": {
+            "type": "string"
+          },
+          "sqlType": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "nullable": {
+            "type": "boolean"
+          },
+          "key": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "foreign",
+              "none"
+            ]
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HotlineFieldReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowedValues": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "table",
+          "column",
+          "sqlType",
+          "description",
+          "nullable",
+          "key",
+          "reference",
+          "allowedValues"
+        ],
         "additionalProperties": false
       }
     },

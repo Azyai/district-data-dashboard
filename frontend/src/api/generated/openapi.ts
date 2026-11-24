@@ -415,6 +415,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/hotline/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询接诉即办区域概览
+         * @description 按区、镇街或村社聚合。趋势包含全部已发布的演示月份。
+         */
+        get: operations["getHotlineOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hotline/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 分页查询合成工单
+         * @description 按受理日期与工单编号倒序排列。
+         */
+        get: operations["getHotlineTickets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hotline/tickets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查看合成工单与办理流程
+         * @description 可按当前区域与月份约束详情。工单超出所选范围时返回未找到。
+         */
+        get: operations["getHotlineTicket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hotline/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取接诉即办固定口径分析
+         * @description 返回高频诉求、受理量环比、办理时限和工单派发情况。
+         */
+        get: operations["getHotlineAnalysis"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/hotline/semantics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取接诉即办指标语义
+         * @description 返回指标解释、工单事实表字段及关联维度的字段类型、含义、键和枚举。
+         */
+        get: operations["getHotlineSemantics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -680,6 +780,168 @@ export interface components {
             level: components["schemas"]["CockpitLevel"];
             parentId: string | null;
         };
+        HotlineArea: {
+            id: string;
+            name: string;
+            level: components["schemas"]["CockpitLevel"];
+            parentId: string | null;
+        };
+        HotlineThresholds: {
+            dueDays: number;
+            lateDays: number;
+        };
+        HotlineTotals: {
+            received: number;
+            assigned: number;
+            closed: number;
+            open: number;
+            due: number;
+            late: number;
+            unassigned: number;
+            processing: number;
+            closedRate: number;
+        };
+        HotlineAreaTotals: {
+            id: string;
+            name: string;
+            level: components["schemas"]["CockpitLevel"];
+            received: number;
+            assigned: number;
+            closed: number;
+            open: number;
+            due: number;
+            late: number;
+            unassigned: number;
+            processing: number;
+            closedRate: number;
+        };
+        HotlineCategory: {
+            /** @enum {string} */
+            id: "property" | "utilities" | "sanitation" | "traffic" | "other";
+            label: string;
+            count: number;
+        };
+        HotlineTrendPoint: {
+            month: string;
+            received: number;
+        };
+        HotlineOverview: {
+            area: components["schemas"]["HotlineArea"];
+            month: string;
+            /** @enum {string} */
+            quality: "SIMULATED";
+            /** Format: date */
+            snapshotOn: string;
+            thresholds: components["schemas"]["HotlineThresholds"];
+            totals: components["schemas"]["HotlineTotals"];
+            trend: components["schemas"]["HotlineTrendPoint"][];
+            categories: components["schemas"]["HotlineCategory"][];
+            areas: components["schemas"]["HotlineAreaTotals"][];
+        };
+        HotlineTicket: {
+            id: string;
+            title: string;
+            areaId: string;
+            areaName: string;
+            townId: string;
+            townName: string;
+            /** @enum {string} */
+            categoryId: "property" | "utilities" | "sanitation" | "traffic" | "other";
+            category: string;
+            /** @enum {string} */
+            status: "pending" | "processing" | "closed";
+            /** @enum {string} */
+            lane: "open" | "due" | "late" | "closed";
+            elapsedDays: number;
+            /** Format: date */
+            openedOn: string;
+            note: string;
+        };
+        HotlineTicketPage: {
+            area: components["schemas"]["HotlineArea"];
+            month: string;
+            page: number;
+            size: number;
+            total: number;
+            items: components["schemas"]["HotlineTicket"][];
+        };
+        HotlineStep: {
+            /** @enum {string} */
+            label: "受理" | "派单" | "办理" | "反馈";
+            /** @enum {string} */
+            state: "pending" | "active" | "done";
+            /** Format: date */
+            on: string | null;
+        };
+        HotlineTicketDetail: {
+            id: string;
+            title: string;
+            areaId: string;
+            areaName: string;
+            townId: string;
+            townName: string;
+            /** @enum {string} */
+            categoryId: "property" | "utilities" | "sanitation" | "traffic" | "other";
+            category: string;
+            /** @enum {string} */
+            status: "pending" | "processing" | "closed";
+            /** @enum {string} */
+            lane: "open" | "due" | "late" | "closed";
+            elapsedDays: number;
+            /** Format: date */
+            openedOn: string;
+            note: string;
+            steps: components["schemas"]["HotlineStep"][];
+        };
+        HotlineFinding: {
+            /** @enum {string} */
+            id: "top-category" | "month-change" | "deadline-watch" | "dispatch-watch";
+            title: string;
+            summary: string;
+            metricId: string;
+            value: number;
+            unit: string;
+        };
+        HotlineAnalysis: {
+            area: components["schemas"]["HotlineArea"];
+            month: string;
+            /** @enum {string} */
+            quality: "SIMULATED";
+            /** Format: date */
+            snapshotOn: string;
+            totals: components["schemas"]["HotlineTotals"];
+            findings: components["schemas"]["HotlineFinding"][];
+        };
+        HotlineMetric: {
+            id: string;
+            label: string;
+            description: string;
+            unit: string;
+            dimensions: string[];
+        };
+        HotlineSemantics: {
+            /** @enum {string} */
+            dataset: "hotline";
+            metrics: components["schemas"]["HotlineMetric"][];
+            fields: components["schemas"]["HotlineField"][];
+        };
+        HotlineFieldReference: {
+            /** @enum {string} */
+            table: "hotline_area" | "hotline_category" | "hotline_snapshot";
+            column: string;
+        };
+        HotlineField: {
+            /** @enum {string} */
+            table: "hotline_ticket" | "hotline_area" | "hotline_category" | "hotline_snapshot";
+            column: string;
+            sqlType: string;
+            description: string;
+            nullable: boolean;
+            /** @enum {string} */
+            key: "primary" | "foreign" | "none";
+            reference: components["schemas"]["HotlineFieldReference"] | null;
+            allowedValues: string[];
+        };
         Geometry: {
             x: number;
             y: number;
@@ -828,6 +1090,10 @@ export interface components {
         IfMatch: string;
         /** @description 安全重试的操作标识 */
         IdempotencyKey: string;
+        /** @description 区、镇街或村社的区域 ID */
+        HotlineAreaId: string;
+        /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+        HotlineMonth: string;
     };
     requestBodies: never;
     headers: {
@@ -1654,6 +1920,177 @@ export interface operations {
             400: components["responses"]["Http400"];
             404: components["responses"]["Http404"];
             409: components["responses"]["Http409"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getHotlineOverview: {
+        parameters: {
+            query?: {
+                /** @description 区、镇街或村社的区域 ID */
+                areaId?: components["parameters"]["HotlineAreaId"];
+                /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+                month?: components["parameters"]["HotlineMonth"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["HotlineOverview"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getHotlineTickets: {
+        parameters: {
+            query?: {
+                /** @description 区、镇街或村社的区域 ID */
+                areaId?: components["parameters"]["HotlineAreaId"];
+                /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+                month?: components["parameters"]["HotlineMonth"];
+                /** @description 办理时限分类 */
+                lane?: "all" | "open" | "due" | "late" | "closed";
+                /** @description 诉求类别 */
+                category?: "all" | "property" | "utilities" | "sanitation" | "traffic" | "other";
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["HotlineTicketPage"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getHotlineTicket: {
+        parameters: {
+            query?: {
+                /** @description 区、镇街或村社的区域 ID */
+                areaId?: components["parameters"]["HotlineAreaId"];
+                /** @description 限定工单所属统计月份，省略时按编号查询。 */
+                month?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["HotlineTicketDetail"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getHotlineAnalysis: {
+        parameters: {
+            query?: {
+                /** @description 区、镇街或村社的区域 ID */
+                areaId?: components["parameters"]["HotlineAreaId"];
+                /** @description 目前的演示数据覆盖 2026 年 1–10 月 */
+                month?: components["parameters"]["HotlineMonth"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["HotlineAnalysis"];
+                    };
+                };
+            };
+            400: components["responses"]["Http400"];
+            404: components["responses"]["Http404"];
+            500: components["responses"]["Http500"];
+        };
+    };
+    getHotlineSemantics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 请求成功 */
+            200: {
+                headers: {
+                    "X-Request-Id": components["headers"]["RequestId"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @enum {string} */
+                        code: "0";
+                        message: string;
+                        data: components["schemas"]["HotlineSemantics"];
+                    };
+                };
+            };
             500: components["responses"]["Http500"];
         };
     };
