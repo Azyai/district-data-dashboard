@@ -3,16 +3,15 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ConfigProvider, Spin, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import { lazy, Suspense, type ReactNode } from 'react'
-import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useMatch, useNavigate } from 'react-router'
-import type { CockpitArea } from '../api/client'
+import { BrowserRouter, Link, Navigate, Route, Routes, useLocation, useMatch } from 'react-router'
 import { Session } from '../features/session/Session'
 import { screenPath } from '../features/screens/screenCatalog'
-import { asksForInsight, matchTopics, topicFor, topicPath, topics } from '../features/topics/topicCatalog'
+import { topicFor } from '../features/topics/topicCatalog'
+import VoiceOrb from '../features/assistant/VoiceOrb'
 
 const Cockpit = lazy(() => import('../features/cockpit/Cockpit'))
 const DisplayShell = lazy(() => import('../features/screens/DisplayShell'))
 const TwinScene = lazy(() => import('../features/cockpit/TwinScene'))
-const TopicPage = lazy(() => import('../features/topics/TopicPage'))
 const Playback = lazy(() => import('../features/playback/Playback'))
 const AreaWorkbench = lazy(() => import('../features/workbench/AreaWorkbench'))
 const Administration = lazy(() => import('../features/admin/Administration'))
@@ -68,41 +67,15 @@ function Loading() {
 
 function DataWorkspace({ identityControl }: { identityControl: ReactNode }) {
   const location = useLocation()
-  const navigate = useNavigate()
   const params = new URLSearchParams(location.search)
-  const selected = topicFor(params.get('topic'))
-  const area = params.get('area')
-  const activeArea = useMatch('/data/areas/:areaId')?.params.areaId ?? area ?? undefined
-
-  async function topicQuestion(question: string, area: CockpitArea, signal: AbortSignal) {
-    signal.throwIfAborted()
-    const matched = matchTopics(question)
-    if (!matched.length) return undefined
-    const reply = (text: string) => ({ answer: { text, evidence: '' }, scope: area })
-    if (matched.length > 1) return reply('请先指定一个专题，可选择人口、接诉即办或水务。')
-    if (matched[0].id !== 'water') {
-      void navigate(topicPath(matched[0].id, area.id))
-      return null
-    }
-    if (area.level !== 'district') {
-      return reply(area.name + '暂无可用的' + matched[0].title + '快照。可说「打开全区' + matched[0].title + '」。')
-    }
-    if (area.id !== 'mentougou') return undefined
-    void navigate(topicPath(matched[0].id),
-      { state: { topicQuestion: asksForInsight(question) ? question : undefined } })
-    return null
+  const legacyArea = useMatch('/data/areas/:areaId')?.params.areaId
+  const areaId = legacyArea ?? (params.get('area') || 'mentougou')
+  const topic = topicFor(params.get('topic'))
+  if (topic) return <Navigate replace to={screenPath(topic.screen, areaId, params.get('month'))} />
+  if (legacyArea || params.has('area') || location.hash === '#area-issues') {
+    return <Navigate replace to={screenPath('diagnosis', areaId)} />
   }
-
-  if (selected) return <Navigate to={topicPath(selected.id, activeArea)} replace state={location.state} />
-  if (area && location.pathname.toLowerCase().replace(/\/$/, '') === '/workbench') {
-    return <Navigate to={'/data/areas/' + encodeURIComponent(area) + location.hash} replace />
-  }
-  const topicControl = <nav className="workbench-topic-links" aria-label="数据专题">
-    {topics.map(topic => <Link key={topic.id} to={topicPath(topic.id, activeArea)} className="workbench-action">{topic.title}</Link>)}
-    <Link to={screenPath('economy', activeArea)} className="workbench-action">经济发展</Link>
-  </nav>
-
-  return <AreaWorkbench identityControl={identityControl} topicControl={topicControl} onTopicQuestion={topicQuestion} />
+  return <AreaWorkbench identityControl={identityControl} />
 }
 
 function DisplayCockpit() {
@@ -110,9 +83,8 @@ function DisplayCockpit() {
   const area = useMatch('/areas/:areaId')?.params.areaId
   const params = new URLSearchParams(search)
   const linkedTopic = topicFor(params.get('topic'))
-  const linkedPanel = hash === '#voice-assistant' || hash === '#area-issues'
-  if (linkedTopic) return <Navigate to={topicPath(linkedTopic.id, area ?? params.get('area') ?? undefined)} replace />
-  if (linkedPanel) return <Navigate to={(area ? '/data/areas/' + encodeURIComponent(area) : '/workbench') + hash} replace />
+  if (linkedTopic) return <Navigate to={screenPath(linkedTopic.screen, area ?? params.get('area') ?? undefined, params.get('month'))} replace />
+  if (hash === '#area-issues') return <Navigate to={screenPath('diagnosis', area ?? params.get('area') ?? undefined)} replace />
   return <Cockpit />
 }
 
@@ -125,12 +97,17 @@ function OverviewAlias() {
 function TopicEntry() {
   const topic = topicFor(useMatch('/topics/:topicId')?.params.topicId ?? null)
   const location = useLocation()
-  if (topic && topic.id !== 'water') {
+  if (topic) {
     const params = new URLSearchParams(location.search)
-    const target = topicPath(topic.id, params.get('area') ?? undefined, params.get('month'))
+    const target = screenPath(topic.screen, params.get('area') ?? undefined, params.get('month'))
     return <Navigate to={target} replace state={location.state} />
   }
-  return <TopicPage />
+  return <main className="center-state"><h1>专题不存在</h1><Link to="/">返回首页</Link></main>
+}
+
+function DisplayVoice() {
+  const { pathname } = useLocation()
+  return /^\/admin(?:\/|$)/i.test(pathname) ? null : <VoiceOrb />
 }
 
 export function App() {
@@ -139,6 +116,7 @@ export function App() {
       <ConfigProvider locale={zhCN} theme={districtTheme}>
         <QueryClientProvider client={client}>
           <BrowserRouter>
+            <DisplayVoice />
             <Session>
               {(session) => (
                 <Suspense fallback={<Loading />}>
@@ -152,6 +130,10 @@ export function App() {
                     <Route path="/screens/overview" element={<OverviewAlias />} />
                     <Route path="/screens/population" element={<DisplayShell screen="population" />} />
                     <Route path="/screens/governance" element={<DisplayShell screen="governance" />} />
+                    <Route path="/screens/roads" element={<OverviewAlias />} />
+                    <Route path="/screens/grid" element={<Cockpit page="grid" />} />
+                    <Route path="/screens/waters" element={<Cockpit page="waters" />} />
+                    <Route path="/screens/diagnosis" element={<DisplayShell screen="diagnosis" />} />
                     <Route path="/screens/economy" element={<DisplayShell screen="economy" />} />
                     <Route path="/topics/:topicId" element={<TopicEntry />} />
                     <Route path="/play/:projectId" element={
