@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react'
-import { Link, NavLink, useLocation, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import LocalDistrictModel from './LocalDistrictModel'
 import { isTwinId, twinPath, twinSites } from './twinSites'
+import { CenterMasthead } from '../screens/DisplayHeader'
 import './cockpit.css'
 import './twin-scene.css'
 
@@ -13,15 +13,10 @@ const landmarks = [
 export default function TwinScene() {
   const { twinId } = useParams()
   const location = useLocation()
-  const heading = useRef<HTMLHeadingElement>(null)
+  const navigate = useNavigate()
   const backArea: unknown = location.state?.backArea
   const backPath = typeof backArea === 'string' && backArea !== 'mentougou'
     && /^[a-z0-9-]{1,100}$/.test(backArea) ? '/areas/' + backArea : '/'
-
-  useEffect(() => {
-    window.scrollTo(0, 0)
-    heading.current?.focus({ preventScroll: true })
-  }, [twinId])
 
   if (!isTwinId(twinId)) {
     return <main className="center-state"><h1>孪生场景不存在</h1><Link to={backPath} className="action-link">返回驾驶舱</Link></main>
@@ -30,23 +25,17 @@ export default function TwinScene() {
   const site = twinSites[twinId]
   return (
     <div className="cockpit twin-page" data-landmark={twinId}>
-      <header className="twin-header">
-        <Link to={backPath} className="twin-back">
-          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-            <path d="M16 10H4m5-5-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          返回驾驶舱
-        </Link>
-        <nav className="twin-switcher" aria-label="地标切换">
-          {landmarks.map(({ id, label }) => (
-            <NavLink key={id} to={twinPath(id)} state={location.state} className="twin-switch">{label}</NavLink>
-          ))}
-        </nav>
-      </header>
+      <CenterMasthead subject={site.name} controls={<>
+        <Link to={backPath}>返回地图</Link>
+        <select aria-label="选择地标" value={twinId} onChange={event => {
+          if (isTwinId(event.target.value)) void navigate(twinPath(event.target.value), { state: location.state })
+        }}>
+          {landmarks.map(({ id, label }) => <option key={id} value={id}>{label}</option>)}
+        </select>
+      </>} />
       <main className="twin-body">
         <div className="twin-title">
           <div>
-            <h1 ref={heading} tabIndex={-1}>{site.name}</h1>
             <p><span>{site.kind}</span><span>{site.location}</span></p>
           </div>
           <a className="twin-source" href={site.source} target="_blank" rel="noopener noreferrer">

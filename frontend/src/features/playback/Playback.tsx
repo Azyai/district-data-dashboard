@@ -6,6 +6,7 @@ import { ApiError, dashboardApi } from '../../api/client'
 import type { Me } from '../../api/client'
 import { Problem } from '../../shared/Problem'
 import { ScreenCanvas } from './ScreenCanvas'
+import { CenterMasthead } from '../screens/DisplayHeader'
 import './playback.css'
 
 const displayDate = new Intl.DateTimeFormat('zh-CN', {
@@ -50,14 +51,12 @@ export default function Playback({ identity, identityControl }: { identity: Me; 
 
   const snapshot = dataQuery.data
   return (
-    <main className="playback-shell" data-theme={manifest.theme} aria-labelledby="screen-title">
-      <header className="playback-bar">
-        <Link to="/" className="playback-back"><i aria-hidden="true" />返回驾驶舱</Link>
-        {identityControl}
-      </header>
+    <main className="playback-shell" data-theme={manifest.theme} aria-label={manifest.title}>
+      <CenterMasthead subject={manifest.title} controls={<>
+        <Link to="/">返回首页</Link>{identityControl}
+      </>} />
       <section className="playback-heading">
         <div>
-          <h1 id="screen-title">{manifest.title}</h1>
           <p className="muted">{manifest.description}</p>
         </div>
         <p className="playback-status">
